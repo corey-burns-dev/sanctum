@@ -73,6 +73,21 @@ make lint       # Run Go linter
 - `REDIS_URL` - Redis connection URL (default: `redis://redis:6379`)
 - `DATABASE_URL` - PostgreSQL connection URL
 
+`REDIS_URL` accepts either a plain `host:port` value or a URL form. Examples:
+
+```bash
+# URL form (supports password and DB index)
+export REDIS_URL="redis://:mypassword@redis:6379/1"
+
+# TLS (secure) URL form
+export REDIS_URL="rediss://:mypassword@redis:6379/1"
+
+# Plain host:port form (no scheme)
+export REDIS_URL="redis:6379"
+```
+
+The server will parse a `redis://`/`rediss://` URL and extract host, port, password, and optional DB index. If a plain `host:port` is provided it will be used directly.
+
 ## Development
 
 ### Project Structure
@@ -131,3 +146,8 @@ For production deployment:
 ## License
 
 MIT
+
+## CI / Integration Tests
+
+- The repository's integration workflow uses Docker Compose. On GitHub Actions runners the workflow will install the Docker Compose CLI plugin and provide a `docker-compose` compatibility symlink so tests run regardless of the runner's preinstalled compose tooling.
+- If you run the integration script locally, ensure you have a Compose-capable Docker CLI (`docker compose`) or the legacy `docker-compose` binary available.
