@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"vibeshift/internal/handlers"
+	"vibeshift/pkg/db"
 	redispkg "vibeshift/pkg/redis"
 )
 
@@ -23,6 +24,13 @@ func main() {
 	raw := os.Getenv("REDIS_URL")
 	rawClient := redispkg.NewClient(raw)
 	redisClient := redispkg.NewAdapter(rawClient)
+	// Initialize Postgres DB (if DATABASE_URL or env vars are set).
+	database, err := db.NewDB()
+	if err != nil {
+		// Fail fast: if DB is required, it's better to know at startup.
+		// If you prefer the app to continue without DB, change this to log and continue.
+		log.Fatalf("failed to connect to database: %v", err)
+	}
 
 	h := &handlers.Handlers{Redis: redisClient}
 
@@ -51,4 +59,7 @@ func main() {
 	defer cancel()
 	_ = srv.Shutdown(ctx)
 	_ = redisClient.Close()
+	if database != nil {
+		_ = database.Close()
+	}
 }
