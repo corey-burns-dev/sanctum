@@ -57,14 +57,14 @@ A professional full-stack application with Go backend, React frontend, Redis, an
 ### Development
 
 - `make dev` — Start full stack (backend + frontend + databases)
-- `make dev:backend` — Backend only (Go + Redis + Postgres)
-- `make dev:frontend` — Frontend only (Vite dev server, local)
+- `make dev-backend` — Backend only (Go + Redis + Postgres)
+- `make dev-frontend` — Frontend only (Vite dev server, local)
 
 ### Building
 
 - `make build` — Build all Docker images (production)
-- `make build:backend` — Build backend image only
-- `make build:frontend` — Build frontend image only
+- `make build-backend` — Build backend image only
+- `make build-frontend` — Build frontend image only
 
 ### Container Management
 
@@ -75,9 +75,9 @@ A professional full-stack application with Go backend, React frontend, Redis, an
 ### Monitoring
 
 - `make logs` — Stream backend logs
-- `make logs:backend` — Backend logs only
-- `make logs:frontend` — Frontend logs only
-- `make logs:all` — All service logs
+- `make logs-backend` — Backend logs only
+- `make logs-frontend` — Frontend logs only
+- `make logs-all` — All service logs
 
 ### Code Quality
 
@@ -146,37 +146,40 @@ vibeshift/
 
 ```bash
 make dev
-# Backend: http://localhost:8080
-# Frontend: http://localhost:5173
-# Postgres: localhost:5432
-# Redis: localhost:6379
 ```
+
+- Backend: `http://localhost:8080`
+- Frontend: `http://localhost:5173`
+- Postgres: `localhost:5432`
+- Redis: `localhost:6379`
 
 ### Backend-Only Development
 
 ```bash
-make dev:backend
-# Backend: http://localhost:8080
-# Postgres: localhost:5432
-# Redis: localhost:6379
+make dev-backend
 ```
+
+- Backend: `http://localhost:8080`
+- Postgres: `localhost:5432`
+- Redis: `localhost:6379`
 
 ### Frontend-Only Development (with backend proxy)
 
 ```bash
-make dev:frontend
-# Frontend: http://localhost:5173
-# API proxied to http://localhost:8080/health and /ping
+make dev-frontend
 ```
+
+- Frontend: `http://localhost:5173`
+- API proxied to `http://localhost:8080/health` and `/ping`
 
 ### Check Logs
 
 ```bash
 # Backend logs
-make logs:backend
+make logs-backend
 
 # All logs
-make logs:all
+make logs-all
 
 # Follow specific service
 docker-compose logs -f frontend
