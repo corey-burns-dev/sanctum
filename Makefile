@@ -1,4 +1,4 @@
-.PHONY: help dev dev-backend dev-frontend dev-both prod build build-backend build-frontend up down logs logs-backend logs-frontend logs-all clean lint fmt install env restart check-versions
+.PHONY: help dev dev-backend dev-frontend dev-both prod build build-backend build-frontend up down logs logs-backend logs-frontend logs-all clean lint lint-frontend fmt fmt-frontend install env restart check-versions
 
 # Variables
 DOCKER_COMPOSE := docker-compose
@@ -39,7 +39,9 @@ help:
 	@echo ""
 	@echo "$(GREEN)Code Quality:$(NC)"
 	@echo "  make fmt                - 🎨 Format Go code"
+	@echo "  make fmt-frontend       - 🎨 Format frontend code (Biome)"
 	@echo "  make lint               - 🔍 Lint Go code"
+	@echo "  make lint-frontend      - 🔍 Lint frontend code (Biome)"
 	@echo "  make install            - 📦 Install frontend dependencies"
 	@echo ""
 	@echo "$(GREEN)Utilities:$(NC)"
@@ -115,6 +117,16 @@ lint:
 	@echo "$(BLUE)Linting Go code...$(NC)"
 	$(GO) vet ./...
 	@echo "$(GREEN)✓ Linting passed$(NC)"
+
+fmt-frontend:
+	@echo "$(BLUE)Formatting frontend code with Biome...$(NC)"
+	cd frontend && $(PNPM) run format:write
+	@echo "$(GREEN)✓ Frontend code formatted$(NC)"
+
+lint-frontend:
+	@echo "$(BLUE)Linting frontend code with Biome...$(NC)"
+	cd frontend && $(PNPM) run lint:fix
+	@echo "$(GREEN)✓ Frontend linting passed$(NC)"
 
 # Frontend dependencies
 install:

@@ -37,11 +37,7 @@ export function StatusCard() {
         </div>
       )}
 
-      <Button
-        onClick={() => refetch()}
-        disabled={isLoading}
-        className="w-full"
-      >
+      <Button onClick={() => refetch()} disabled={isLoading} className="w-full">
         {isLoading ? 'Checking...' : 'Refresh Status'}
       </Button>
     </div>

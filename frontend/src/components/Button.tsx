@@ -1,5 +1,5 @@
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
-import { ReactNode } from 'react'
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode
@@ -7,13 +7,9 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   size?: 'sm' | 'md' | 'lg'
 }
 
-export function Button({
-  className,
-  variant = 'default',
-  size = 'md',
-  ...props
-}: ButtonProps) {
-  const baseStyles = 'font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed'
+export function Button({ className, variant = 'default', size = 'md', ...props }: ButtonProps) {
+  const baseStyles =
+    'font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed'
 
   const variants = {
     default: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
@@ -27,10 +23,5 @@ export function Button({
     lg: 'px-6 py-3 text-lg',
   }
 
-  return (
-    <button
-      className={cn(baseStyles, variants[variant], sizes[size], className)}
-      {...props}
-    />
-  )
+  return <button className={cn(baseStyles, variants[variant], sizes[size], className)} {...props} />
 }
