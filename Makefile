@@ -1,27 +1,35 @@
-.PHONY: help dev prod build up down logs clean lint fmt
+.PHONY: help dev dev:backend dev:frontend prod build up down logs clean lint fmt
 
 help:
 	@echo "Vibeshift - Development & Production Commands"
 	@echo ""
 	@echo "Development:"
-	@echo "  make dev          - Start development environment with hot reloading"
-	@echo "  make logs         - View live logs from containers"
-	@echo "  make down         - Stop all containers"
+	@echo "  make dev               - Start full dev environment (backend + frontend)"
+	@echo "  make dev:backend       - Start backend dev (Go + Redis + Postgres)"
+	@echo "  make dev:frontend      - Start frontend dev (Vite dev server)"
+	@echo "  make logs              - View live logs from containers"
+	@echo "  make down              - Stop all containers"
 	@echo ""
 	@echo "Production:"
-	@echo "  make prod         - Start production environment"
-	@echo "  make build        - Build production image"
+	@echo "  make prod              - Start production environment"
+	@echo "  make build             - Build production image"
 	@echo ""
 	@echo "Code Quality:"
-	@echo "  make fmt          - Format Go code"
-	@echo "  make lint         - Run Go linter"
+	@echo "  make fmt               - Format Go code"
+	@echo "  make lint              - Run Go linter"
 	@echo ""
 	@echo "Utilities:"
-	@echo "  make clean        - Remove containers, volumes, and build artifacts"
-	@echo "  make env          - Copy .env.example to .env"
+	@echo "  make clean             - Remove containers, volumes, and build artifacts"
+	@echo "  make env               - Copy .env.example to .env"
 
 dev:
 	docker-compose up --build
+
+dev:backend:
+	docker-compose up --build app redis postgres
+
+dev:frontend:
+	cd frontend && pnpm install && pnpm dev
 
 prod:
 	docker-compose -f compose.yml up -d --build
