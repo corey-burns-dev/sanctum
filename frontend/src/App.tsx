@@ -1,10 +1,10 @@
+import { useQueryClient } from '@tanstack/react-query'
+import { lazy, Suspense, useEffect } from 'react'
+import { Route, BrowserRouter as Router, Routes, useLocation } from 'react-router-dom'
 import { Navbar } from '@/components/Navbar'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { Button } from '@/components/ui/button'
 import { routePrefetchMap } from '@/utils/prefetch'
-import { useQueryClient } from '@tanstack/react-query'
-import { lazy, Suspense, useEffect } from 'react'
-import { Route, BrowserRouter as Router, Routes, useLocation } from 'react-router-dom'
 
 // Lazy load pages for code splitting
 const Login = lazy(() => import('@/pages/Login'))
