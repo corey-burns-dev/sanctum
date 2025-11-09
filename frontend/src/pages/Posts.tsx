@@ -61,7 +61,9 @@ const PostComments = memo(function PostComments({ postId }: { postId: number }) 
                 <div className="flex items-center gap-2 mb-1">
                   <span className="font-semibold text-sm">{comment.user?.username}</span>
                   <span className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                    {formatDistanceToNow(new Date(comment.created_at), {
+                      addSuffix: true,
+                    })}
                   </span>
                 </div>
                 <p className="text-sm">{comment.content}</p>
@@ -269,7 +271,9 @@ export default function Posts() {
                     <div>
                       <p className="font-semibold">{post.user?.username}</p>
                       <p className="text-sm text-muted-foreground">
-                        {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                        {formatDistanceToNow(new Date(post.created_at), {
+                          addSuffix: true,
+                        })}
                       </p>
                     </div>
                   </div>
