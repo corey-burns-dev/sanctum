@@ -2,10 +2,12 @@
 FROM node:24.11.0-alpine3.21 AS build
 WORKDIR /app
 
+# Install required packages for Bun installation
+RUN apk add --no-cache curl bash
+
 # Install Bun
 RUN curl -fsSL https://bun.sh/install | bash && \
-  mv ~/.bun/bin/bun /usr/local/bin/ && \
-  mv ~/.bun/bin/bunx /usr/local/bin/
+  mv ~/.bun/bin/bun /usr/local/bin/
 
 COPY package.json bun.lockb* ./
 RUN bun install

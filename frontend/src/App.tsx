@@ -1,16 +1,18 @@
-import { Button } from './components/Button'
-import { Navbar } from './components/Navbar'
+import { Navbar } from '@/components/Navbar'
+import { Button } from '@/components/ui/button'
+import Chat from '@/pages/Chat'
+import Posts from '@/pages/Posts'
+import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
 
-
-export default function App() {
+function HomePage() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <Navbar />
       {/* Hero Section */}
       <section className="max-w-6xl mx-auto px-4 py-20">
         <div className="text-center mb-16">
-          <h1 className="text-5xl font-bold text-gray-900 mb-4">Welcome to Vibeshift</h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+          <h1 className="text-5xl font-bold text-foreground mb-4">Welcome to Vibeshift</h1>
+          <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
             A modern full-stack application with a Go backend and React frontend, powered by
             TanStack Query and Tailwind CSS.
           </p>
@@ -24,40 +26,39 @@ export default function App() {
       </section>
 
       {/* Status Section */}
-      <section id="status" className="bg-white py-16 border-t border-gray-200">
+      <section id="status" className="bg-card py-16 border-t">
         <div className="max-w-6xl mx-auto px-4">
-          <h2 className="text-3xl font-bold text-gray-900 mb-8">System Status</h2>
+          <h2 className="text-3xl font-bold text-card-foreground mb-8">System Status</h2>
           <div className="grid md:grid-cols-3 gap-6">
-            <h3>STATUS CARD</h3>
-            <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+            <div className="bg-card rounded-lg border p-6 shadow-sm">
               <h3 className="text-lg font-semibold mb-4">Features</h3>
-              <ul className="space-y-3 text-gray-600">
+              <ul className="space-y-3 text-muted-foreground">
                 <li className="flex gap-2">
-                  <span className="text-blue-600">✓</span>
+                  <span className="text-primary">✓</span>
                   <span>Real-time health checks</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="text-blue-600">✓</span>
+                  <span className="text-primary">✓</span>
                   <span>Redis integration</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="text-blue-600">✓</span>
+                  <span className="text-primary">✓</span>
                   <span>PostgreSQL support</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="text-blue-600">✓</span>
+                  <span className="text-primary">✓</span>
                   <span>Modern UI with Tailwind</span>
                 </li>
               </ul>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+            <div className="bg-card rounded-lg border p-6 shadow-sm">
               <h3 className="text-lg font-semibold mb-4">Stack</h3>
-              <div className="space-y-2 text-gray-600 text-sm">
+              <div className="space-y-2 text-muted-foreground text-sm">
                 <p>
                   <strong>Frontend:</strong> React 19, TypeScript, Vite
                 </p>
                 <p>
-                  <strong>Styling:</strong> Tailwind CSS, shadcn
+                  <strong>Styling:</strong> Tailwind CSS, shadcn/ui
                 </p>
                 <p>
                   <strong>Data:</strong> TanStack Query
@@ -67,16 +68,45 @@ export default function App() {
                 </p>
               </div>
             </div>
+            <div className="bg-card rounded-lg border p-6 shadow-sm">
+              <h3 className="text-lg font-semibold mb-4">Navigation</h3>
+              <div className="space-y-2 text-muted-foreground text-sm">
+                <p>
+                  🧭 <strong>Posts:</strong> Browse and create posts
+                </p>
+                <p>
+                  💬 <strong>Chat:</strong> Real-time messaging
+                </p>
+                <p>
+                  🔐 <strong>Auth:</strong> Login/Signup system
+                </p>
+                <p>
+                  🌙 <strong>Theme:</strong> Dark mode enabled
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-8 border-t border-gray-800">
+      <footer className="bg-muted/50 text-muted-foreground py-8 border-t">
         <div className="max-w-6xl mx-auto px-4 text-center">
-          <p className="text-gray-400">© 2025 Vibeshift. All rights reserved.</p>
+          <p>© 2025 Vibeshift. All rights reserved.</p>
         </div>
       </footer>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/posts" element={<Posts />} />
+        <Route path="/chat" element={<Chat />} />
+      </Routes>
+    </Router>
   )
 }
