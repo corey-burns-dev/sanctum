@@ -3,7 +3,7 @@
 # Variables
 DOCKER_COMPOSE := docker-compose
 GO := go
-PNPM := pnpm
+PNPM := bun
 GO_PORT ?= 8080
 FRONTEND_PORT ?= 5173
 
@@ -151,6 +151,8 @@ check-versions:
 clean:
 	@echo "$(BLUE)Cleaning up containers, volumes, and artifacts...$(NC)"
 	$(DOCKER_COMPOSE) down -v
-	rm -rf tmp/ frontend/node_modules frontend/dist
+	-sudo chmod -R 755 tmp/ 2>/dev/null || true
+	-sudo rm -rf tmp/ 2>/dev/null || true
+	rm -rf frontend/node_modules frontend/dist
 	$(GO) clean
 	@echo "$(GREEN)✓ Cleanup complete$(NC)"

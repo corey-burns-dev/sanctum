@@ -15,7 +15,11 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@/components": ["./src/components"],
+      "@/lib": ["./src/lib"],
+      "@/hooks": ["./src/hooks"],
+      "@/components/ui": ["./src/components/ui"]
     }
   },
   "include": ["src"]

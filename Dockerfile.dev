@@ -6,13 +6,13 @@ WORKDIR /app
 RUN go install github.com/air-verse/air@latest
 
 # Copy go mod files
-COPY go.mod ./
+COPY backend/go.mod ./
 
 # Download dependencies
 RUN go mod download
 
 # Copy source code
-COPY . .
+COPY backend/ .
 
 ENV PORT=8080
 EXPOSE 8080

@@ -1,6 +1,6 @@
 import { Button } from './components/Button'
 import { Navbar } from './components/Navbar'
-import { StatusCard } from './components/StatusCard'
+
 
 export default function App() {
   return (
@@ -28,7 +28,7 @@ export default function App() {
         <div className="max-w-6xl mx-auto px-4">
           <h2 className="text-3xl font-bold text-gray-900 mb-8">System Status</h2>
           <div className="grid md:grid-cols-3 gap-6">
-            <StatusCard />
+            <h3>STATUS CARD</h3>
             <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
               <h3 className="text-lg font-semibold mb-4">Features</h3>
               <ul className="space-y-3 text-gray-600">

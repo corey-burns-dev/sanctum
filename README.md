@@ -15,7 +15,7 @@ A professional full-stack application with Go backend, React frontend, Redis, an
 
 - Docker and Docker Compose
 - Git
-- Node.js (v24+) and pnpm (for local frontend development)
+- Node.js (v24+) and Bun (for local frontend development)
 - Go (v1.23+, optional for local backend development)
 
 ## Quick Start
