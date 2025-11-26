@@ -164,8 +164,11 @@ export function useLikePost() {
   return useMutation({
     mutationFn: (postId: number) => apiClient.likePost(postId),
     onSuccess: (updatedPost) => {
-      // Update cache with server response
-      updatePostInCache(queryClient, updatedPost.id, () => updatedPost)
+      // Update cache with server response, merging with existing data
+      updatePostInCache(queryClient, updatedPost.id, (oldPost) => ({
+        ...oldPost,
+        ...updatedPost,
+      }))
     },
     onError: (error) => {
       handleAuthOrFKError(error)
