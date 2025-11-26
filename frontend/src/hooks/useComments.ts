@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../api/client'
 import type { Comment, CreateCommentRequest, UpdateCommentRequest } from '../api/types'
+import { handleAuthOrFKError } from '../lib/handleAuthOrFKError'
 
 // Query keys
 export const commentKeys = {
@@ -27,8 +28,10 @@ export function useCreateComment(postId: number) {
   return useMutation({
     mutationFn: (data: CreateCommentRequest) => apiClient.createComment(postId, data),
     onSuccess: () => {
-      // Invalidate and refetch comments for this post
       queryClient.invalidateQueries({ queryKey: commentKeys.list(postId) })
+    },
+    onError: (error) => {
+      handleAuthOrFKError(error)
     },
   })
 }
@@ -58,8 +61,8 @@ export function useUpdateComment(postId: number, commentId: number) {
 
       return { previousComments }
     },
-    onError: (_err, _newData, context) => {
-      // Rollback on error
+    onError: (error, _newData, context) => {
+      handleAuthOrFKError(error)
       if (context?.previousComments) {
         queryClient.setQueryData(commentKeys.list(postId), context.previousComments)
       }
@@ -94,8 +97,8 @@ export function useDeleteComment(postId: number) {
 
       return { previousComments }
     },
-    onError: (_err, _commentId, context) => {
-      // Rollback on error
+    onError: (error, _commentId, context) => {
+      handleAuthOrFKError(error)
       if (context?.previousComments) {
         queryClient.setQueryData(commentKeys.list(postId), context.previousComments)
       }

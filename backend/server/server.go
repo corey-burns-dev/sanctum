@@ -10,6 +10,7 @@ import (
 	"vibeshift/cache"
 	"vibeshift/config"
 	"vibeshift/database"
+	_ "vibeshift/docs" // swagger docs
 	"vibeshift/middleware"
 	"vibeshift/models"
 	"vibeshift/notifications"
@@ -18,6 +19,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/swagger"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -35,6 +37,7 @@ type Server struct {
 	friendRepo  repository.FriendRepository
 	notifier    *notifications.Notifier
 	hub         *notifications.Hub
+	chatHub     *notifications.ChatHub
 	// Add other repositories as needed
 }
 
@@ -69,6 +72,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	if redisClient != nil {
 		server.notifier = notifications.NewNotifier(redisClient)
 		server.hub = notifications.NewHub()
+		server.chatHub = notifications.NewChatHub()
 	}
 
 	return server, nil
@@ -98,10 +102,20 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	// Health check
 	api.Get("/", s.HealthCheck)
 
+	// Swagger documentation
+	api.Get("/swagger/*", swagger.HandlerDefault)
+
 	// Auth routes
 	auth := api.Group("/auth")
 	auth.Post("/signup", s.Signup)
 	auth.Post("/login", middleware.RateLimit(s.redis, 5, time.Minute), s.Login)
+
+	// Public post routes (browse/search)
+	publicPosts := api.Group("/posts")
+	publicPosts.Get("/", s.GetPosts)
+	publicPosts.Get("/search", s.SearchPosts)
+	publicPosts.Get(":id", s.GetPost)
+	publicPosts.Get(":id/comments", s.GetComments)
 
 	// Protected routes
 	protected := api.Group("", s.AuthRequired())
@@ -126,13 +140,6 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	friends.Get("/status/:userId", s.GetFriendshipStatus)
 	friends.Delete("/:userId", s.RemoveFriend)
 
-	// Public post routes (browse/search)
-	publicPosts := api.Group("/posts")
-	publicPosts.Get("/", s.GetPosts)
-	publicPosts.Get("/search", s.SearchPosts)
-	publicPosts.Get(":id", s.GetPost)
-	publicPosts.Get(":id/comments", s.GetComments)
-
 	// Protected post routes
 	posts := protected.Group("/posts")
 	posts.Post("/", s.CreatePost)
@@ -153,8 +160,9 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	conversations.Get("/:id/messages", s.GetMessages)
 	conversations.Post("/:id/participants", s.AddParticipant)
 
-	// Websocket endpoint (example): client should connect and send auth message first
-	api.Get("/ws", s.WebsocketHandler())
+	// Websocket endpoints
+	api.Get("/ws", s.WebsocketHandler())          // General notifications
+	api.Get("/ws/chat", s.WebSocketChatHandler()) // Real-time chat
 }
 
 // HealthCheck handles health check requests
@@ -245,6 +253,45 @@ func (s *Server) AuthRequired() fiber.Handler {
 	}
 }
 
+// optionalUserID attempts to extract userID from Authorization header but does not enforce it.
+func (s *Server) optionalUserID(c *fiber.Ctx) (uint, bool) {
+	authHeader := c.Get("Authorization")
+	if authHeader == "" {
+		return 0, false
+	}
+
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return 0, false
+	}
+
+	tokenString := parts[1]
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fiber.NewError(fiber.StatusUnauthorized, "Invalid signing method")
+		}
+		return []byte(s.config.JWTSecret), nil
+	})
+	if err != nil || !token.Valid {
+		return 0, false
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return 0, false
+	}
+
+	sub, ok := claims["sub"].(string)
+	if !ok {
+		return 0, false
+	}
+	userID, err := strconv.ParseUint(sub, 10, 32)
+	if err != nil {
+		return 0, false
+	}
+	return uint(userID), true
+}
+
 // Start starts the server
 func (s *Server) Start() error {
 	app := fiber.New(fiber.Config{
@@ -265,6 +312,13 @@ func (s *Server) Start() error {
 		go func() {
 			// best-effort wiring; ignores error
 			_ = s.hub.StartWiring(context.Background(), s.notifier)
+		}()
+	}
+
+	// Wire chat hub to Redis subscriber if available
+	if s.chatHub != nil && s.notifier != nil {
+		go func() {
+			_ = s.chatHub.StartWiring(context.Background(), s.notifier)
 		}()
 	}
 

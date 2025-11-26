@@ -3,12 +3,13 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../api/client'
 import type {
-  CreatePostRequest,
-  PaginationParams,
-  Post,
-  SearchParams,
-  UpdatePostRequest,
+    CreatePostRequest,
+    PaginationParams,
+    Post,
+    SearchParams,
+    UpdatePostRequest,
 } from '../api/types'
+import { handleAuthOrFKError } from '../lib/handleAuthOrFKError'
 
 // Query keys
 export const postKeys = {
@@ -66,8 +67,10 @@ export function useCreatePost() {
   return useMutation({
     mutationFn: (data: CreatePostRequest) => apiClient.createPost(data),
     onSuccess: () => {
-      // Invalidate and refetch posts
       queryClient.invalidateQueries({ queryKey: postKeys.lists() })
+    },
+    onError: (error) => {
+      handleAuthOrFKError(error)
     },
   })
 }
@@ -95,8 +98,8 @@ export function useUpdatePost(postId: number) {
 
       return { previousPost }
     },
-    onError: (_err, _variables, context) => {
-      // Rollback on error
+    onError: (error, _variables, context) => {
+      handleAuthOrFKError(error)
       if (context?.previousPost) {
         queryClient.setQueryData(postKeys.detail(postId), context.previousPost)
       }
@@ -120,41 +123,109 @@ export function useDeletePost() {
       // Invalidate lists
       queryClient.invalidateQueries({ queryKey: postKeys.lists() })
     },
+    onError: (error) => {
+      handleAuthOrFKError(error)
+    },
   })
 }
 
-// Like post
+// Helper function to perform optimistic updates on both detail and list caches
+function updatePostInCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  postId: number,
+  updateFn: (oldPost: Post) => Post
+) {
+  // Find all infinite posts queries
+  const infiniteQueries = queryClient.getQueryCache().findAll({ queryKey: ['posts', 'infinite'] })
+
+  // Update each infinite query cache
+  for (const query of infiniteQueries) {
+    queryClient.setQueryData<{ pages: Post[][] } | undefined>(query.queryKey, (oldData) => {
+      if (!oldData) return oldData
+      return {
+        ...oldData,
+        pages: oldData.pages.map((page: Post[]) =>
+          page.map((post) => (post.id === postId ? updateFn(post) : post))
+        ),
+      }
+    })
+  }
+
+  // Also update the detail cache
+  queryClient.setQueryData<Post>(postKeys.detail(postId), (oldPost) =>
+    oldPost ? updateFn(oldPost) : undefined
+  )
+}
+
+// Like/Toggle post (backend handles toggle logic)
 export function useLikePost() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: (postId: number) => apiClient.likePost(postId),
-    onMutate: async (postId) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: postKeys.detail(postId) })
-
-      // Snapshot the previous value
-      const previousPost = queryClient.getQueryData<Post>(postKeys.detail(postId))
-
-      // Optimistically update likes
-      if (previousPost) {
-        queryClient.setQueryData<Post>(postKeys.detail(postId), {
-          ...previousPost,
-          likes: previousPost.likes + 1,
-        })
-      }
-
-      return { previousPost }
+    onSuccess: (updatedPost) => {
+      console.log('Like toggle response - liked:', updatedPost.liked, 'count:', updatedPost.likes_count, 'id:', updatedPost.id)
+      // Update cache with server response, merging with existing data
+      updatePostInCache(queryClient, updatedPost.id, (oldPost) => {
+        console.log('Cache update - OLD liked:', oldPost.liked, 'count:', oldPost.likes_count, '→ NEW liked:', updatedPost.liked, 'count:', updatedPost.likes_count)
+        return {
+          ...oldPost,
+          ...updatedPost,
+        }
+      })
+      // Force refetch to ensure UI is in sync
+      queryClient.invalidateQueries({ queryKey: ['posts', 'infinite'] })
     },
-    onError: (_err, postId, context) => {
-      // Rollback on error
+    onError: (error) => {
+      handleAuthOrFKError(error)
+    },
+  })
+}
+
+// Unlike post
+export function useUnlikePost() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (postId: number) => apiClient.unlikePost(postId),
+    onMutate: async (postId: number) => {
+      await queryClient.cancelQueries({ queryKey: postKeys.all })
+
+      const previousPost = queryClient.getQueryData<Post>(postKeys.detail(postId))
+      const infiniteQueries = queryClient
+        .getQueryCache()
+        .findAll({ queryKey: ['posts', 'infinite'] })
+      const previousInfinitePostsData = infiniteQueries.map((q) => ({
+        queryKey: q.queryKey,
+        data: queryClient.getQueryData(q.queryKey),
+      }))
+
+      // Optimistically update
+      updatePostInCache(queryClient, postId, (oldPost) => ({
+        ...oldPost,
+        likes_count: Math.max((oldPost.likes_count ?? 0) - 1, 0),
+        liked: false,
+      }))
+
+      return { previousPost, previousInfinitePostsData }
+    },
+    onSuccess: (updatedPost) => {
+      // Use the returned post to update cache
+      updatePostInCache(queryClient, updatedPost.id, () => updatedPost)
+    },
+    onError: (error, postId, context) => {
+      handleAuthOrFKError(error)
       if (context?.previousPost) {
         queryClient.setQueryData(postKeys.detail(postId), context.previousPost)
       }
+      context?.previousInfinitePostsData?.forEach((query) => {
+        if (query.data) {
+          queryClient.setQueryData(query.queryKey, query.data)
+        }
+      })
     },
-    onSettled: (_data, _error, postId) => {
-      // Refetch after error or success
-      queryClient.invalidateQueries({ queryKey: postKeys.detail(postId) })
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: postKeys.all })
     },
   })
 }

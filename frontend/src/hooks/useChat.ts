@@ -9,6 +9,7 @@ import type {
   PaginationParams,
   SendMessageRequest,
 } from '@/api/types'
+import { handleAuthOrFKError } from '../lib/handleAuthOrFKError'
 
 // Query keys
 const chatKeys = {
@@ -45,6 +46,9 @@ export function useCreateConversation() {
       queryClient.invalidateQueries({ queryKey: chatKeys.conversations() })
       navigate(`/chat/${conversation.id}`)
     },
+    onError: (error) => {
+      handleAuthOrFKError(error)
+    },
   })
 }
 
@@ -54,8 +58,13 @@ export function useMarkAsRead() {
   return useMutation({
     mutationFn: (conversationId: number) => apiClient.markConversationAsRead(conversationId),
     onSuccess: (_, conversationId) => {
-      queryClient.invalidateQueries({ queryKey: chatKeys.conversation(conversationId) })
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.conversation(conversationId),
+      })
       queryClient.invalidateQueries({ queryKey: chatKeys.conversations() })
+    },
+    onError: (error) => {
+      handleAuthOrFKError(error)
     },
   })
 }
@@ -77,7 +86,9 @@ export function useSendMessage(conversationId: number) {
     mutationFn: (data: SendMessageRequest) => apiClient.sendMessage(conversationId, data),
     onMutate: async (newMessage) => {
       // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: chatKeys.messages(conversationId) })
+      await queryClient.cancelQueries({
+        queryKey: chatKeys.messages(conversationId),
+      })
 
       // Snapshot previous value
       const previousMessages = queryClient.getQueryData<Message[]>(
@@ -106,15 +117,17 @@ export function useSendMessage(conversationId: number) {
 
       return { previousMessages }
     },
-    onError: (err, newMessage, context) => {
-      // Rollback on error
+    onError: (error, _newMessage, context) => {
+      handleAuthOrFKError(error)
       if (context?.previousMessages) {
         queryClient.setQueryData(chatKeys.messages(conversationId), context.previousMessages)
       }
     },
     onSettled: () => {
       // Refetch after mutation
-      queryClient.invalidateQueries({ queryKey: chatKeys.messages(conversationId) })
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.messages(conversationId),
+      })
       queryClient.invalidateQueries({ queryKey: chatKeys.conversations() })
     },
   })
@@ -127,7 +140,9 @@ export function useDeleteMessage(conversationId: number) {
     mutationFn: (messageId: number) => apiClient.deleteMessage(conversationId, messageId),
     onMutate: async (messageId) => {
       // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: chatKeys.messages(conversationId) })
+      await queryClient.cancelQueries({
+        queryKey: chatKeys.messages(conversationId),
+      })
 
       // Snapshot previous value
       const previousMessages = queryClient.getQueryData<Message[]>(
@@ -144,15 +159,17 @@ export function useDeleteMessage(conversationId: number) {
 
       return { previousMessages }
     },
-    onError: (err, messageId, context) => {
-      // Rollback on error
+    onError: (error, _messageId, context) => {
+      handleAuthOrFKError(error)
       if (context?.previousMessages) {
         queryClient.setQueryData(chatKeys.messages(conversationId), context.previousMessages)
       }
     },
     onSettled: () => {
       // Refetch after mutation
-      queryClient.invalidateQueries({ queryKey: chatKeys.messages(conversationId) })
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.messages(conversationId),
+      })
       queryClient.invalidateQueries({ queryKey: chatKeys.conversations() })
     },
   })

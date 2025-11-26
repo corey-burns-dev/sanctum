@@ -4,6 +4,7 @@ import (
 	"vibeshift/models"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 )
 
 // SearchPosts handles GET /api/posts/search?q=...
@@ -16,8 +17,9 @@ func (s *Server) SearchPosts(c *fiber.Ctx) error {
 
 	limit := c.QueryInt("limit", 10)
 	offset := c.QueryInt("offset", 0)
+	userID, _ := s.optionalUserID(c)
 
-	posts, err := s.postRepo.Search(ctx, q, limit, offset)
+	posts, err := s.postRepo.Search(ctx, q, limit, offset, userID)
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
@@ -58,7 +60,7 @@ func (s *Server) CreatePost(c *fiber.Ctx) error {
 	}
 
 	// Load user data for response
-	post, err := s.postRepo.GetByID(ctx, post.ID)
+	post, err := s.postRepo.GetByID(ctx, post.ID, userID)
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
@@ -71,8 +73,9 @@ func (s *Server) GetPosts(c *fiber.Ctx) error {
 	ctx := c.Context()
 	limit := c.QueryInt("limit", 20)
 	offset := c.QueryInt("offset", 0)
+	userID, _ := s.optionalUserID(c)
 
-	posts, err := s.postRepo.List(ctx, limit, offset)
+	posts, err := s.postRepo.List(ctx, limit, offset, userID)
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
@@ -88,8 +91,9 @@ func (s *Server) GetPost(c *fiber.Ctx) error {
 		return models.RespondWithError(c, fiber.StatusBadRequest,
 			models.NewValidationError("Invalid post ID"))
 	}
+	userID, _ := s.optionalUserID(c)
 
-	post, err := s.postRepo.GetByID(ctx, uint(id))
+	post, err := s.postRepo.GetByID(ctx, uint(id), userID)
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusNotFound, err)
 	}
@@ -108,8 +112,9 @@ func (s *Server) GetUserPosts(c *fiber.Ctx) error {
 
 	limit := c.QueryInt("limit", 20)
 	offset := c.QueryInt("offset", 0)
+	currentUserID, _ := s.optionalUserID(c)
 
-	posts, err := s.postRepo.GetByUserID(ctx, uint(userIDParam), limit, offset)
+	posts, err := s.postRepo.GetByUserID(ctx, uint(userIDParam), limit, offset, currentUserID)
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
@@ -138,7 +143,7 @@ func (s *Server) UpdatePost(c *fiber.Ctx) error {
 	}
 
 	// Get existing post
-	post, err := s.postRepo.GetByID(ctx, uint(postID))
+	post, err := s.postRepo.GetByID(ctx, uint(postID), userID)
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusNotFound, err)
 	}
@@ -178,7 +183,7 @@ func (s *Server) DeletePost(c *fiber.Ctx) error {
 	}
 
 	// Get existing post to check ownership
-	post, err := s.postRepo.GetByID(ctx, uint(postID))
+	post, err := s.postRepo.GetByID(ctx, uint(postID), userID)
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusNotFound, err)
 	}
@@ -197,33 +202,61 @@ func (s *Server) DeletePost(c *fiber.Ctx) error {
 }
 
 // LikePost handles POST /api/posts/:id/like
+// This endpoint toggles the like status - if already liked, it unlikes; if not liked, it likes
 func (s *Server) LikePost(c *fiber.Ctx) error {
 	ctx := c.Context()
+	userID := c.Locals("userID").(uint)
 	postID, err := c.ParamsInt("id")
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusBadRequest,
 			models.NewValidationError("Invalid post ID"))
 	}
 
-	if err := s.postRepo.Like(ctx, uint(postID)); err != nil {
+	// Check if already liked
+	var existingLike models.Like
+	err = s.db.WithContext(ctx).Where("user_id = ? AND post_id = ?", userID, uint(postID)).First(&existingLike).Error
+
+	if err == nil {
+		// Already liked, so unlike it
+		if err := s.postRepo.Unlike(ctx, userID, uint(postID)); err != nil {
+			return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+		}
+	} else if err == gorm.ErrRecordNotFound {
+		// Not liked, so like it
+		if err := s.postRepo.Like(ctx, userID, uint(postID)); err != nil {
+			return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+		}
+	} else {
+		// Some other error
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
 
-	return c.SendStatus(fiber.StatusOK)
+	// Return updated post
+	post, err := s.postRepo.GetByID(ctx, uint(postID), userID)
+	if err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+	return c.JSON(post)
 }
 
 // UnlikePost handles DELETE /api/posts/:id/like
 func (s *Server) UnlikePost(c *fiber.Ctx) error {
 	ctx := c.Context()
+	userID := c.Locals("userID").(uint)
 	postID, err := c.ParamsInt("id")
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusBadRequest,
 			models.NewValidationError("Invalid post ID"))
 	}
 
-	if err := s.postRepo.Unlike(ctx, uint(postID)); err != nil {
+	if err := s.postRepo.Unlike(ctx, userID, uint(postID)); err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
 
-	return c.SendStatus(fiber.StatusOK)
+	// Return updated post
+	post, err := s.postRepo.GetByID(ctx, uint(postID), userID)
+	if err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+	return c.JSON(post)
 }

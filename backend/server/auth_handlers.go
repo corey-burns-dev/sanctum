@@ -13,6 +13,16 @@ import (
 )
 
 // Signup handles POST /api/auth/signup
+// @Summary User signup
+// @Description Register a new user account
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body object{username=string,email=string,password=string} true "Signup request"
+// @Success 201 {object} object{token=string,user=models.User}
+// @Failure 400 {object} object{error=string}
+// @Failure 409 {object} object{error=string}
+// @Router /auth/signup [post]
 func (s *Server) Signup(c *fiber.Ctx) error {
 	var req struct {
 		Username string `json:"username"`
@@ -72,6 +82,16 @@ func (s *Server) Signup(c *fiber.Ctx) error {
 }
 
 // Login handles POST /api/auth/login
+// @Summary User login
+// @Description Authenticate user and return JWT token
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body object{email=string,password=string} true "Login credentials"
+// @Success 200 {object} object{token=string,user=models.User}
+// @Failure 400 {object} object{error=string}
+// @Failure 401 {object} object{error=string}
+// @Router /auth/login [post]
 func (s *Server) Login(c *fiber.Ctx) error {
 	var req struct {
 		Email    string `json:"email"`
