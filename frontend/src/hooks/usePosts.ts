@@ -190,11 +190,12 @@ export function useLikePost() {
       return { previousPost, previousInfinitePostsData }
     },
     onSuccess: (updatedPost) => {
-      // Use the returned post to update cache with actual state
+      // Use the returned post to update cache with actual state from server
       updatePostInCache(queryClient, updatedPost.id, () => updatedPost)
     },
     onError: (error, postId, context) => {
       handleAuthOrFKError(error)
+      // Rollback on error
       if (context?.previousPost) {
         queryClient.setQueryData(postKeys.detail(postId), context.previousPost)
       }
@@ -204,9 +205,7 @@ export function useLikePost() {
         }
       })
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: postKeys.all })
-    },
+    // Removed onSettled to prevent unnecessary refetches that cause flickering
   })
 }
 
