@@ -137,6 +137,12 @@ install:
 	cd frontend && $(PNPM) install
 	@echo "$(GREEN)✓ Dependencies installed$(NC)"
 
+# Swagger documentation
+swagger:
+	@echo "$(BLUE)Generating Swagger documentation...$(NC)"
+	cd backend && ~/go/bin/swag init -g main.go --output ./docs
+	@echo "$(GREEN)✓ Swagger docs generated$(NC)"
+
 # Environment setup
 env:
 	@if [ ! -f config.yml ]; then \

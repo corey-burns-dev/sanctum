@@ -10,6 +10,7 @@ import (
 	"vibeshift/cache"
 	"vibeshift/config"
 	"vibeshift/database"
+	_ "vibeshift/docs" // swagger docs
 	"vibeshift/middleware"
 	"vibeshift/models"
 	"vibeshift/notifications"
@@ -18,6 +19,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/swagger"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -97,6 +99,9 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 
 	// Health check
 	api.Get("/", s.HealthCheck)
+
+	// Swagger documentation
+	api.Get("/swagger/*", swagger.HandlerDefault)
 
 	// Auth routes
 	auth := api.Group("/auth")
