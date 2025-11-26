@@ -243,6 +243,7 @@ export default function Posts() {
   const [editingPostContent, setEditingPostContent] = useState('')
   const queryClient = useQueryClient()
   const debounceRef = useRef<number | null>(null)
+  const [likingPostId, setLikingPostId] = useState<number | null>(null)
 
   // Flatten pages into single array of posts
   const posts = data?.pages.flat() ?? []
@@ -310,9 +311,16 @@ export default function Posts() {
   }
 
   const handleLikeToggle = (post: Post) => {
+    if (likingPostId === post.id) return // Prevent double-clicks
+    
+    setLikingPostId(post.id)
     // Backend now handles toggle logic automatically
     likePostMutation.mutate(post.id, {
+      onSuccess: () => {
+        setLikingPostId(null)
+      },
       onError: (error) => {
+        setLikingPostId(null)
         console.error('Failed to toggle like:', error)
       },
     })
@@ -500,7 +508,7 @@ export default function Posts() {
                       variant={post.liked ? 'default' : 'ghost'}
                       size="sm"
                       onClick={() => handleLikeToggle(post)}
-                      disabled={!isAuthenticated || likePostMutation.isPending}
+                      disabled={!isAuthenticated || likingPostId === post.id}
                       aria-label={`Like post by ${post.user?.username}`}
                     >
                       <Heart className="w-4 h-4 mr-2" />
