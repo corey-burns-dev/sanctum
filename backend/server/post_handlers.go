@@ -1,10 +1,10 @@
 package server
 
 import (
-	"log"
 	"vibeshift/models"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 )
 
 // SearchPosts handles GET /api/posts/search?q=...
@@ -202,6 +202,7 @@ func (s *Server) DeletePost(c *fiber.Ctx) error {
 }
 
 // LikePost handles POST /api/posts/:id/like
+// This endpoint toggles the like status - if already liked, it unlikes; if not liked, it likes
 func (s *Server) LikePost(c *fiber.Ctx) error {
 	ctx := c.Context()
 	userID := c.Locals("userID").(uint)
@@ -211,7 +212,22 @@ func (s *Server) LikePost(c *fiber.Ctx) error {
 			models.NewValidationError("Invalid post ID"))
 	}
 
-	if err := s.postRepo.Like(ctx, userID, uint(postID)); err != nil {
+	// Check if already liked
+	var existingLike models.Like
+	err = s.db.WithContext(ctx).Where("user_id = ? AND post_id = ?", userID, uint(postID)).First(&existingLike).Error
+
+	if err == nil {
+		// Already liked, so unlike it
+		if err := s.postRepo.Unlike(ctx, userID, uint(postID)); err != nil {
+			return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+		}
+	} else if err == gorm.ErrRecordNotFound {
+		// Not liked, so like it
+		if err := s.postRepo.Like(ctx, userID, uint(postID)); err != nil {
+			return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+		}
+	} else {
+		// Some other error
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
 
@@ -220,8 +236,6 @@ func (s *Server) LikePost(c *fiber.Ctx) error {
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
-	// Debug: Log the like count after liking
-	log.Printf("[DEBUG] Post ID %d now has %d likes (liked: %v)", post.ID, post.LikesCount, post.Liked)
 	return c.JSON(post)
 }
 
