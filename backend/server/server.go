@@ -87,10 +87,10 @@ func (s *Server) SetupMiddleware(app *fiber.App) {
 		TimeFormat: "2006/01/02 15:04:05",
 	}))
 
-	// CORS middleware with more restrictive settings
+	// CORS middleware with WebSocket support
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173", // Allow localhost origins
-		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, Upgrade, Connection, Sec-WebSocket-Key, Sec-WebSocket-Version",
 		AllowCredentials: true,
 		MaxAge:           86400, // 24 hours
 	}))
@@ -115,8 +115,8 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	publicPosts := api.Group("/posts")
 	publicPosts.Get("/", s.GetPosts)
 	publicPosts.Get("/search", s.SearchPosts)
-	publicPosts.Get(":id", s.GetPost)
-	publicPosts.Get(":id/comments", s.GetComments)
+	publicPosts.Get("/:id/comments", s.GetComments)
+	publicPosts.Get("/:id", s.GetPost)
 
 	// Protected routes
 	protected := api.Group("", s.AuthRequired())
@@ -126,40 +126,48 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	users.Get("/me", s.GetMyProfile)
 	users.Put("/me", s.UpdateMyProfile)
 	users.Get("/", s.GetAllUsers)
-	users.Get(":id", s.GetUserProfile)
-	users.Get(":id/cached", s.GetUserCached)
+	// Define specific /:id/:resource routes BEFORE generic /:id route
+	users.Get("/:id/cached", s.GetUserCached)
 	users.Get("/:id/posts", s.GetUserPosts)
+	users.Get("/:id", s.GetUserProfile)
 
 	// Friend routes
 	friends := protected.Group("/friends")
+	friends.Get("/", s.GetFriends)
+	// Specific /requests routes before generic /:userId
 	friends.Post("/requests/:userId", s.SendFriendRequest)
 	friends.Get("/requests", s.GetPendingRequests)
 	friends.Get("/requests/sent", s.GetSentRequests)
 	friends.Post("/requests/:requestId/accept", s.AcceptFriendRequest)
 	friends.Post("/requests/:requestId/reject", s.RejectFriendRequest)
-	friends.Get("/", s.GetFriends)
+	// Specific /status routes before generic /:userId
 	friends.Get("/status/:userId", s.GetFriendshipStatus)
+	// Generic /:userId route must be last
 	friends.Delete("/:userId", s.RemoveFriend)
 
 	// Protected post routes
 	posts := protected.Group("/posts")
 	posts.Post("/", s.CreatePost)
-	posts.Put(":id", s.UpdatePost)
-	posts.Delete(":id", s.DeletePost)
-	posts.Post(":id/like", s.LikePost)
-	posts.Delete(":id/like", s.UnlikePost)
-	posts.Post(":id/comments", s.CreateComment)
-	posts.Put(":id/comments/:commentId", s.UpdateComment)
-	posts.Delete(":id/comments/:commentId", s.DeleteComment)
+	// Define specific /:id/:resource routes BEFORE generic /:id route
+	posts.Post("/:id/like", s.LikePost)
+	posts.Delete("/:id/like", s.UnlikePost)
+	posts.Post("/:id/comments", s.CreateComment)
+	posts.Put("/:id/comments/:commentId", s.UpdateComment)
+	posts.Delete("/:id/comments/:commentId", s.DeleteComment)
+	// Generic /:id routes (for item detail, update, delete)
+	posts.Put("/:id", s.UpdatePost)
+	posts.Delete("/:id", s.DeletePost)
 
 	// Chat routes
 	conversations := protected.Group("/conversations")
 	conversations.Post("/", s.CreateConversation)
 	conversations.Get("/", s.GetConversations)
-	conversations.Get("/:id", s.GetConversation)
-	conversations.Post("/:id/messages", middleware.RateLimit(s.redis, 30, time.Minute), s.SendMessage)
+	// Define specific /:id/:resource routes BEFORE generic /:id route
 	conversations.Get("/:id/messages", s.GetMessages)
+	conversations.Post("/:id/messages", middleware.RateLimit(s.redis, 30, time.Minute), s.SendMessage)
 	conversations.Post("/:id/participants", s.AddParticipant)
+	// Generic /:id route must be last
+	conversations.Get("/:id", s.GetConversation)
 
 	// Websocket endpoints
 	api.Get("/ws", s.WebsocketHandler())          // General notifications

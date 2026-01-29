@@ -1,16 +1,15 @@
-import { MessageCircle, Send, Settings, Users } from 'lucide-react'
-import { useEffect, useRef, useState, useCallback } from 'react'
 import type { Conversation } from '@/api/types'
 import { Navbar } from '@/components/Navbar'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useConversations, useMessages, useSendMessage } from '@/hooks/useChat'
+import { useChatWebSocket } from '@/hooks/useChatWebSocket'
 import { getCurrentUser } from '@/hooks/useUsers'
 import { useQueryClient } from '@tanstack/react-query'
-import { useChatWebSocket } from '@/hooks/useChatWebSocket'
+import { MessageCircle, Send, Users } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 
 export default function Chat() {
   const [newMessage, setNewMessage] = useState('')
@@ -41,8 +40,8 @@ export default function Chat() {
   useEffect(() => {
     const conv = conversations?.find((c) => c.id === globalConversationId)
     if (!conv) return
-    // try multiple property names that could contain users
-    const usersList: any[] = conv.members || conv.participants || conv.users || []
+    // Use participants property from Conversation type
+    const usersList: any[] = conv.participants || []
     if (usersList && usersList.length > 0) {
       const map: Record<number, any> = {}
       usersList.forEach((u: any) => {
@@ -133,178 +132,178 @@ export default function Chat() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
       <Navbar />
 
-      <div className="flex-1 max-w-7xl mx-auto px-4 py-6 w-full">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
-          {/* Chat Area */}
-          <div className="lg:col-span-3 flex flex-col">
-            <Card className="flex-1 flex flex-col min-h-0">
-              <CardHeader className="shrink-0">
-                <CardTitle className="flex items-center gap-2">
-                  <MessageCircle className="w-5 h-5" />
-                  Live Chat
-                </CardTitle>
-              </CardHeader>
-
-              <CardContent className="flex-1 flex flex-col p-0 min-h-0">
-                {/* Messages */}
-                <ScrollArea className="flex-1 px-6 min-h-0" ref={scrollAreaRef}>
-                  <div className="space-y-3 py-4">
-                    {isLoading ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        Loading messages...
-                      </div>
-                    ) : messages.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No messages yet. Start the conversation!
-                      </div>
-                    ) : (
-                      messages.map((msg) => {
-                        const isOwnMessage = msg.sender_id === currentUser?.id
-                        const sender = msg.sender
-                        return (
-                          <div key={msg.id} className="flex items-start gap-3 group">
-                            <Avatar className="w-8 h-8 shrink-0">
-                              <AvatarImage
-                                src={
-                                  sender?.avatar ||
-                                  `https://api.dicebear.com/7.x/avataaars/svg?seed=${sender?.username}`
-                                }
-                              />
-                              <AvatarFallback className="text-xs">
-                                {sender?.username?.[0].toUpperCase() || 'U'}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-baseline gap-2 mb-1">
-                                <span
-                                  className="font-semibold text-sm"
-                                  style={{ color: getUserColor(msg.sender_id) }}
-                                >
-                                  {isOwnMessage ? 'You' : sender?.username || 'Unknown'}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {formatTimestamp(msg.created_at)}
-                                </span>
-                              </div>
-                              <p className="text-sm wrap-break-word">{msg.content}</p>
-                            </div>
-                          </div>
-                        )
-                      })
+      {/* Main chat container - full height, no scroll */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Sidebar - Rooms (15%) */}
+        <div className="w-[15%] border-r bg-card flex flex-col overflow-hidden">
+          <div className="p-4 border-b shrink-0">
+            <h2 className="font-semibold text-sm flex items-center gap-2">
+              <MessageCircle className="w-4 h-4" />
+              Rooms
+            </h2>
+          </div>
+          <ScrollArea className="flex-1">
+            <div className="space-y-1 p-2">
+              {conversations && conversations.length > 0 ? (
+                conversations.map((conversation: Conversation) => (
+                  <button
+                    type="button"
+                    key={conversation.id}
+                    className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                      conversation.id === globalConversationId
+                        ? 'bg-primary text-primary-foreground'
+                        : 'hover:bg-accent'
+                    }`}
+                    onClick={() => setGlobalConversationId(conversation.id)}
+                  >
+                    <p className="font-medium truncate">
+                      {conversation.name || `Room ${conversation.id}`}
+                    </p>
+                    {conversation.last_message && (
+                      <p className="text-xs opacity-75 truncate">
+                        {conversation.last_message.content}
+                      </p>
                     )}
-                    <div ref={messagesEndRef} />
-                  </div>
-                </ScrollArea>
-
-                {/* Message Input */}
-                <div className="border-t p-4 shrink-0">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Type a message..."
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      className="flex-1"
-                    />
-                    <Button onClick={handleSendMessage} disabled={!newMessage.trim()}>
-                      <Send className="w-4 h-4" />
-                    </Button>
-                  </div>
+                  </button>
+                ))
+              ) : (
+                <div className="text-xs text-muted-foreground text-center py-8">
+                  No rooms yet
                 </div>
-              </CardContent>
-            </Card>
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+
+        {/* Center - Chat Window (70%) */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="border-b p-4 shrink-0 bg-card">
+            <h3 className="font-semibold text-sm">
+              {conversations?.find((c) => c.id === globalConversationId)?.name ||
+                `Room ${globalConversationId}`}
+            </h3>
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6 lg:flex lg:flex-col">
-            {/* Conversations */}
-            <Card className="lg:flex-1">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Users className="w-5 h-5" />
-                  Conversations ({conversations?.length || 0})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {conversations && conversations.length > 0 ? (
-                    conversations.map((conversation: Conversation) => (
-                      <button
-                        type="button"
-                        key={conversation.id}
-                        className={`flex items-center gap-3 p-2 rounded cursor-pointer hover:bg-muted ${
-                          conversation.id === globalConversationId ? 'bg-muted' : ''
-                        }`}
-                        onClick={() => setGlobalConversationId(conversation.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault()
-                            setGlobalConversationId(conversation.id)
+          {/* Messages Area */}
+          <ScrollArea className="flex-1 overflow-hidden" ref={scrollAreaRef}>
+            <div className="space-y-3 p-6">
+              {isLoading ? (
+                <div className="text-center py-8 text-muted-foreground">Loading messages...</div>
+              ) : messages.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No messages yet. Start the conversation!
+                </div>
+              ) : (
+                messages.map((msg) => {
+                  const isOwnMessage = msg.sender_id === currentUser?.id
+                  const sender = msg.sender
+                  return (
+                    <div key={msg.id} className="flex items-start gap-3">
+                      <Avatar className="w-8 h-8 shrink-0">
+                        <AvatarImage
+                          src={
+                            sender?.avatar ||
+                            `https://api.dicebear.com/7.x/avataaars/svg?seed=${sender?.username}`
                           }
-                        }}
-                        aria-pressed={conversation.id === globalConversationId}
-                      >
-                        <Avatar className="w-8 h-8">
-                          <AvatarImage
-                            src={
-                              conversation.avatar ||
-                              `https://api.dicebear.com/7.x/avataaars/svg?seed=${conversation.id}`
-                            }
-                          />
-                          <AvatarFallback className="text-xs">
-                            {conversation.name?.[0]?.toUpperCase() || 'C'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {conversation.name || `Conversation ${conversation.id}`}
-                          </p>
-                          {conversation.last_message && (
-                            <p className="text-xs text-muted-foreground truncate">
-                              {conversation.last_message.content}
-                            </p>
-                          )}
+                        />
+                        <AvatarFallback className="text-xs">
+                          {sender?.username?.[0]?.toUpperCase() || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <span
+                            className="font-semibold text-sm"
+                            style={{ color: getUserColor(msg.sender_id) }}
+                          >
+                            {isOwnMessage ? 'You' : sender?.username || 'Unknown'}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatTimestamp(msg.created_at)}
+                          </span>
                         </div>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="text-xs text-muted-foreground text-center py-4">
-                      No conversations yet
+                        <p className="text-sm wrap-break-word">{msg.content}</p>
+                      </div>
                     </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                  )
+                })
+              )}
 
-            {/* Chat Settings */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Settings className="w-5 h-5" />
-                  Settings
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Show timestamps</span>
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Highlight mentions</span>
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Sound notifications</span>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                  </div>
+              {/* Typing indicators */}
+              {Object.values(participants).some((p) => p.typing) && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>
+                    {Object.values(participants)
+                      .filter((p) => p.typing)
+                      .map((p) => p.username)
+                      .join(', ')}{' '}
+                    is typing...
+                  </span>
                 </div>
-              </CardContent>
-            </Card>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+          </ScrollArea>
+
+          {/* Message Input */}
+          <div className="border-t bg-card p-4 shrink-0">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Type a message..."
+                value={newMessage}
+                onChange={(e) => handleInputChange(e.target.value)}
+                onKeyPress={handleKeyPress}
+                className="flex-1"
+              />
+              <Button onClick={handleSendMessage} disabled={!newMessage.trim()}>
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
+        </div>
+
+        {/* Right Sidebar - Participants (15%) */}
+        <div className="w-[15%] border-l bg-card flex flex-col overflow-hidden">
+          <div className="p-4 border-b shrink-0">
+            <h2 className="font-semibold text-sm flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              Members
+            </h2>
+          </div>
+          <ScrollArea className="flex-1">
+            <div className="space-y-2 p-2">
+              {Object.values(participants).length > 0 ? (
+                Object.values(participants).map((participant) => (
+                  <div key={participant.id} className="px-3 py-2 rounded-md text-sm">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div
+                        className={`w-2 h-2 rounded-full ${
+                          participant.online ? 'bg-green-500' : 'bg-gray-400'
+                        }`}
+                      />
+                      <span className="truncate font-medium text-xs">
+                        {participant.username || `User ${participant.id}`}
+                      </span>
+                    </div>
+                    {participant.typing && (
+                      <p className="text-xs text-muted-foreground italic">typing...</p>
+                    )}
+                    {!participant.typing && !participant.online && (
+                      <p className="text-xs text-muted-foreground">offline</p>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="text-xs text-muted-foreground text-center py-8">
+                  No members
+                </div>
+              )}
+            </div>
+          </ScrollArea>
         </div>
       </div>
     </div>
