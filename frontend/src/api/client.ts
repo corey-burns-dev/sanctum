@@ -23,267 +23,267 @@ import type {
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8375/api'
 
 class ApiClient {
-  private baseUrl: string
+    private baseUrl: string
 
-  constructor(baseUrl: string) {
-    this.baseUrl = baseUrl
-  }
-
-  private getAuthToken(): string | null {
-    return localStorage.getItem('token')
-  }
-
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`
-    const token = this.getAuthToken()
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+    constructor(baseUrl: string) {
+        this.baseUrl = baseUrl
     }
 
-    // Add existing headers
-    if (options.headers) {
-      const existingHeaders = new Headers(options.headers)
-      existingHeaders.forEach((value, key) => {
-        headers[key] = value
-      })
+    private getAuthToken(): string | null {
+        return localStorage.getItem('token')
     }
 
-    // Add auth token if available and not already set
-    if (token && !headers.Authorization) {
-      headers.Authorization = `Bearer ${token}`
-    }
+    private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+        const url = `${this.baseUrl}${endpoint}`
+        const token = this.getAuthToken()
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    })
-
-    // Read response as text first so we can handle empty/non-JSON bodies
-    const text = await response.text()
-
-    if (!response.ok) {
-      // Try to parse JSON error body, otherwise use text/status
-      let errMsg = `HTTP ${response.status}: ${response.statusText}`
-      try {
-        const parsed = text ? JSON.parse(text) : null
-        if (parsed && typeof parsed === 'object' && parsed.error) {
-          errMsg = parsed.error
-        } else if (parsed && typeof parsed === 'string') {
-          errMsg = parsed
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
         }
-      } catch (_) {
-        // not JSON - use text if present
-        if (text) errMsg = text
-      }
-      throw new Error(errMsg)
+
+        // Add existing headers
+        if (options.headers) {
+            const existingHeaders = new Headers(options.headers)
+            existingHeaders.forEach((value, key) => {
+                headers[key] = value
+            })
+        }
+
+        // Add auth token if available and not already set
+        if (token && !headers.Authorization) {
+            headers.Authorization = `Bearer ${token}`
+        }
+
+        const response = await fetch(url, {
+            ...options,
+            headers,
+        })
+
+        // Read response as text first so we can handle empty/non-JSON bodies
+        const text = await response.text()
+
+        if (!response.ok) {
+            // Try to parse JSON error body, otherwise use text/status
+            let errMsg = `HTTP ${response.status}: ${response.statusText}`
+            try {
+                const parsed = text ? JSON.parse(text) : null
+                if (parsed && typeof parsed === 'object' && parsed.error) {
+                    errMsg = parsed.error
+                } else if (parsed && typeof parsed === 'string') {
+                    errMsg = parsed
+                }
+            } catch (_) {
+                // not JSON - use text if present
+                if (text) errMsg = text
+            }
+            throw new Error(errMsg)
+        }
+
+        // If response body is empty, return undefined cast to T
+        if (!text) {
+            return undefined as unknown as T
+        }
+
+        // Try to parse JSON, otherwise return raw text
+        try {
+            return JSON.parse(text) as T
+        } catch (_) {
+            return text as unknown as T
+        }
     }
 
-    // If response body is empty, return undefined cast to T
-    if (!text) {
-      return undefined as unknown as T
+    // Health
+    async healthCheck(): Promise<{ message: string }> {
+        return this.request('/')
     }
 
-    // Try to parse JSON, otherwise return raw text
-    try {
-      return JSON.parse(text) as T
-    } catch (_) {
-      return text as unknown as T
+    // Auth
+    async signup(data: SignupRequest): Promise<AuthResponse> {
+        return this.request('/auth/signup', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        })
     }
-  }
 
-  // Health
-  async healthCheck(): Promise<{ message: string }> {
-    return this.request('/')
-  }
+    async login(data: LoginRequest): Promise<AuthResponse> {
+        return this.request('/auth/login', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        })
+    }
 
-  // Auth
-  async signup(data: SignupRequest): Promise<AuthResponse> {
-    return this.request('/auth/signup', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
+    // Posts
+    async getPosts(params?: PaginationParams): Promise<Post[]> {
+        const query = new URLSearchParams()
+        if (params?.offset !== undefined) query.set('offset', params.offset.toString())
+        if (params?.limit !== undefined) query.set('limit', params.limit.toString())
+        const queryString = query.toString() ? `?${query.toString()}` : ''
+        return this.request(`/posts${queryString}`)
+    }
 
-  async login(data: LoginRequest): Promise<AuthResponse> {
-    return this.request('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
+    async getPost(id: number): Promise<Post> {
+        return this.request(`/posts/${id}`)
+    }
 
-  // Posts
-  async getPosts(params?: PaginationParams): Promise<Post[]> {
-    const query = new URLSearchParams()
-    if (params?.offset !== undefined) query.set('offset', params.offset.toString())
-    if (params?.limit !== undefined) query.set('limit', params.limit.toString())
-    const queryString = query.toString() ? `?${query.toString()}` : ''
-    return this.request(`/posts${queryString}`)
-  }
+    async createPost(data: CreatePostRequest): Promise<Post> {
+        return this.request('/posts', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        })
+    }
 
-  async getPost(id: number): Promise<Post> {
-    return this.request(`/posts/${id}`)
-  }
+    async updatePost(id: number, data: UpdatePostRequest): Promise<Post> {
+        return this.request(`/posts/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        })
+    }
 
-  async createPost(data: CreatePostRequest): Promise<Post> {
-    return this.request('/posts', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
+    async deletePost(id: number): Promise<{ message: string }> {
+        return this.request(`/posts/${id}`, {
+            method: 'DELETE',
+        })
+    }
 
-  async updatePost(id: number, data: UpdatePostRequest): Promise<Post> {
-    return this.request(`/posts/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    })
-  }
+    async likePost(id: number): Promise<Post> {
+        return this.request(`/posts/${id}/like`, {
+            method: 'POST',
+        })
+    }
 
-  async deletePost(id: number): Promise<{ message: string }> {
-    return this.request(`/posts/${id}`, {
-      method: 'DELETE',
-    })
-  }
+    async unlikePost(id: number): Promise<Post> {
+        return this.request(`/posts/${id}/like`, {
+            method: 'DELETE',
+        })
+    }
 
-  async likePost(id: number): Promise<Post> {
-    return this.request(`/posts/${id}/like`, {
-      method: 'POST',
-    })
-  }
+    async searchPosts(params: SearchParams): Promise<Post[]> {
+        const query = new URLSearchParams()
+        query.set('q', params.q)
+        if (params.offset !== undefined) query.set('offset', params.offset.toString())
+        if (params.limit !== undefined) query.set('limit', params.limit.toString())
+        return this.request(`/posts/search?${query.toString()}`)
+    }
 
-  async unlikePost(id: number): Promise<Post> {
-    return this.request(`/posts/${id}/like`, {
-      method: 'DELETE',
-    })
-  }
+    // Comments
+    async getPostComments(postId: number): Promise<Comment[]> {
+        return this.request(`/posts/${postId}/comments`)
+    }
 
-  async searchPosts(params: SearchParams): Promise<Post[]> {
-    const query = new URLSearchParams()
-    query.set('q', params.q)
-    if (params.offset !== undefined) query.set('offset', params.offset.toString())
-    if (params.limit !== undefined) query.set('limit', params.limit.toString())
-    return this.request(`/posts/search?${query.toString()}`)
-  }
+    async createComment(postId: number, data: CreateCommentRequest): Promise<Comment> {
+        return this.request(`/posts/${postId}/comments`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        })
+    }
 
-  // Comments
-  async getPostComments(postId: number): Promise<Comment[]> {
-    return this.request(`/posts/${postId}/comments`)
-  }
+    async updateComment(
+        postId: number,
+        commentId: number,
+        data: UpdateCommentRequest
+    ): Promise<Comment> {
+        return this.request(`/posts/${postId}/comments/${commentId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        })
+    }
 
-  async createComment(postId: number, data: CreateCommentRequest): Promise<Comment> {
-    return this.request(`/posts/${postId}/comments`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
+    async deleteComment(postId: number, commentId: number): Promise<{ message: string }> {
+        return this.request(`/posts/${postId}/comments/${commentId}`, {
+            method: 'DELETE',
+        })
+    }
 
-  async updateComment(
-    postId: number,
-    commentId: number,
-    data: UpdateCommentRequest
-  ): Promise<Comment> {
-    return this.request(`/posts/${postId}/comments/${commentId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    })
-  }
+    // Users
+    async getUsers(params?: PaginationParams): Promise<User[]> {
+        const query = new URLSearchParams()
+        if (params?.offset !== undefined) query.set('offset', params.offset.toString())
+        if (params?.limit !== undefined) query.set('limit', params.limit.toString())
+        const queryString = query.toString() ? `?${query.toString()}` : ''
+        return this.request(`/users${queryString}`)
+    }
 
-  async deleteComment(postId: number, commentId: number): Promise<{ message: string }> {
-    return this.request(`/posts/${postId}/comments/${commentId}`, {
-      method: 'DELETE',
-    })
-  }
+    async getFriends(params?: PaginationParams): Promise<User[]> {
+        const query = new URLSearchParams()
+        if (params?.offset !== undefined) query.set('offset', params.offset.toString())
+        if (params?.limit !== undefined) query.set('limit', params.limit.toString())
+        const queryString = query.toString() ? `?${query.toString()}` : ''
+        return this.request(`/friends${queryString}`)
+    }
 
-  // Users
-  async getUsers(params?: PaginationParams): Promise<User[]> {
-    const query = new URLSearchParams()
-    if (params?.offset !== undefined) query.set('offset', params.offset.toString())
-    if (params?.limit !== undefined) query.set('limit', params.limit.toString())
-    const queryString = query.toString() ? `?${query.toString()}` : ''
-    return this.request(`/users${queryString}`)
-  }
+    async getMyProfile(): Promise<User> {
+        return this.request('/users/me')
+    }
 
-  async getFriends(params?: PaginationParams): Promise<User[]> {
-    const query = new URLSearchParams()
-    if (params?.offset !== undefined) query.set('offset', params.offset.toString())
-    if (params?.limit !== undefined) query.set('limit', params.limit.toString())
-    const queryString = query.toString() ? `?${query.toString()}` : ''
-    return this.request(`/friends${queryString}`)
-  }
+    async getUserProfile(id: number): Promise<User> {
+        return this.request(`/users/${id}`)
+    }
 
-  async getMyProfile(): Promise<User> {
-    return this.request('/users/me')
-  }
+    async updateMyProfile(data: UpdateProfileRequest): Promise<User> {
+        return this.request('/users/me', {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        })
+    }
 
-  async getUserProfile(id: number): Promise<User> {
-    return this.request(`/users/${id}`)
-  }
+    // Chat - Conversations
+    async getConversations(): Promise<Conversation[]> {
+        return this.request('/conversations')
+    }
 
-  async updateMyProfile(data: UpdateProfileRequest): Promise<User> {
-    return this.request('/users/me', {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    })
-  }
+    async getConversation(id: number): Promise<Conversation> {
+        return this.request(`/conversations/${id}`)
+    }
 
-  // Chat - Conversations
-  async getConversations(): Promise<Conversation[]> {
-    return this.request('/conversations')
-  }
+    async createConversation(data: CreateConversationRequest): Promise<Conversation> {
+        return this.request('/conversations', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        })
+    }
 
-  async getConversation(id: number): Promise<Conversation> {
-    return this.request(`/conversations/${id}`)
-  }
+    async markConversationAsRead(id: number): Promise<{ message: string }> {
+        return this.request(`/conversations/${id}/read`, {
+            method: 'POST',
+        })
+    }
 
-  async createConversation(data: CreateConversationRequest): Promise<Conversation> {
-    return this.request('/conversations', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
+    // Chat - Messages
+    async getMessages(conversationId: number, params?: PaginationParams): Promise<Message[]> {
+        const query = new URLSearchParams()
+        if (params?.offset !== undefined) query.set('offset', params.offset.toString())
+        if (params?.limit !== undefined) query.set('limit', params.limit.toString())
+        const queryString = query.toString() ? `?${query.toString()}` : ''
+        return this.request(`/conversations/${conversationId}/messages${queryString}`)
+    }
 
-  async markConversationAsRead(id: number): Promise<{ message: string }> {
-    return this.request(`/conversations/${id}/read`, {
-      method: 'POST',
-    })
-  }
+    async sendMessage(conversationId: number, data: SendMessageRequest): Promise<Message> {
+        return this.request(`/conversations/${conversationId}/messages`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        })
+    }
 
-  // Chat - Messages
-  async getMessages(conversationId: number, params?: PaginationParams): Promise<Message[]> {
-    const query = new URLSearchParams()
-    if (params?.offset !== undefined) query.set('offset', params.offset.toString())
-    if (params?.limit !== undefined) query.set('limit', params.limit.toString())
-    const queryString = query.toString() ? `?${query.toString()}` : ''
-    return this.request(`/conversations/${conversationId}/messages${queryString}`)
-  }
+    async deleteMessage(conversationId: number, messageId: number): Promise<{ message: string }> {
+        return this.request(`/conversations/${conversationId}/messages/${messageId}`, {
+            method: 'DELETE',
+        })
+    }
 
-  async sendMessage(conversationId: number, data: SendMessageRequest): Promise<Message> {
-    return this.request(`/conversations/${conversationId}/messages`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
+    // Chatrooms (public group conversations)
+    async getAllChatrooms(): Promise<(Conversation & { is_joined: boolean })[]> {
+        return this.request('/chatrooms')
+    }
 
-  async deleteMessage(conversationId: number, messageId: number): Promise<{ message: string }> {
-    return this.request(`/conversations/${conversationId}/messages/${messageId}`, {
-      method: 'DELETE',
-    })
-  }
+    async getJoinedChatrooms(): Promise<Conversation[]> {
+        return this.request('/chatrooms/joined')
+    }
 
-  // Chatrooms (public group conversations)
-  async getAllChatrooms(): Promise<(Conversation & { is_joined: boolean })[]> {
-    return this.request('/chatrooms')
-  }
-
-  async getJoinedChatrooms(): Promise<Conversation[]> {
-    return this.request('/chatrooms/joined')
-  }
-
-  async joinChatroom(chatroomId: number): Promise<{ message: string }> {
-    return this.request(`/chatrooms/${chatroomId}/join`, {
-      method: 'POST',
-    })
-  }
+    async joinChatroom(chatroomId: number): Promise<{ message: string }> {
+        return this.request(`/chatrooms/${chatroomId}/join`, {
+            method: 'POST',
+        })
+    }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL)

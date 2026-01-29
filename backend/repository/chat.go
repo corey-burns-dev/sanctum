@@ -5,6 +5,7 @@ import (
 	"vibeshift/models"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // ChatRepository defines the interface for chat data operations
@@ -54,6 +55,7 @@ func (r *chatRepository) GetUserConversations(ctx context.Context, userID uint) 
 	err := r.db.WithContext(ctx).
 		Joins("JOIN conversation_participants cp ON conversations.id = cp.conversation_id").
 		Where("cp.user_id = ?", userID).
+		Select("conversations.*, COALESCE(cp.unread_count, 0) as unread_count").
 		Preload("Participants").
 		Preload("Messages", func(db *gorm.DB) *gorm.DB {
 			return db.Order("created_at DESC").Limit(1)
@@ -69,7 +71,8 @@ func (r *chatRepository) AddParticipant(ctx context.Context, convID, userID uint
 		ConversationID: convID,
 		UserID:         userID,
 	}
-	return r.db.WithContext(ctx).Create(&participant).Error
+	// Use OnConflict to silently ignore duplicate key errors
+	return r.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&participant).Error
 }
 
 func (r *chatRepository) RemoveParticipant(ctx context.Context, convID, userID uint) error {
@@ -85,7 +88,7 @@ func (r *chatRepository) GetMessages(ctx context.Context, convID uint, limit, of
 	err := r.db.WithContext(ctx).
 		Where("conversation_id = ?", convID).
 		Preload("Sender").
-		Order("created_at DESC").
+		Order("created_at ASC").
 		Limit(limit).
 		Offset(offset).
 		Find(&messages).Error

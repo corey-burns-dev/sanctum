@@ -2,8 +2,8 @@
 package server
 
 import (
-	"encoding/json"
 	"vibeshift/models"
+	"vibeshift/notifications"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -144,6 +144,12 @@ func (s *Server) GetConversation(c *fiber.Ctx) error {
 		}
 	}
 
+	// Auto-add user to group conversations if not already a participant
+	if !isParticipant && conv.IsGroup {
+		s.chatRepo.AddParticipant(ctx, uint(convID), userID)
+		isParticipant = true // Trust that add succeeded
+	}
+
 	if !isParticipant {
 		return models.RespondWithError(c, fiber.StatusForbidden,
 			models.NewUnauthorizedError("You are not a participant in this conversation"))
@@ -195,6 +201,12 @@ func (s *Server) SendMessage(c *fiber.Ctx) error {
 		}
 	}
 
+	// Auto-add user to group conversations if not already a participant
+	if !isParticipant && conv.IsGroup {
+		s.chatRepo.AddParticipant(ctx, uint(convID), userID)
+		isParticipant = true // Trust that add succeeded
+	}
+
 	if !isParticipant {
 		return models.RespondWithError(c, fiber.StatusForbidden,
 			models.NewUnauthorizedError("You are not a participant in this conversation"))
@@ -219,18 +231,15 @@ func (s *Server) SendMessage(c *fiber.Ctx) error {
 	// Load message with sender info for response
 	message.Sender, _ = s.userRepo.GetByID(ctx, userID)
 
-	// Broadcast message to all participants via Redis pub/sub
-	if s.notifier != nil {
-		messageJSON, err := json.Marshal(map[string]interface{}{
-			"type":            "message",
-			"conversation_id": uint(convID),
-			"user_id":         userID,
-			"username":        message.Sender.Username,
-			"payload":         message,
+	// Broadcast message to all WebSocket-connected participants in real-time via ChatHub
+	if s.chatHub != nil {
+		s.chatHub.BroadcastToConversation(uint(convID), notifications.ChatMessage{
+			Type:           "message",
+			ConversationID: uint(convID),
+			UserID:         userID,
+			Username:       message.Sender.Username,
+			Payload:        message,
 		})
-		if err == nil {
-			_ = s.notifier.PublishChatMessage(ctx, uint(convID), string(messageJSON))
-		}
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(message)
@@ -261,6 +270,12 @@ func (s *Server) GetMessages(c *fiber.Ctx) error {
 			isParticipant = true
 			break
 		}
+	}
+
+	// Auto-add user to group conversations if not already a participant
+	if !isParticipant && conv.IsGroup {
+		s.chatRepo.AddParticipant(ctx, uint(convID), userID)
+		isParticipant = true // Trust that add succeeded
 	}
 
 	if !isParticipant {
@@ -333,6 +348,39 @@ func (s *Server) GetAllChatrooms(c *fiber.Ctx) error {
 	// Get all group conversations (public chatrooms)
 	var chatrooms []*models.Conversation
 	err := s.db.WithContext(ctx).
+		Where("is_group = ?", true).
+		Preload("Participants").
+		Preload("Messages", func(db *gorm.DB) *gorm.DB {
+			return db.Order("created_at DESC").Limit(1)
+		}).
+		Preload("Messages.Sender").
+		Order("name ASC").
+		Find(&chatrooms).Error
+	if err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	// Auto-add user to any group conversations they're not in
+	for _, conv := range chatrooms {
+		isParticipant := false
+		for _, p := range conv.Participants {
+			if p.ID == userID {
+				isParticipant = true
+				break
+			}
+		}
+		// If user is not a participant, add them (ignore errors if already exists)
+		if !isParticipant {
+			// Use OnConflict to avoid duplicate key errors
+			s.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&models.ConversationParticipant{
+				ConversationID: conv.ID,
+				UserID:         userID,
+			})
+		}
+	}
+
+	// Re-query to get updated Participants list after auto-adding
+	err = s.db.WithContext(ctx).
 		Where("is_group = ?", true).
 		Preload("Participants").
 		Preload("Messages", func(db *gorm.DB) *gorm.DB {

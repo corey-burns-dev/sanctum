@@ -19,6 +19,7 @@ type Conversation struct {
 	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
 	Participants []User         `gorm:"many2many:conversation_participants;" json:"participants,omitempty"`
 	Messages     []Message      `gorm:"foreignKey:ConversationID" json:"messages,omitempty"`
+	UnreadCount  int            `gorm:"-" json:"unread_count"`
 }
 
 // Message represents a chat message

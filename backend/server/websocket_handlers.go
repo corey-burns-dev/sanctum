@@ -59,40 +59,26 @@ func (s *Server) WebSocketChatHandler() fiber.Handler {
 
 		log.Printf("WebSocket: User %d (%s) connected to chat", userID, username)
 
-		// Register user with ChatHub
-		if s.chatHub != nil {
-			s.chatHub.RegisterUser(userID, conn)
-			defer s.chatHub.UnregisterUser(userID)
+		// Create Client
+		client := &notifications.Client{
+			Hub:    s.chatHub,
+			Conn:   conn,
+			Send:   make(chan []byte, 256),
+			UserID: userID,
 		}
 
-		// Send welcome message
-		welcomeMsg := notifications.ChatMessage{
-			Type:    "connected",
-			Payload: map[string]interface{}{"user_id": userID, "username": username},
-		}
-		welcomeJSON, _ := json.Marshal(welcomeMsg)
-		if werr := conn.WriteMessage(websocket.TextMessage, welcomeJSON); werr != nil {
-			log.Printf("failed to send welcome message: %v", werr)
-		}
-
-		// Message handling loop
-		for {
-			_, msg, err := conn.ReadMessage()
-			if err != nil {
-				log.Printf("WebSocket: User %d disconnected: %v", userID, err)
-				break
-			}
-
+		// Define Incoming Message Handler
+		client.IncomingHandler = func(c *notifications.Client, message []byte) {
 			// Parse incoming message
 			var incomingMsg map[string]interface{}
-			if err := json.Unmarshal(msg, &incomingMsg); err != nil {
+			if err := json.Unmarshal(message, &incomingMsg); err != nil {
 				log.Printf("WebSocket: Invalid message format from user %d", userID)
-				continue
+				return
 			}
 
 			msgType, ok := incomingMsg["type"].(string)
 			if !ok {
-				continue
+				return
 			}
 
 			// Handle different message types
@@ -113,16 +99,31 @@ func (s *Server) WebSocketChatHandler() fiber.Handler {
 								}
 							}
 
-							// Send confirmation
+							// Get updated participants list and broadcast to all users in conversation
+							if conv, err := s.chatRepo.GetConversation(ctx, convID); err == nil {
+								participantUpdate := notifications.ChatMessage{
+									Type:           "participant_joined",
+									ConversationID: convID,
+									UserID:         userID,
+									Username:       username,
+									Payload: map[string]interface{}{
+										"conversation_id": convID,
+										"user_id":         userID,
+										"username":        username,
+										"participants":    conv.Participants,
+									},
+								}
+								s.chatHub.BroadcastToConversation(convID, participantUpdate)
+							}
+
+							// Send confirmation to user
 							response := notifications.ChatMessage{
 								Type:           "joined",
 								ConversationID: convID,
 								Payload:        map[string]interface{}{"conversation_id": convID},
 							}
 							responseJSON, _ := json.Marshal(response)
-							if werr := conn.WriteMessage(websocket.TextMessage, responseJSON); werr != nil {
-								log.Printf("websocket write error sending joined confirmation: %v", werr)
-							}
+							c.TrySend(responseJSON)
 						}
 					}
 				}
@@ -132,6 +133,12 @@ func (s *Server) WebSocketChatHandler() fiber.Handler {
 				if convIDFloat, ok := incomingMsg["conversation_id"].(float64); ok {
 					convID := uint(convIDFloat)
 					if s.chatHub != nil {
+						// Get current participants before leaving
+						var currentParticipants []models.User
+						if conv, err := s.chatRepo.GetConversation(ctx, convID); err == nil {
+							currentParticipants = conv.Participants
+						}
+
 						s.chatHub.LeaveConversation(userID, convID)
 
 						// Publish presence
@@ -140,6 +147,21 @@ func (s *Server) WebSocketChatHandler() fiber.Handler {
 								log.Printf("publish presence (offline) error: %v", perr)
 							}
 						}
+
+						// Broadcast participant_left to all users still in conversation
+						participantUpdate := notifications.ChatMessage{
+							Type:           "participant_left",
+							ConversationID: convID,
+							UserID:         userID,
+							Username:       username,
+							Payload: map[string]interface{}{
+								"conversation_id": convID,
+								"user_id":         userID,
+								"username":        username,
+								"participants":    currentParticipants,
+							},
+						}
+						s.chatHub.BroadcastToConversation(convID, participantUpdate)
 					}
 				}
 
@@ -173,7 +195,7 @@ func (s *Server) WebSocketChatHandler() fiber.Handler {
 
 						if err := s.chatRepo.CreateMessage(ctx, message); err != nil {
 							log.Printf("WebSocket: Failed to create message: %v", err)
-							continue
+							return
 						}
 
 						// Load sender info
@@ -222,6 +244,26 @@ func (s *Server) WebSocketChatHandler() fiber.Handler {
 				}
 			}
 		}
+
+		// Register user with ChatHub
+		if s.chatHub != nil {
+			s.chatHub.RegisterUser(client)
+		}
+
+		// Send welcome message
+		welcomeMsg := notifications.ChatMessage{
+			Type:    "connected",
+			Payload: map[string]interface{}{"user_id": userID, "username": username},
+		}
+		if welcomeJSON, err := json.Marshal(welcomeMsg); err == nil {
+			client.TrySend(welcomeJSON)
+		}
+
+		// Start write pump in a goroutine
+		go client.WritePump()
+
+		// Read pump runs in the main handler goroutine (blocking)
+		client.ReadPump()
 	})
 }
 

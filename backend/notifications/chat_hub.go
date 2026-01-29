@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"log"
 	"sync"
-
-	"github.com/gofiber/websocket/v2"
 )
 
 // ChatHub manages WebSocket connections for chat conversations.
@@ -16,14 +14,14 @@ import (
 type ChatHub struct {
 	mu sync.RWMutex
 
-	// Map: conversationID -> userID -> websocket connection
-	conversations map[uint]map[uint]*websocket.Conn
+	// Map: conversationID -> userID -> Client
+	conversations map[uint]map[uint]*Client
 
 	// Map: userID -> set of conversationIDs they're actively viewing
 	userActiveConvs map[uint]map[uint]struct{}
 
-	// Map: userID -> their primary websocket connection
-	userConns map[uint]*websocket.Conn
+	// Map: userID -> set of active Clients (Multi-Device Support)
+	userConns map[uint]map[*Client]bool
 }
 
 // ChatMessage represents a message broadcast to a conversation
@@ -39,71 +37,105 @@ type ChatMessage struct {
 // NewChatHub creates a new ChatHub instance
 func NewChatHub() *ChatHub {
 	return &ChatHub{
-		conversations:   make(map[uint]map[uint]*websocket.Conn),
+		conversations:   make(map[uint]map[uint]*Client),
 		userActiveConvs: make(map[uint]map[uint]struct{}),
-		userConns:       make(map[uint]*websocket.Conn),
+		userConns:       make(map[uint]map[*Client]bool),
 	}
 }
 
-// RegisterUser registers a user's websocket connection
-func (h *ChatHub) RegisterUser(userID uint, conn *websocket.Conn) {
+// RegisterUser registers a user's websocket client
+func (h *ChatHub) RegisterUser(client *Client) {
 	h.mu.Lock()
 
-	h.userConns[userID] = conn
+	// Initialize user connection set if needed
+	if h.userConns[client.UserID] == nil {
+		h.userConns[client.UserID] = make(map[*Client]bool)
+	}
 
-	// Collect all currently online user IDs (excluding self)
+	// Add the new client
+	h.userConns[client.UserID][client] = true
+
+	// Collect online users (if this is the first connection for this user, they are 'joining' global state)
+	// But we need to send snapshot to THIS client regardless.
 	onlineIDs := make([]uint, 0, len(h.userConns))
 	for id := range h.userConns {
-		if id != userID {
+		if id != client.UserID {
 			onlineIDs = append(onlineIDs, id)
 		}
 	}
 	h.mu.Unlock()
 
-	log.Printf("ChatHub: Registered user %d", userID)
+	log.Printf("ChatHub: Registered user %d (Active clients: %d)", client.UserID, len(h.userConns[client.UserID]))
 
-	// 1. Send initial snapshot of online users to the NEW user
+	// 1. Send initial snapshot of online users to the NEW client
 	if len(onlineIDs) > 0 {
 		snapshotMsg := ChatMessage{
 			Type:    "connected_users",
 			Payload: map[string]interface{}{"user_ids": onlineIDs},
 		}
 		if jsonMsg, err := json.Marshal(snapshotMsg); err == nil {
-			if err := conn.WriteMessage(websocket.TextMessage, jsonMsg); err != nil {
-				log.Printf("ChatHub: Failed to send snapshot to user %d: %v", userID, err)
-			}
+			client.TrySend(jsonMsg)
 		}
 	}
 
-	// 2. Broadcast "User X is Online" to everyone else
-	h.BroadcastGlobalStatus(userID, "online")
+	// 2. Broadcast "User X is Online" to everyone else (only if this is their first connection?)
+	// Actually, strictly speaking, they are "online" if they have >0 connections.
+	// But broadcasting "online" again triggers green dots which is fine.
+	h.BroadcastGlobalStatus(client.UserID, "online")
 }
 
 // UnregisterUser removes a user's websocket connection and cleans up all their conversation subscriptions
-func (h *ChatHub) UnregisterUser(userID uint) {
+// UnregisterUser removes a user's websocket connection and cleans up all their conversation subscriptions
+func (h *ChatHub) UnregisterUser(client *Client) {
 	h.mu.Lock()
 
+	// Remove from connection set
+	if clients, ok := h.userConns[client.UserID]; ok {
+		delete(clients, client)
+		// If NO more connections for this user, then they are offline
+		if len(clients) == 0 {
+			delete(h.userConns, client.UserID)
+			// Proceed to cleanup conversation subscriptions
+		} else {
+			// User still has other connections, so just close this one and return
+			// We DO NOT mark them offline globally.
+			h.mu.Unlock()
+			close(client.Send)
+			log.Printf("ChatHub: Unregistered client for user %d (Remaining clients: %d)", client.UserID, len(clients))
+			return
+		}
+	} else {
+		// Client not found (already removed)
+		h.mu.Unlock()
+		return
+	}
+
+	// Logic below only runs if ALL connections for this user are gone
+
 	// Remove from all conversations
-	if convs, ok := h.userActiveConvs[userID]; ok {
+	if convs, ok := h.userActiveConvs[client.UserID]; ok {
 		for convID := range convs {
 			if users, ok := h.conversations[convID]; ok {
-				delete(users, userID)
+				delete(users, client.UserID)
 				if len(users) == 0 {
 					delete(h.conversations, convID)
 				}
 			}
 		}
-		delete(h.userActiveConvs, userID)
+		delete(h.userActiveConvs, client.UserID)
 	}
 
-	// Remove user connection
-	delete(h.userConns, userID)
+	// The client set and userConns entry were already cleaned up above
+
+	// Close the channel
+	close(client.Send)
+
 	h.mu.Unlock()
 
-	log.Printf("ChatHub: Unregistered user %d", userID)
+	log.Printf("ChatHub: Unregistered user %d (All connections closed)", client.UserID)
 
 	// Broadcast "User X is Offline" to everyone else
-	h.BroadcastGlobalStatus(userID, "offline")
+	h.BroadcastGlobalStatus(client.UserID, "offline")
 }
 
 // JoinConversation subscribes a user to a conversation's messages
@@ -111,18 +143,35 @@ func (h *ChatHub) JoinConversation(userID, conversationID uint) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	// Get user's connection
-	conn, ok := h.userConns[userID]
+	// Get user's client
+	// Get user's client set
+	clients, ok := h.userConns[userID]
 	if !ok {
 		log.Printf("ChatHub: User %d not connected, cannot join conversation %d", userID, conversationID)
 		return
 	}
 
-	// Add to conversation map
+	// Add to conversation map (Just simple user presence in room)
 	if h.conversations[conversationID] == nil {
-		h.conversations[conversationID] = make(map[uint]*websocket.Conn)
+		h.conversations[conversationID] = make(map[uint]*Client) // Note: Map value type *Client is legacy, we actually just need boolean presence here
+		// But changing `conversations` map type requires more refactoring.
+		// For now, we store nil or just any client. It doesn't matter because BroadcastToConversation should iterate userConns.
+		// Wait, BroadcastToConversation uses `users := h.conversations[conversationID]`.
+		// It iterates `for _, client := range users`.
+		// This OLD logic assumes 1 Client per User.
+		// We need to FIX `BroadcastToConversation` too.
+		// For now, let's keep the map type but ignore the value in new logic.
 	}
-	h.conversations[conversationID][userID] = conn
+	// We just mark presence:
+	// We just mark presence:
+	// We need to provide a single *Client to satisfy the map type for now.
+	// Since BroadcastToConversation ignores this value (it uses userConns), any valid client works.
+	var anyClient *Client
+	for c := range clients {
+		anyClient = c
+		break
+	}
+	h.conversations[conversationID][userID] = anyClient
 
 	// Track active conversation for user
 	if h.userActiveConvs[userID] == nil {
@@ -172,9 +221,13 @@ func (h *ChatHub) BroadcastToConversation(conversationID uint, message ChatMessa
 	}
 
 	// Send to all connected users in this conversation
-	for userID, conn := range users {
-		if err := conn.WriteMessage(websocket.TextMessage, messageJSON); err != nil {
-			log.Printf("ChatHub: Failed to send to user %d in conversation %d: %v", userID, conversationID, err)
+	// Iterate UserIDs in the conversation
+	for userID := range users {
+		// For each user, send to ALL their active clients
+		if clients, ok := h.userConns[userID]; ok {
+			for client := range clients {
+				client.TrySend(messageJSON)
+			}
 		}
 	}
 
@@ -264,20 +317,14 @@ func (h *ChatHub) BroadcastGlobalStatus(userID uint, status string) {
 		return
 	}
 
-	for id, conn := range h.userConns {
-		// Don't echo back to the user who triggered it
+	for id, clients := range h.userConns {
+		// Don't echo back to the user who triggered it (optional, but good for noise reduction)
 		if id == userID {
 			continue
 		}
-		if conn == nil {
-			continue
-		}
 
-		// Fire and forget
-		go func(c *websocket.Conn) {
-			if err := c.WriteMessage(websocket.TextMessage, jsonMsg); err != nil {
-				// Log but don't panic
-			}
-		}(conn)
+		for client := range clients {
+			client.TrySend(jsonMsg)
+		}
 	}
 }

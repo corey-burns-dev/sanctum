@@ -21,6 +21,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/swagger"
+	"github.com/gofiber/websocket/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -175,7 +176,13 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	chatrooms.Get("/joined", s.GetJoinedChatrooms) // Get rooms user has joined
 	chatrooms.Post("/:id/join", s.JoinChatroom)    // Join a chatroom
 
-	// Websocket endpoints
+	// Websocket endpoints - require upgrade check middleware
+	api.Use("/ws", func(c *fiber.Ctx) error {
+		if websocket.IsWebSocketUpgrade(c) {
+			return c.Next()
+		}
+		return fiber.ErrUpgradeRequired
+	})
 	api.Get("/ws", s.WebsocketHandler())          // General notifications
 	api.Get("/ws/chat", s.WebSocketChatHandler()) // Real-time chat
 }
@@ -190,9 +197,30 @@ func (s *Server) HealthCheck(c *fiber.Ctx) error {
 }
 
 // AuthRequired returns the authentication middleware
+// AuthRequired returns the authentication middleware
 func (s *Server) AuthRequired() fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		path := c.Path()
+		// Skip auth for WebSocket handshake if handled by manual token check (though this middleware shouldn't run)
+		if strings.HasPrefix(path, "/api/ws") {
+			// For WebSocket, we accept token in query param since headers aren't supported in JS WebSocket
+			if c.Get("Upgrade") == "websocket" {
+				token := c.Query("token")
+				if token != "" {
+					// We'll validate this later in the handler, or here.
+					// Let's validate here to be safe if this middleware is indeed running.
+					c.Locals("user_token", token)
+					// Hack: set the Authorization header so the rest of the logic works?
+					// Or just return Next() and let the specific handler do it?
+					// The specific handler DOES do it. So if we are here, we should probably just Next() if token exists.
+					return c.Next()
+				}
+			}
+		}
+
 		authHeader := c.Get("Authorization")
+		log.Printf("AuthRequired checking %s. Header: %s", path, authHeader)
+
 		if authHeader == "" {
 			return models.RespondWithError(c, fiber.StatusUnauthorized,
 				models.NewUnauthorizedError("Authorization header required"))

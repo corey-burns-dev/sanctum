@@ -139,6 +139,18 @@ var (
 func Seed(db *gorm.DB) error {
 	log.Println("🌱 Starting database seeding...")
 
+	// Clear existing data to avoid conflicts
+	if err := clearData(db); err != nil {
+		log.Println("⚠️  Warning: Could not clear all existing data, but continuing anyway...")
+	}
+
+	// Create test users
+	users, err := createUsers(db)
+	if err != nil {
+		return fmt.Errorf("failed to create users: %w", err)
+	}
+	log.Printf("✓ %d test users created", len(users))
+
 	// Create conversations (chat rooms) - these should always exist
 	// They are never cleared, only created if they don't exist
 	conversations, err := createOrGetConversations(db)
@@ -147,8 +159,16 @@ func Seed(db *gorm.DB) error {
 	}
 	log.Printf("✓ %d conversations available", len(conversations))
 
+	// Create posts for users
+	posts, err := createPosts(db, users)
+	if err != nil {
+		return fmt.Errorf("failed to create posts: %w", err)
+	}
+	log.Printf("✓ %d posts created", len(posts))
+
 	log.Println("🎉 Database seeding completed successfully!")
 	log.Println("✨ Chat rooms are ready. Users will auto-join when they login.")
+	log.Println("📧 All test users have the password: password123")
 	return nil
 }
 
