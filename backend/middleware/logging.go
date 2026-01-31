@@ -11,10 +11,18 @@ import (
 var Logger *slog.Logger
 
 func init() {
-	// Initialize a structured logger that writes to stdout in JSON format
-	Logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
+	// Initialize a structured logger based on environment
+	var handler slog.Handler
+	level := slog.LevelInfo
+
+	if os.Getenv("APP_ENV") == "production" {
+		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level})
+	} else {
+		// Pretty text output for local development
+		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level})
+	}
+
+	Logger = slog.New(handler)
 }
 
 // StructuredLogger returns a Fiber middleware for logging requests using slog

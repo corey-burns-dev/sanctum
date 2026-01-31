@@ -111,6 +111,34 @@ func (n *Notifier) StartChatSubscriber(
 	return nil
 }
 
+// PublishGameAction publishes a game action (move, join, etc) to a room channel
+func (n *Notifier) PublishGameAction(
+	ctx context.Context, roomID uint, payload string) error {
+	if n.rdb == nil {
+		return nil
+	}
+	channel := fmt.Sprintf("game:room:%d", roomID)
+	return n.rdb.Publish(ctx, channel, payload).Err()
+}
+
+// StartGameSubscriber subscribes to game room patterns
+func (n *Notifier) StartGameSubscriber(
+	ctx context.Context, onMessage func(channel string, payload string)) error {
+	if n.rdb == nil {
+		return nil
+	}
+	sub := n.rdb.PSubscribe(ctx, "game:room:*")
+	ch := sub.Channel()
+
+	go func() {
+		for msg := range ch {
+			onMessage(msg.Channel, msg.Payload)
+		}
+	}()
+
+	return nil
+}
+
 // UserChannel derives the Redis channel name for a user.
 func UserChannel(userID uint) string {
 	return "notifications:user:" + strconv.FormatUint(uint64(userID), 10)
@@ -119,4 +147,9 @@ func UserChannel(userID uint) string {
 // ConversationChannel derives the Redis channel name for a conversation.
 func ConversationChannel(conversationID uint) string {
 	return "chat:conv:" + strconv.FormatUint(uint64(conversationID), 10)
+}
+
+// GameRoomChannel derives the Redis channel name for a game room.
+func GameRoomChannel(roomID uint) string {
+	return "game:room:" + strconv.FormatUint(uint64(roomID), 10)
 }

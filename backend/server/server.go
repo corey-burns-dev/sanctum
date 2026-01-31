@@ -41,9 +41,11 @@ type Server struct {
 	commentRepo repository.CommentRepository
 	chatRepo    repository.ChatRepository
 	friendRepo  repository.FriendRepository
+	gameRepo    repository.GameRepository
 	notifier    *notifications.Notifier
 	hub         *notifications.Hub
 	chatHub     *notifications.ChatHub
+	gameHub     *notifications.GameHub
 	// Add other repositories as needed
 }
 
@@ -65,6 +67,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	commentRepo := repository.NewCommentRepository(db)
 	chatRepo := repository.NewChatRepository(db)
 	friendRepo := repository.NewFriendRepository(db)
+	gameRepo := repository.NewGameRepository(db)
 
 	server := &Server{
 		config:      cfg,
@@ -75,6 +78,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		commentRepo: commentRepo,
 		chatRepo:    chatRepo,
 		friendRepo:  friendRepo,
+		gameRepo:    gameRepo,
 	}
 
 	// Initialize notifier and hub if Redis is available
@@ -82,6 +86,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		server.notifier = notifications.NewNotifier(redisClient)
 		server.hub = notifications.NewHub()
 		server.chatHub = notifications.NewChatHub()
+		server.gameHub = notifications.NewGameHub(db, server.notifier)
 	}
 
 	return server, nil
@@ -210,6 +215,13 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	chatrooms.Get("/joined", s.GetJoinedChatrooms) // Get rooms user has joined
 	chatrooms.Post("/:id/join", s.JoinChatroom)    // Join a chatroom
 
+	// Game routes
+	games := protected.Group("/games")
+	games.Post("/rooms", s.CreateGameRoom)
+	games.Get("/rooms/active", s.GetActiveGameRooms)
+	games.Get("/stats/:type", s.GetGameStats)
+	games.Get("/rooms/:id", s.GetGameRoom)
+
 	// Websocket endpoints - require upgrade check middleware
 	api.Use("/ws", func(c *fiber.Ctx) error {
 		if websocket.IsWebSocketUpgrade(c) {
@@ -219,6 +231,7 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	})
 	api.Get("/ws", s.WebsocketHandler())          // General notifications
 	api.Get("/ws/chat", s.WebSocketChatHandler()) // Real-time chat
+	api.Get("/ws/game", s.WebSocketGameHandler()) // Multiplayer games
 }
 
 // HealthCheck handles health check requests
@@ -428,6 +441,15 @@ func (s *Server) Start() error {
 		go func() {
 			if err := s.chatHub.StartWiring(context.Background(), s.notifier); err != nil {
 				log.Printf("failed to start chat hub wiring: %v", err)
+			}
+		}()
+	}
+
+	// Wire game hub to Redis subscriber if available
+	if s.gameHub != nil && s.notifier != nil {
+		go func() {
+			if err := s.gameHub.StartWiring(context.Background(), s.notifier); err != nil {
+				log.Printf("failed to start game hub wiring: %v", err)
 			}
 		}()
 	}
