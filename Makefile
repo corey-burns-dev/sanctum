@@ -2,7 +2,6 @@
 GO ?= go
 DOCKER_COMPOSE ?= docker compose
 BUN ?= bun
-SWAG_VERSION ?= v1.8.12
 
 # Environment Orchestration
 ENVIRONMENT ?= dev
@@ -20,12 +19,12 @@ GREEN := \033[1;32m
 YELLOW := \033[1;33m
 NC := \033[0m # No Color
 
-.PHONY: help dev dev-backend dev-frontend dev-both dev-fresh build build-backend build-frontend up down recreate recreate-frontend recreate-backend logs logs-backend logs-frontend logs-all fmt fmt-frontend lint lint-frontend install env restart check-versions clean test test-backend test-frontend test-api test-e2e test-e2e-smoke test-load test-up test-down seed admin-list admin-promote admin-demote admin-bootstrap-me deps-update deps-update-backend deps-update-frontend deps-tidy deps-check deps-vuln deps-audit monitor-up monitor-down monitor-logs monitor-config monitor-lite-up monitor-lite-down report report-open swagger openapi-check
+.PHONY: help dev dev-backend dev-frontend dev-both build build-backend build-frontend up down recreate recreate-frontend recreate-backend logs logs-backend logs-frontend logs-all fmt fmt-frontend lint lint-frontend install env restart check-versions clean test test-api test-up test-down test-backend seed deps-update deps-update-backend deps-update-frontend deps-tidy deps-check deps-vuln deps-audit monitor-up monitor-down monitor-logs monitor-config monitor-lite-up monitor-lite-down
 
 # Default target
 help:
 	@echo "$(BLUE)╔════════════════════════════════════════════════════════════════╗$(NC)"
-	@echo "$(BLUE)║           Sanctum - Full Stack Development CLI               ║$(NC)"
+	@echo "$(BLUE)║           Vibeshift - Full Stack Development CLI               ║$(NC)"
 	@echo "$(BLUE)╚════════════════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
 	@echo "$(GREEN)Development:$(NC)"
@@ -33,7 +32,6 @@ help:
 	@echo "  make dev-backend        - 🔧 Backend only (Go + Redis + Postgres)"
 	@echo "  make dev-frontend       - 🎨 Frontend only (Vite dev server, local)"
 	@echo "  make dev-both           - 🔀 Backend in Docker + Frontend local (best DX)"
-	@echo "  make dev-fresh          - 🧹 Start fresh dev (clean DB, migrations, seed)"
 	@echo ""
 	@echo "$(GREEN)Build & Compose:$(NC)"
 	@echo "  make build              - 🔨 Build all Docker images (prod)"
@@ -67,22 +65,13 @@ help:
 	@echo ""
 	@echo "$(GREEN)Testing:$(NC)"
 	@echo "  make test               - 🧪 Run backend tests"
-	@echo "  make test-frontend      - 🧪 Run frontend unit tests (Vitest)"
 	@echo "  make test-api           - 🧪 Test all API endpoints"
-	@echo "  make test-e2e-smoke     - 🧪 Run Playwright Sanctum smoke tests"
-	@echo "  make test-e2e           - 🧪 Run full Playwright E2E suite"
 	@echo ""
 	@echo "$(GREEN)Database:$(NC)"
 	@echo "  make seed               - 🌱 Seed database with test data"
-	@echo "  make admin-list         - 👑 List admin users"
-	@echo "  make admin-promote user_id=<id> - 👑 Promote user to admin"
-	@echo "  make admin-demote user_id=<id>  - 👑 Demote admin user"
-	@echo "  make admin-bootstrap-me email=<email> - 👑 Make exactly one admin (you)"
 	@echo ""
 	@echo "$(GREEN)Utilities:$(NC)"
 	@echo "  make env                - ⚙️  Initialize .env file"
-	@echo "  make report slug=<name> - 📝 Create a timestamped report in docs/reports/"
-	@echo "  make report-open        - 📝 Show most recent report file path"
 	@echo "  make restart            - 🔄 Restart all services"
 	@echo "  make clean              - 🧹 Clean containers, volumes, and artifacts"
 	@echo "  make check-versions     - 🔍 Check latest Docker image versions"
@@ -116,14 +105,6 @@ dev-both: env install
 	@set -a; [ -f .env ] && . ./.env; set +a; $(DOCKER_COMPOSE) $(COMPOSE_FILES) up --build app redis postgres -d
 	@echo "$(YELLOW)Frontend starting in foreground...$(NC)"
 	@cd frontend && $(BUN) --bun vite --host
-
-# Start a fresh development environment: remove volumes, start services, run migrations + seed
-dev-fresh: env
-	@echo "$(BLUE)Starting fresh dev environment (clean DB, migrations, seed)...$(NC)"
-	@$(MAKE) clean
-	@$(MAKE) up
-	@sleep 3
-	@./scripts/reset_and_seed.sh
 
 # Build targets
 build: build-backend build-frontend
@@ -213,20 +194,8 @@ config-check:
 # Code quality
 fmt:
 	@echo "$(BLUE)Formatting Go code...$(NC)"
-	@echo "$(BLUE)Formatting Go code with goimports + gofumpt...$(NC)"
-	@if ! command -v goimports >/dev/null 2>&1; then \
-		echo "$(YELLOW)goimports not found. Run 'make install-formatters' to install formatters.$(NC)"; \
-		exit 1; \
-	fi
-	@if ! command -v gofumpt >/dev/null 2>&1; then \
-		echo "$(YELLOW)gofumpt not found. Run 'make install-formatters' to install formatters.$(NC)"; \
-		exit 1; \
-	fi
-	# format imports and files
-	cd backend && goimports -w .
-	# apply stricter formatting
-	cd backend && gofumpt -w .
-	@echo "$(GREEN)✓ Code formatted (goimports + gofumpt)$(NC)"
+	$(GO) fmt ./...
+	@echo "$(GREEN)✓ Code formatted$(NC)"
 
 lint:
 	@echo "$(BLUE)Linting Go code with golangci-lint...$(NC)"
@@ -243,13 +212,6 @@ install-linter:
 	@GO111MODULE=on go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	@echo "$(GREEN)✓ golangci-lint installed (ensure $HOME/go/bin is in your PATH)$(NC)"
 
-.PHONY: install-formatters
-install-formatters:
-	@echo "$(BLUE)Installing Go formatters (goimports, gofumpt)...$(NC)"
-	@GO111MODULE=on go install golang.org/x/tools/cmd/goimports@latest
-	@GO111MODULE=on go install mvdan.cc/gofumpt@latest
-	@echo "$(GREEN)✓ goimports and gofumpt installed (ensure $HOME/go/bin is in your PATH)$(NC)"
-
 fmt-frontend:
 	@echo "$(BLUE)Formatting frontend code with Biome...$(NC)"
 	cd frontend && $(BUN) --bun biome format --write .
@@ -257,9 +219,7 @@ fmt-frontend:
 
 lint-frontend:
 	@echo "$(BLUE)Linting frontend code with Biome...$(NC)"
-	# In CI, clean build artifacts to ensure linting is deterministic.
-	# Locally we avoid removing `dist` so developers' build output isn't destroyed.
-	cd frontend && if [ -n "$(CI)" ]; then rm -rf dist; fi && $(BUN) --bun biome check .
+	cd frontend && $(BUN) --bun biome check --write .
 	@echo "$(GREEN)✓ Frontend linting passed$(NC)"
 
 # Frontend dependencies
@@ -269,21 +229,10 @@ install:
 	@echo "$(GREEN)✓ Dependencies installed$(NC)"
 
 # Swagger documentation
-SWAG_BIN := $(shell $(GO) env GOPATH)/bin/swag
-
-.PHONY: swagger
 swagger:
-	@echo "$(BLUE)Ensuring swag $(SWAG_VERSION) is installed...$(NC)"
-	@GO111MODULE=on $(GO) install github.com/swaggo/swag/cmd/swag@$(SWAG_VERSION)
 	@echo "$(BLUE)Generating Swagger documentation...$(NC)"
-	cd backend && $(SWAG_BIN) init -g cmd/server/main.go --output ./docs
+	cd backend && ~/go/bin/swag init -g main.go --output ./docs
 	@echo "$(GREEN)✓ Swagger docs generated$(NC)"
-
-.PHONY: openapi-check
-openapi-check:
-	@echo "$(BLUE)Checking frontend endpoint paths against OpenAPI...$(NC)"
-	@scripts/check_openapi_frontend_sync.sh
-	@echo "$(GREEN)✓ OpenAPI checks passed$(NC)"
 
 # Environment setup
 env:
@@ -300,22 +249,6 @@ restart: down dev
 check-versions:
 	@bash scripts/check-versions.sh
 
-report:
-	@if [ -z "$(slug)" ]; then \
-		echo "$(YELLOW)Usage: make report slug=<short-kebab-slug>$(NC)"; \
-		echo "Example: make report slug=auth-refresh-fix"; \
-		exit 1; \
-	fi
-	@./scripts/new_report.sh "$(slug)"
-
-report-open:
-	@latest="$$(ls -1 docs/reports/*.md 2>/dev/null | grep -v 'REPORT_TEMPLATE.md' | sort | tail -n 1)"; \
-	if [ -z "$$latest" ]; then \
-		echo "$(YELLOW)No report files found in docs/reports.$(NC)"; \
-		exit 1; \
-	fi; \
-	echo "$$latest"
-
 clean:
 	@echo "$(BLUE)Cleaning up containers, volumes, and artifacts...$(NC)"
 	$(DOCKER_COMPOSE) $(COMPOSE_FILES) down -v
@@ -330,18 +263,11 @@ test: test-backend
 
 test-backend:
 	@echo "$(BLUE)Running backend tests...$(NC)"
-	make test-up
-	@echo "$(BLUE)Waiting for test database...$(NC)"
-	@sleep 5
-	cd backend && APP_ENV=test $(GO) test ./...
-
-test-frontend:
-	@echo "$(BLUE)Running frontend unit tests...$(NC)"
-	cd frontend && $(BUN) run test:run
+	cd backend && $(GO) test ./...
 
 test-api:
 	@echo "$(BLUE)Running API endpoint tests...$(NC)"
-	./test-routes.sh
+	./test-api.sh
 
 test-up:
 	$(DOCKER_COMPOSE) $(COMPOSE_FILES) up -d postgres_test redis
@@ -349,62 +275,12 @@ test-up:
 test-down:
 	$(DOCKER_COMPOSE) $(COMPOSE_FILES) down
 
-coverage: test-up
-	@echo "$(BLUE)Running backend tests with coverage...$(NC)"
-	@sleep 5
-	cd backend && APP_ENV=test $(GO) test -race -coverprofile=coverage.out -covermode=atomic ./...
-	cd backend && $(GO) tool cover -html=coverage.out -o coverage.html
-	@echo "$(GREEN)✓ Coverage report generated at backend/coverage.html$(NC)"
-
-# E2E Testing (Playwright)
-test-e2e-smoke:
-	@echo "$(BLUE)Running Playwright smoke E2E tests...$(NC)"
-	@echo "$(YELLOW)⚠️  Ensure backend and frontend are running (make dev or run both locally)$(NC)"
-	cd frontend && PLAYWRIGHT_BASE_URL=http://localhost:5173 PLAYWRIGHT_API_URL=http://localhost:8375/api DB_HOST=localhost DB_PORT=5433 DB_USER=sanctum_user DB_PASSWORD=sanctum_password DB_NAME=sanctum_test $(BUN) run test:e2e:smoke
-
-test-e2e:
-	@echo "$(BLUE)Running full Playwright E2E suite...$(NC)"
-	@echo "$(YELLOW)⚠️  Ensure backend and frontend are running (make dev or run both locally)$(NC)"
-	cd frontend && PLAYWRIGHT_BASE_URL=http://localhost:5173 PLAYWRIGHT_API_URL=http://localhost:8375/api DB_HOST=localhost DB_PORT=5433 DB_USER=sanctum_user DB_PASSWORD=sanctum_password DB_NAME=sanctum_test $(BUN) run test:e2e
-
-test-load:
-	@echo "$(BLUE)Running backend load smoke tests (login/feed/chat send)...$(NC)"
-	cd backend && APP_ENV=test $(GO) test ./test -tags=load -run TestLoadScenarios -count=1
-
 # Database seeding
 seed:
-	@echo "$(BLUE)Seeding database with default parameters...$(NC)"
+	@echo "$(BLUE)Seeding database with test data...$(NC)"
 	cd backend && $(GO) run cmd/seed/main.go
-
-seed-all:
-	@echo "$(BLUE)Applying MegaPopulated seeder preset...$(NC)"
-	cd backend && $(GO) run cmd/seed/main.go -preset MegaPopulated
-
-seed-clean:
-	@echo "$(BLUE)Cleaning and seeding database...$(NC)"
-	cd backend && $(GO) run cmd/seed/main.go -clean=true
 	@echo "$(GREEN)✓ Database seeded successfully!$(NC)"
 	@echo "$(YELLOW)📧 Test users password: password123$(NC)"
-
-# Admin management
-admin-list:
-	@echo "$(BLUE)Listing admin users...$(NC)"
-	cd backend && APP_ENV=development $(GO) run ./cmd/admin/main.go list-admins
-
-admin-promote:
-	@if [ -z "$(user_id)" ]; then echo "Usage: make admin-promote user_id=<id>"; exit 1; fi
-	@echo "$(BLUE)Promoting user $(user_id) to admin...$(NC)"
-	cd backend && APP_ENV=development $(GO) run ./cmd/admin/main.go promote $(user_id)
-
-admin-demote:
-	@if [ -z "$(user_id)" ]; then echo "Usage: make admin-demote user_id=<id>"; exit 1; fi
-	@echo "$(BLUE)Demoting user $(user_id) from admin...$(NC)"
-	cd backend && APP_ENV=development $(GO) run ./cmd/admin/main.go demote $(user_id)
-
-admin-bootstrap-me:
-	@if [ -z "$(email)" ]; then echo "Usage: make admin-bootstrap-me email=<email>"; exit 1; fi
-	@echo "$(BLUE)Bootstrapping single-admin mode for $(email)...$(NC)"
-	./scripts/admin_bootstrap_me.sh "$(email)"
 
 # Dependency Management
 deps-install-backend:
@@ -431,9 +307,8 @@ deps-update: deps-tidy
 
 deps-update-backend:
 	@echo "$(BLUE)Updating Go dependencies...$(NC)"
-	@echo "$(BLUE)Updating Go dependencies inside container...$(NC)"
-	$(DOCKER_COMPOSE) $(COMPOSE_FILES) exec -T app go get -u ./...
-	$(DOCKER_COMPOSE) $(COMPOSE_FILES) exec -T app go mod tidy
+	cd backend && $(GO) get -u ./...
+	cd backend && $(GO) mod tidy
 	@echo "$(GREEN)✓ Go dependencies updated$(NC)"
 
 deps-update-frontend:
