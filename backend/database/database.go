@@ -2,10 +2,13 @@
 package database
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 	"vibeshift/config"
+	"vibeshift/middleware"
 	"vibeshift/models"
 
 	"gorm.io/driver/postgres"
@@ -16,9 +19,69 @@ import (
 // DB is the global database connection instance.
 var DB *gorm.DB
 
+// CustomGormLogger integrates GORM with slog
+type CustomGormLogger struct {
+	logger *slog.Logger
+	Config logger.Config
+}
+
+func (l *CustomGormLogger) LogMode(level logger.LogLevel) logger.Interface {
+	newlogger := *l
+	newlogger.Config.LogLevel = level
+	return &newlogger
+}
+
+func (l *CustomGormLogger) Info(ctx context.Context, msg string, data ...interface{}) {
+	if l.Config.LogLevel >= logger.Info {
+		l.logger.InfoContext(ctx, fmt.Sprintf(msg, data...))
+	}
+}
+
+func (l *CustomGormLogger) Warn(ctx context.Context, msg string, data ...interface{}) {
+	if l.Config.LogLevel >= logger.Warn {
+		l.logger.WarnContext(ctx, fmt.Sprintf(msg, data...))
+	}
+}
+
+func (l *CustomGormLogger) Error(ctx context.Context, msg string, data ...interface{}) {
+	if l.Config.LogLevel >= logger.Error {
+		l.logger.ErrorContext(ctx, fmt.Sprintf(msg, data...))
+	}
+}
+
+func (l *CustomGormLogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
+	if l.Config.LogLevel <= logger.Silent {
+		return
+	}
+
+	elapsed := time.Since(begin)
+	sql, rows := fc()
+
+	switch {
+	case err != nil && l.Config.LogLevel >= logger.Error && !errors.Is(err, gorm.ErrRecordNotFound):
+		l.logger.ErrorContext(ctx, "GORM query error",
+			slog.String("sql", sql),
+			slog.Int64("rows", rows),
+			slog.Duration("elapsed", elapsed),
+			slog.String("error", err.Error()),
+		)
+	case elapsed > l.Config.SlowThreshold && l.Config.SlowThreshold != 0 && l.Config.LogLevel >= logger.Warn:
+		l.logger.WarnContext(ctx, "GORM slow query",
+			slog.String("sql", sql),
+			slog.Int64("rows", rows),
+			slog.Duration("elapsed", elapsed),
+		)
+	case l.Config.LogLevel >= logger.Info:
+		l.logger.InfoContext(ctx, "GORM query",
+			slog.String("sql", sql),
+			slog.Int64("rows", rows),
+			slog.Duration("elapsed", elapsed),
+		)
+	}
+}
+
 // Connect opens a database connection using the provided configuration and performs
 // automatic migration for the application models, then returns the gorm DB instance.
-// Connect establishes a database connection using the provided configuration.
 func Connect(cfg *config.Config) (*gorm.DB, error) {
 	var err error
 
@@ -32,15 +95,26 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 		cfg.DBName,
 	)
 
+	// Custom GORM logger that uses slog and ignores ErrRecordNotFound
+	gormLogger := &CustomGormLogger{
+		logger: middleware.Logger,
+		Config: logger.Config{
+			SlowThreshold:             200 * time.Millisecond,
+			LogLevel:                  logger.Warn,
+			IgnoreRecordNotFoundError: true,
+			Colorful:                  false,
+		},
+	}
+
 	dbInstance, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: gormLogger,
 	})
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	log.Println("Database connected successfully")
+	middleware.Logger.Info("Database connected successfully")
 
 	// Auto migrate models
 	err = dbInstance.AutoMigrate(
@@ -57,7 +131,7 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to migrate database: %w", err)
 	}
 
-	log.Println("Database migration completed")
+	middleware.Logger.Info("Database migration completed")
 
 	// Set connection pooling parameters
 	sqlDB, err := dbInstance.DB()

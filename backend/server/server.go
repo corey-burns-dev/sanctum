@@ -22,6 +22,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/helmet"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
+	"github.com/gofiber/fiber/v2/middleware/monitor"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"github.com/gofiber/swagger"
 	"github.com/gofiber/websocket/v2"
@@ -131,6 +132,11 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 
 	// Health check
 	api.Get("/", s.HealthCheck)
+
+	// Metrics endpoint for Prometheus
+	api.Get("/metrics", monitor.New(monitor.Config{
+		Title: "Vibeshift Backend Metrics",
+	}))
 
 	// Swagger documentation
 	api.Get("/swagger/*", swagger.HandlerDefault)

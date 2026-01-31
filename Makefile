@@ -11,13 +11,15 @@ else
 	COMPOSE_FILES := -f compose.yml -f compose.override.yml
 endif
 
+MONITOR_FILES := -f compose.monitoring.yml
+
 # Colors
 BLUE := \033[1;34m
 GREEN := \033[1;32m
 YELLOW := \033[1;33m
 NC := \033[0m # No Color
 
-.PHONY: help dev dev-backend dev-frontend dev-both build build-backend build-frontend up down recreate recreate-frontend recreate-backend logs logs-backend logs-frontend logs-all fmt fmt-frontend lint lint-frontend install env restart check-versions clean test test-api test-up test-down test-backend seed deps-update deps-update-backend deps-update-frontend deps-tidy deps-check deps-vuln deps-audit
+.PHONY: help dev dev-backend dev-frontend dev-both build build-backend build-frontend up down recreate recreate-frontend recreate-backend logs logs-backend logs-frontend logs-all fmt fmt-frontend lint lint-frontend install env restart check-versions clean test test-api test-up test-down test-backend seed deps-update deps-update-backend deps-update-frontend deps-tidy deps-check deps-vuln deps-audit monitor-up monitor-down monitor-logs monitor-config monitor-lite-up monitor-lite-down
 
 # Default target
 help:
@@ -44,7 +46,11 @@ help:
 	@echo "$(GREEN)Logs & Monitoring:$(NC)"
 	@echo "  make logs               - 📋 Stream backend logs"
 	@echo "  make logs-backend       - 📋 Backend logs only"
+	@echo "  make logs-frontend      - 📋 Frontend logs only"
 	@echo "  make logs-all           - 📋 All service logs"
+	@echo "  make monitor-logs       - 📊 View monitoring stack logs"
+	@echo "  make monitor-lite-up    - ⚡ Start ultra-lite monitoring (Dozzle, Uptime Kuma)"
+	@echo "  make monitor-lite-down  - ⚡ Stop ultra-lite monitoring"
 	@echo ""
 	@echo "$(GREEN)Environment & Config:$(NC)"
 	@echo "  make config-check       - 🔍 Validate merged Docker Compose config"
@@ -151,6 +157,34 @@ logs-frontend:
 
 logs-all:
 	$(DOCKER_COMPOSE) $(COMPOSE_FILES) logs -f
+
+# Monitoring targets
+monitor-up:
+	@echo "$(BLUE)Starting observability stack...$(NC)"
+	$(DOCKER_COMPOSE) $(MONITOR_FILES) up -d
+	@echo "$(GREEN)✓ Monitoring stack started (Grafana: http://localhost:3000)$(NC)"
+
+monitor-down:
+	@echo "$(BLUE)Stopping observability stack...$(NC)"
+	$(DOCKER_COMPOSE) $(MONITOR_FILES) down
+	@echo "$(GREEN)✓ Monitoring stack stopped$(NC)"
+
+monitor-logs:
+	$(DOCKER_COMPOSE) $(MONITOR_FILES) logs -f
+
+monitor-config:
+	$(DOCKER_COMPOSE) $(MONITOR_FILES) config
+
+# Lite Monitoring targets
+monitor-lite-up:
+	@echo "$(BLUE)Starting ultra-lite observability stack...$(NC)"
+	$(DOCKER_COMPOSE) -f compose.monitor-lite.yml up -d
+	@echo "$(GREEN)✓ Lite Monitoring started (Dozzle: http://localhost:8081, Uptime Kuma: http://localhost:3001)$(NC)"
+
+monitor-lite-down:
+	@echo "$(BLUE)Stopping ultra-lite observability stack...$(NC)"
+	$(DOCKER_COMPOSE) -f compose.monitor-lite.yml down
+	@echo "$(GREEN)✓ Lite Monitoring stopped$(NC)"
 
 # Config validation
 config-check:
@@ -281,17 +315,6 @@ deps-update-frontend:
 	@echo "$(BLUE)Updating frontend dependencies...$(NC)"
 	cd frontend && $(BUN) update
 	@echo "$(GREEN)✓ Frontend dependencies updated$(NC)"
-
-deps-tidy:
-	@echo "$(BLUE)Tidying Go modules inside container...$(NC)"
-	$(DOCKER_COMPOSE) $(COMPOSE_FILES) exec -T app go mod tidy
-	@echo "$(GREEN)✓ Go modules tidied$(NC)"
-
-deps-add-backend:
-	@if [ -z "$(pkg)" ]; then echo "Usage: make deps-add-backend pkg=github.com/foo/bar"; exit 1; fi
-	@echo "$(BLUE)Adding Go package $(pkg) inside container...$(NC)"
-	$(DOCKER_COMPOSE) $(COMPOSE_FILES) exec -T app go get $(pkg)
-	$(DOCKER_COMPOSE) $(COMPOSE_FILES) exec -T app go mod tidy
 
 deps-check:
 	@echo "$(BLUE)Checking for outdated Go dependencies...$(NC)"

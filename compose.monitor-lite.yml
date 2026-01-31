@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: vibeshift_dozzle
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+    networks:
+      - vibeshift_default
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: vibeshift_uptime_kuma
+    volumes:
+      - uptime_kuma_data:/app/data
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+    networks:
+      - vibeshift_default
+
+volumes:
+  uptime_kuma_data:
+
+networks:
+  vibeshift_default:
+    external: true
