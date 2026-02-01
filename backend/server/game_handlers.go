@@ -88,7 +88,7 @@ func (s *Server) WebSocketGameHandler() fiber.Handler {
 		userIDVal := c.Locals("userID")
 		if userIDVal == nil {
 			log.Println("GameWS: No userID in locals")
-			c.Close()
+			_ = c.Close()
 			return
 		}
 		userID := userIDVal.(uint)
@@ -96,7 +96,7 @@ func (s *Server) WebSocketGameHandler() fiber.Handler {
 		roomIDStr := c.Query("room_id")
 		if roomIDStr == "" {
 			log.Println("GameWS: No room_id in query")
-			c.Close()
+			_ = c.Close()
 			return
 		}
 		roomID64, _ := strconv.ParseUint(roomIDStr, 10, 32)
@@ -107,13 +107,15 @@ func (s *Server) WebSocketGameHandler() fiber.Handler {
 
 		defer func() {
 			s.gameHub.Unregister(userID, roomID, c)
-			c.Close()
+			_ = c.Close()
 		}()
 
 		// Subscribe to Redis game room notifications
 		ctx := context.Background()
 		redisSub := s.redis.Subscribe(ctx, notifications.GameRoomChannel(roomID))
-		defer redisSub.Close()
+		defer func() {
+			_ = redisSub.Close()
+		}()
 
 		// Channel to handle Redis messages
 		redisChan := redisSub.Channel()

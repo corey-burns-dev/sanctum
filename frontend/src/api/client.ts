@@ -6,6 +6,7 @@ import type {
     CreateCommentRequest,
     CreateConversationRequest,
     CreatePostRequest,
+    GameRoom,
     LoginRequest,
     Message,
     PaginationParams,
@@ -315,22 +316,23 @@ class ApiClient {
     }
 
     // Games
-    async createGameRoom(type: string): Promise<any> {
+    async createGameRoom(type: string): Promise<GameRoom> {
         return this.request('/games/rooms', {
             method: 'POST',
             body: JSON.stringify({ type }),
         })
     }
 
-    async getActiveGameRooms(type?: string): Promise<any[]> {
+    async getActiveGameRooms(type?: string): Promise<GameRoom[]> {
         const query = type ? `?type=${type}` : ''
         return this.request(`/games/rooms/active${query}`)
     }
 
-    async getGameRoom(id: number): Promise<any> {
+    async getGameRoom(id: number): Promise<GameRoom> {
         return this.request(`/games/rooms/${id}`)
     }
 
+    // biome-ignore lint/suspicious/noExplicitAny: dynamic stats object
     async getGameStats(type: string): Promise<any> {
         return this.request(`/games/stats/${type}`)
     }

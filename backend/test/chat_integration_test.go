@@ -32,9 +32,10 @@ func createTestUser(t *testing.T, app interface {
 	if err != nil {
 		t.Fatalf("signup error: %v", err)
 	}
+	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode != 201 {
 		buf := new(bytes.Buffer)
-		buf.ReadFrom(res.Body)
+		_, _ = buf.ReadFrom(res.Body)
 		t.Fatalf("expected 201, got %d. Body: %s", res.StatusCode, buf.String())
 	}
 
@@ -44,7 +45,7 @@ func createTestUser(t *testing.T, app interface {
 			ID uint `json:"id"`
 		} `json:"user"`
 	}
-	json.NewDecoder(res.Body).Decode(&resp)
+	_ = json.NewDecoder(res.Body).Decode(&resp)
 	return TestUser{ID: resp.User.ID, Token: resp.Token}
 }
 
@@ -72,11 +73,12 @@ func TestChatAPI(t *testing.T) {
 		res, err := app.Test(req, -1)
 		assert.NoError(t, err)
 		assert.Equal(t, 201, res.StatusCode)
+		defer func() { _ = res.Body.Close() }()
 
 		var resp struct {
 			ID uint `json:"id"`
 		}
-		json.NewDecoder(res.Body).Decode(&resp)
+		_ = json.NewDecoder(res.Body).Decode(&resp)
 		convID = resp.ID
 		assert.NotZero(t, convID)
 	})
@@ -95,6 +97,7 @@ func TestChatAPI(t *testing.T) {
 		res, err := app.Test(req, -1)
 		assert.NoError(t, err)
 		assert.Equal(t, 201, res.StatusCode)
+		_ = res.Body.Close()
 	})
 
 	t.Run("Get Messages", func(t *testing.T) {
@@ -104,9 +107,10 @@ func TestChatAPI(t *testing.T) {
 		res, err := app.Test(req, -1)
 		assert.NoError(t, err)
 		assert.Equal(t, 200, res.StatusCode)
+		defer func() { _ = res.Body.Close() }()
 
 		var messages []map[string]interface{}
-		json.NewDecoder(res.Body).Decode(&messages)
+		_ = json.NewDecoder(res.Body).Decode(&messages)
 		assert.Greater(t, len(messages), 0)
 		assert.Equal(t, "Hello", messages[0]["content"])
 	})
@@ -126,11 +130,12 @@ func TestChatAPI(t *testing.T) {
 		res, err := app.Test(req, -1)
 		assert.NoError(t, err)
 		assert.Equal(t, 201, res.StatusCode)
+		defer func() { _ = res.Body.Close() }()
 
 		var resp struct {
 			Name string `json:"name"`
 		}
-		json.NewDecoder(res.Body).Decode(&resp)
+		_ = json.NewDecoder(res.Body).Decode(&resp)
 		assert.Equal(t, "Group 1", resp.Name)
 	})
 }

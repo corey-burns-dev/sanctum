@@ -82,7 +82,7 @@ func (h *Hub) StartWiring(ctx context.Context, n *Notifier) error {
 }
 
 // Shutdown gracefully closes all websocket connections
-func (h *Hub) Shutdown(ctx context.Context) error {
+func (h *Hub) Shutdown(_ context.Context) error {
 	close(h.shutdown)
 
 	// Close all connections gracefully

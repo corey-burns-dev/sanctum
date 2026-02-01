@@ -69,7 +69,7 @@ func TestChatRepository(t *testing.T) {
 	t.Run("CreateMessage", func(t *testing.T) {
 		conv := &models.Conversation{CreatedBy: user1.ID}
 		db.Create(conv)
-		repo.AddParticipant(ctx, conv.ID, user1.ID)
+		_ = repo.AddParticipant(ctx, conv.ID, user1.ID)
 
 		msg := &models.Message{
 			ConversationID: conv.ID,

@@ -158,7 +158,7 @@ func (h *GameHub) handleJoin(userID uint, action GameAction) {
 		return
 	}
 
-	h.notifier.PublishGameAction(context.Background(), action.RoomID, `{"type": "game_started", "payload": {"status": "active", "next_turn": `+fmt.Sprint(room.NextTurnID)+`}}`)
+	_ = h.notifier.PublishGameAction(context.Background(), action.RoomID, `{"type": "game_started", "payload": {"status": "active", "next_turn": `+fmt.Sprint(room.NextTurnID)+`}}`)
 }
 
 func (h *GameHub) handleMove(userID uint, action GameAction) {
@@ -296,10 +296,10 @@ func (h *GameHub) handleMove(userID uint, action GameAction) {
 		"is_draw":   room.IsDraw,
 	}
 	actionJSON, _ := json.Marshal(action)
-	h.notifier.PublishGameAction(context.Background(), action.RoomID, string(actionJSON))
+	_ = h.notifier.PublishGameAction(context.Background(), action.RoomID, string(actionJSON))
 }
 
-func (h *GameHub) handleChat(userID uint, action GameAction) {
+func (h *GameHub) handleChat(_ uint, action GameAction) {
 	// Simple chat broadcast
 	h.BroadcastToRoom(action.RoomID, action)
 }
@@ -326,7 +326,7 @@ func (h *GameHub) sendError(userID, roomID uint, message string) {
 		},
 	}
 	respJSON, _ := json.Marshal(resp)
-	conn.WriteMessage(websocket.TextMessage, respJSON)
+	_ = conn.WriteMessage(websocket.TextMessage, respJSON)
 }
 
 // StartWiring connects GameHub to Redis
@@ -348,7 +348,7 @@ func (h *GameHub) StartWiring(ctx context.Context, n *Notifier) error {
 }
 
 // Shutdown gracefully closes all websocket connections
-func (h *GameHub) Shutdown(ctx context.Context) error {
+func (h *GameHub) Shutdown(_ context.Context) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 

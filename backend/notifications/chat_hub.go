@@ -330,7 +330,7 @@ func (h *ChatHub) BroadcastGlobalStatus(userID uint, status string) {
 }
 
 // Shutdown gracefully closes all websocket connections
-func (h *ChatHub) Shutdown(ctx context.Context) error {
+func (h *ChatHub) Shutdown(_ context.Context) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 

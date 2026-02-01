@@ -21,6 +21,7 @@ interface ChatWebSocketMessage {
     username?: string
     // biome-ignore lint/suspicious/noExplicitAny: generic payload
     payload?: any
+    error?: string
 }
 
 interface UseChatWebSocketOptions {
@@ -128,10 +129,10 @@ export function useChatWebSocket({
 
                 const data: ChatWebSocketMessage = JSON.parse(event.data)
 
-                if ((data as any).error) {
-                    console.error('WS Server Error:', (data as any).error)
+                if (data.error) {
+                    console.error('WS Server Error:', data.error)
                     // If invalid token, clear it to force re-login
-                    if ((data as any).error === 'invalid token') {
+                    if (data.error === 'invalid token') {
                         localStorage.removeItem('token')
                         localStorage.removeItem('user')
                         // Use window.location to force a full refresh and redirect

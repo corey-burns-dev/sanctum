@@ -7,6 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// GameRepository defines operations for managing game rooms and statistics.
 type GameRepository interface {
 	CreateRoom(room *models.GameRoom) error
 	GetRoom(id uint) (*models.GameRoom, error)
@@ -23,6 +24,7 @@ type gameRepository struct {
 	db *gorm.DB
 }
 
+// NewGameRepository creates and returns a new GameRepository instance.
 func NewGameRepository(db *gorm.DB) GameRepository {
 	return &gameRepository{db: db}
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
+// Logger is the global structured logger instance used throughout the application.
 var Logger *slog.Logger
 
 func init() {

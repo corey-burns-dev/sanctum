@@ -11,7 +11,9 @@ import (
 type GameType string
 
 const (
-	TicTacToe   GameType = "tictactoe"
+	// TicTacToe game type constant
+	TicTacToe GameType = "tictactoe"
+	// ConnectFour game type constant
 	ConnectFour GameType = "connect4"
 )
 
@@ -19,10 +21,14 @@ const (
 type GameStatus string
 
 const (
-	GamePending   GameStatus = "pending"   // Waiting for players to join
-	GameActive    GameStatus = "active"    // Game in progress
-	GameFinished  GameStatus = "finished"  // Game ended
-	GameCancelled GameStatus = "cancelled" // Game stopped before finishing
+	// GamePending indicates game is waiting for players to join
+	GamePending GameStatus = "pending"
+	// GameActive indicates game is currently being played
+	GameActive GameStatus = "active"
+	// GameFinished indicates game has ended
+	GameFinished GameStatus = "finished"
+	// GameCancelled indicates game was aborted
+	GameCancelled GameStatus = "cancelled"
 )
 
 // GameRoom represents a specific instance of a game
@@ -58,7 +64,7 @@ func (r *GameRoom) GetTicTacToeState() [3][3]string {
 	if r.CurrentState == "" || r.CurrentState == "{}" {
 		return board
 	}
-	json.Unmarshal([]byte(r.CurrentState), &board)
+	_ = json.Unmarshal([]byte(r.CurrentState), &board)
 	return board
 }
 
@@ -68,7 +74,7 @@ func (r *GameRoom) GetConnectFourState() [6][7]string {
 	if r.CurrentState == "" || r.CurrentState == "{}" {
 		return board
 	}
-	json.Unmarshal([]byte(r.CurrentState), &board)
+	_ = json.Unmarshal([]byte(r.CurrentState), &board)
 	return board
 }
 
@@ -219,13 +225,13 @@ type GameStats struct {
 	Points     int      `gorm:"default:0" json:"points"`
 }
 
-// MoveDetails for Tic-Tac-Toe
+// TicTacToeMove represents a move in Tic-Tac-Toe game.
 type TicTacToeMove struct {
 	X int `json:"x"`
 	Y int `json:"y"`
 }
 
-// MoveDetails for Connect Four
+// ConnectFourMove represents a move in Connect Four game.
 type ConnectFourMove struct {
 	Column int `json:"column"`
 }

@@ -25,18 +25,21 @@ type CustomGormLogger struct {
 	Config logger.Config
 }
 
+// LogMode sets the logging level and returns a new interface instance.
 func (l *CustomGormLogger) LogMode(level logger.LogLevel) logger.Interface {
 	newlogger := *l
 	newlogger.Config.LogLevel = level
 	return &newlogger
 }
 
+// Info logs an informational message with context.
 func (l *CustomGormLogger) Info(ctx context.Context, msg string, data ...interface{}) {
 	if l.Config.LogLevel >= logger.Info {
 		l.logger.InfoContext(ctx, fmt.Sprintf(msg, data...))
 	}
 }
 
+// Warn logs a warning message with context.
 func (l *CustomGormLogger) Warn(ctx context.Context, msg string, data ...interface{}) {
 	if l.Config.LogLevel >= logger.Warn {
 		l.logger.WarnContext(ctx, fmt.Sprintf(msg, data...))
@@ -49,6 +52,7 @@ func (l *CustomGormLogger) Error(ctx context.Context, msg string, data ...interf
 	}
 }
 
+// Trace logs trace-level information including SQL queries and execution time.
 func (l *CustomGormLogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
 	if l.Config.LogLevel <= logger.Silent {
 		return

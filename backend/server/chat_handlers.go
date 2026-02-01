@@ -147,7 +147,7 @@ func (s *Server) GetConversation(c *fiber.Ctx) error {
 
 	// Auto-add user to group conversations if not already a participant
 	if !isParticipant && conv.IsGroup {
-		s.chatRepo.AddParticipant(ctx, uint(convID), userID)
+		_ = s.chatRepo.AddParticipant(ctx, uint(convID), userID)
 		isParticipant = true // Trust that add succeeded
 	}
 
@@ -204,7 +204,7 @@ func (s *Server) SendMessage(c *fiber.Ctx) error {
 
 	// Auto-add user to group conversations if not already a participant
 	if !isParticipant && conv.IsGroup {
-		s.chatRepo.AddParticipant(ctx, uint(convID), userID)
+		_ = s.chatRepo.AddParticipant(ctx, uint(convID), userID)
 		isParticipant = true // Trust that add succeeded
 	}
 
@@ -278,7 +278,7 @@ func (s *Server) GetMessages(c *fiber.Ctx) error {
 
 	// Auto-add user to group conversations if not already a participant
 	if !isParticipant && conv.IsGroup {
-		s.chatRepo.AddParticipant(ctx, uint(convID), userID)
+		_ = s.chatRepo.AddParticipant(ctx, uint(convID), userID)
 		isParticipant = true // Trust that add succeeded
 	}
 

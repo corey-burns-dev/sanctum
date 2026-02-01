@@ -1,5 +1,4 @@
 import { memo } from 'react'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 interface Participant {
     id: number

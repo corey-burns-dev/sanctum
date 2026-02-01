@@ -1,3 +1,4 @@
+// Package e2eclient provides E2E test client functionality for Vibeshift.
 package e2eclient
 
 // Placeholder for E2E client - currently using shell scripts for E2E testing

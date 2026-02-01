@@ -39,7 +39,7 @@ export default function ConnectFour() {
     const chatEndRef = useRef<HTMLDivElement>(null)
     const shouldAutoJoinRef = useRef(false)
     const hasJoined = useRef(false)
-    const [connectionError, setConnectionError] = useState(false)
+    const [_, setConnectionError] = useState(false)
     const connectionErrorRef = useRef(false)
 
     const { data: room, isError } = useQuery({
