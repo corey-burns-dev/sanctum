@@ -478,3 +478,47 @@ func (s *Server) JoinChatroom(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{"message": "Joined chatroom successfully"})
 }
+
+// RemoveParticipant handles DELETE /api/chatrooms/:id/participants/:participantId (admin only)
+func (s *Server) RemoveParticipant(c *fiber.Ctx) error {
+	ctx := c.Context()
+	userID := c.Locals("userID").(uint)
+	roomID, err := c.ParamsInt("id")
+	if err != nil || roomID < 0 {
+		return models.RespondWithError(c, fiber.StatusBadRequest,
+			models.NewValidationError("Invalid chatroom ID"))
+	}
+
+	participantID, err := c.ParamsInt("participantId")
+	if err != nil || participantID < 0 {
+		return models.RespondWithError(c, fiber.StatusBadRequest,
+			models.NewValidationError("Invalid participant ID"))
+	}
+
+	// Check if user is admin or room creator
+	var user models.User
+	if err := s.db.WithContext(ctx).First(&user, userID).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	var conv models.Conversation
+	if err := s.db.WithContext(ctx).First(&conv, roomID).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusNotFound,
+			models.NewNotFoundError("Chatroom", roomID))
+	}
+
+	// Only admin or room creator can remove participants
+	if !user.IsAdmin && conv.CreatedBy != userID {
+		return models.RespondWithError(c, fiber.StatusForbidden,
+			models.NewUnauthorizedError("Only admins or room creator can remove participants"))
+	}
+
+	// Remove participant from chatroom
+	if err := s.db.WithContext(ctx).
+		Where("conversation_id = ? AND user_id = ?", roomID, participantID).
+		Delete(&models.ConversationParticipant{}).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	return c.JSON(fiber.Map{"message": "Participant removed successfully"})
+}

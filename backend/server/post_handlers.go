@@ -208,10 +208,17 @@ func (s *Server) DeletePost(c *fiber.Ctx) error {
 		return models.RespondWithError(c, fiber.StatusNotFound, err)
 	}
 
-	// Check ownership
+	// Check ownership or admin status
 	if post.UserID != userID {
-		return models.RespondWithError(c, fiber.StatusForbidden,
-			models.NewUnauthorizedError("You can only delete your own posts"))
+		// Check if user is admin
+		var user models.User
+		if err := s.db.WithContext(ctx).First(&user, userID).Error; err != nil {
+			return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+		}
+		if !user.IsAdmin {
+			return models.RespondWithError(c, fiber.StatusForbidden,
+				models.NewUnauthorizedError("You can only delete your own posts"))
+		}
 	}
 
 	if err := s.postRepo.Delete(ctx, uint(postID)); err != nil {

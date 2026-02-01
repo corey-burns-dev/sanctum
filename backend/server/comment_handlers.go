@@ -134,7 +134,14 @@ func (s *Server) DeleteComment(c *fiber.Ctx) error {
 	}
 
 	if comment.UserID != userID {
-		return models.RespondWithError(c, fiber.StatusForbidden, models.NewUnauthorizedError("You can only delete your own comments"))
+		// Check if user is admin
+		var user models.User
+		if err := s.db.WithContext(ctx).First(&user, userID).Error; err != nil {
+			return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+		}
+		if !user.IsAdmin {
+			return models.RespondWithError(c, fiber.StatusForbidden, models.NewUnauthorizedError("You can only delete your own comments"))
+		}
 	}
 
 	if err := s.commentRepo.Delete(ctx, commentID); err != nil {

@@ -15,6 +15,7 @@ type User struct {
 	Password  string         `gorm:"not null" json:"-"`
 	Bio       string         `json:"bio"`
 	Avatar    string         `json:"avatar"`
+	IsAdmin   bool           `gorm:"default:false" json:"is_admin"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`

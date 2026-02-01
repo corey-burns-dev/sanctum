@@ -177,6 +177,8 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	// Define specific /:id/:resource routes BEFORE generic /:id route
 	users.Get("/:id/cached", s.GetUserCached)
 	users.Get("/:id/posts", s.GetUserPosts)
+	users.Post("/:id/promote-admin", s.PromoteToAdmin)
+	users.Post("/:id/demote-admin", s.DemoteFromAdmin)
 	users.Get("/:id", s.GetUserProfile)
 
 	// Friend routes
@@ -219,9 +221,10 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 
 	// Chatrooms routes (public group conversations)
 	chatrooms := protected.Group("/chatrooms")
-	chatrooms.Get("/", s.GetAllChatrooms)          // Get ALL public chatrooms
-	chatrooms.Get("/joined", s.GetJoinedChatrooms) // Get rooms user has joined
-	chatrooms.Post("/:id/join", s.JoinChatroom)    // Join a chatroom
+	chatrooms.Get("/", s.GetAllChatrooms)                                     // Get ALL public chatrooms
+	chatrooms.Get("/joined", s.GetJoinedChatrooms)                            // Get rooms user has joined
+	chatrooms.Post("/:id/join", s.JoinChatroom)                               // Join a chatroom
+	chatrooms.Delete("/:id/participants/:participantId", s.RemoveParticipant) // Remove participant (admin/creator only)
 
 	// Game routes
 	games := protected.Group("/games")

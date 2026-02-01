@@ -111,3 +111,77 @@ func (s *Server) UpdateMyProfile(c *fiber.Ctx) error {
 	user.Password = ""
 	return c.JSON(user)
 }
+
+// PromoteToAdmin handles POST /api/users/:id/promote-admin (admin only)
+func (s *Server) PromoteToAdmin(c *fiber.Ctx) error {
+	ctx := c.Context()
+	requesterID := c.Locals("userID").(uint)
+	targetID, err := c.ParamsInt("id")
+	if err != nil || targetID < 0 {
+		return models.RespondWithError(c, fiber.StatusBadRequest,
+			models.NewValidationError("Invalid user ID"))
+	}
+
+	// Check if requester is admin
+	var requester models.User
+	if err := s.db.WithContext(ctx).First(&requester, requesterID).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	if !requester.IsAdmin {
+		return models.RespondWithError(c, fiber.StatusForbidden,
+			models.NewUnauthorizedError("Only admins can promote users to admin"))
+	}
+
+	// Get target user
+	var target models.User
+	if err := s.db.WithContext(ctx).First(&target, targetID).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusNotFound, err)
+	}
+
+	// Promote user
+	target.IsAdmin = true
+	if err := s.db.WithContext(ctx).Save(&target).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	target.Password = ""
+	return c.JSON(fiber.Map{"message": "User promoted to admin", "user": target})
+}
+
+// DemoteFromAdmin handles POST /api/users/:id/demote-admin (admin only)
+func (s *Server) DemoteFromAdmin(c *fiber.Ctx) error {
+	ctx := c.Context()
+	requesterID := c.Locals("userID").(uint)
+	targetID, err := c.ParamsInt("id")
+	if err != nil || targetID < 0 {
+		return models.RespondWithError(c, fiber.StatusBadRequest,
+			models.NewValidationError("Invalid user ID"))
+	}
+
+	// Check if requester is admin
+	var requester models.User
+	if err := s.db.WithContext(ctx).First(&requester, requesterID).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	if !requester.IsAdmin {
+		return models.RespondWithError(c, fiber.StatusForbidden,
+			models.NewUnauthorizedError("Only admins can demote users from admin"))
+	}
+
+	// Get target user
+	var target models.User
+	if err := s.db.WithContext(ctx).First(&target, targetID).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusNotFound, err)
+	}
+
+	// Demote user
+	target.IsAdmin = false
+	if err := s.db.WithContext(ctx).Save(&target).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	target.Password = ""
+	return c.JSON(fiber.Map{"message": "User demoted from admin", "user": target})
+}
