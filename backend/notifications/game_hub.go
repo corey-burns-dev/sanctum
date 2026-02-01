@@ -82,6 +82,16 @@ func (h *GameHub) Unregister(userID, roomID uint, conn *websocket.Conn) {
 			delete(h.userRooms, userID)
 		}
 	}
+
+	// Database cleanup: If the creator leaves a pending room, cancel it
+	var room models.GameRoom
+	if err := h.db.First(&room, roomID).Error; err == nil {
+		if room.Status == models.GamePending && room.CreatorID == userID {
+			room.Status = models.GameCancelled
+			h.db.Save(&room)
+			log.Printf("GameHub: Pending room %d cancelled because creator (User %d) disconnected", roomID, userID)
+		}
+	}
 }
 
 // BroadcastToRoom sends a message to all users in a game room

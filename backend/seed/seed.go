@@ -175,27 +175,10 @@ func Seed(db *gorm.DB) error {
 
 func clearData(db *gorm.DB) error {
 	log.Println("🗑️  Clearing existing data...")
-
-	// Delete in correct order to respect foreign key constraints
-	if err := db.Exec("DELETE FROM comments").Error; err != nil {
-		return err
-	}
-	if err := db.Exec("DELETE FROM likes").Error; err != nil {
-		return err
-	}
-	if err := db.Exec("DELETE FROM posts").Error; err != nil {
-		return err
-	}
-	if err := db.Exec("DELETE FROM conversation_participants").Error; err != nil {
-		return err
-	}
-	if err := db.Exec("DELETE FROM messages").Error; err != nil {
-		return err
-	}
-	if err := db.Exec("DELETE FROM conversations").Error; err != nil {
-		return err
-	}
-	if err := db.Exec("DELETE FROM users").Error; err != nil {
+	// Use TRUNCATE ... CASCADE to force-remove all existing rows and reset sequences.
+	// This is safer for development/test seeding where we want a clean slate.
+	sql := `TRUNCATE TABLE comments, likes, posts, conversation_participants, messages, conversations, users RESTART IDENTITY CASCADE;`
+	if err := db.Exec(sql).Error; err != nil {
 		return err
 	}
 

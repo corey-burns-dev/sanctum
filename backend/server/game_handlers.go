@@ -10,7 +10,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"
-	"gorm.io/gorm"
 )
 
 // CreateGameRoom handles the creation of a new game room
@@ -24,19 +23,21 @@ func (s *Server) CreateGameRoom(c *fiber.Ctx) error {
 		return models.RespondWithError(c, fiber.StatusBadRequest, models.NewValidationError("Invalid request body"))
 	}
 
+	// Prevent Room Bloat: Check for existing pending rooms for this user
+	existingRooms, _ := s.gameRepo.GetActiveRooms(req.Type)
+	for _, r := range existingRooms {
+		if r.CreatorID == userID {
+			// If already has a pending room, return it instead of creating a new one
+			return c.Status(fiber.StatusOK).JSON(r)
+		}
+	}
+
 	room := &models.GameRoom{
 		Type:          req.Type,
 		Status:        models.GamePending,
 		CreatorID:     userID,
-		CurrentState:  "{}", // Initial empty state
-		Configuration: "{}", // Initial empty configuration
-	}
-
-	// If the creator already has a pending room for this game type, return it
-	if existing, err := s.gameRepo.GetPendingRoomByCreator(req.Type, userID); err == nil {
-		return c.JSON(existing)
-	} else if err != nil && err != gorm.ErrRecordNotFound {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, models.NewInternalError(err))
+		CurrentState:  "{}",
+		Configuration: "{}",
 	}
 
 	if err := s.gameRepo.CreateRoom(room); err != nil {

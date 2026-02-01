@@ -281,8 +281,8 @@ func (s *Server) HealthCheck(c *fiber.Ctx) error {
 func (s *Server) AuthRequired() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		// Extract token from "Bearer <token>" or "token" query parameter (for WebSockets)
-		tokenString := ""
 		authHeader := c.Get("Authorization")
+		tokenString := ""
 		if authHeader != "" {
 			parts := strings.Split(authHeader, " ")
 			if len(parts) == 2 && parts[0] == "Bearer" {

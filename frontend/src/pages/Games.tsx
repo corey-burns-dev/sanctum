@@ -125,6 +125,17 @@ const GAME_CATEGORIES = [
 	},
 ];
 
+interface GameRoom {
+	id: number;
+	type: string;
+	status: string;
+	creator_id: number;
+	opponent_id: number | null;
+	creator: {
+		username: string;
+	};
+}
+
 export default function Games() {
 	const navigate = useNavigate();
 
@@ -133,13 +144,25 @@ export default function Games() {
 		queryFn: () => apiClient.getActiveGameRooms(),
 	});
 
-	const createRoom = async (type: string) => {
+	const handlePlayNow = async (type: string) => {
 		if (type === 'tictactoe' || type === 'connect4') {
 			try {
-				const room = await apiClient.createGameRoom(type);
-				navigate(`/games/${type}/${room.id}`);
+				// 1. Check if there's an existing open room of this type
+				// We filter for pending rooms that the user didn't create
+				const openRoom = (activeRooms as GameRoom[] | undefined)?.find(
+					room => room.type === type && room.status === 'pending'
+				);
+
+				if (openRoom) {
+					// 2. Join existing room
+					navigate(`/games/${type}/${openRoom.id}`);
+				} else {
+					// 3. Create new room if none found
+					const room = await apiClient.createGameRoom(type);
+					navigate(`/games/${type}/${room.id}`);
+				}
 			} catch (err) {
-				console.error('Failed to create room', err);
+				console.error('Failed to handle play now', err);
 			}
 		} else {
 			const routeMap: Record<string, string> = {
@@ -187,9 +210,9 @@ export default function Games() {
 
 				<div className="grid lg:grid-cols-4 gap-8">
 					<div className="lg:col-span-3 space-y-12">
-						{GAME_CATEGORIES.map((category, idx) => (
+						{GAME_CATEGORIES.map(category => (
 							<div
-								key={idx}
+								key={category.name}
 								className="space-y-6"
 							>
 								<div className="flex items-center gap-2 border-b pb-2">
@@ -232,7 +255,7 @@ export default function Games() {
 													<Button
 														className="w-full font-bold uppercase italic tracking-wider text-xs"
 														variant={game.status === 'coming-soon' ? 'secondary' : 'default'}
-														onClick={() => createRoom(game.id)}
+														onClick={() => handlePlayNow(game.id)}
 													>
 														{game.status === 'coming-soon' ? 'Preview' : 'Play Now'}
 													</Button>
@@ -259,9 +282,9 @@ export default function Games() {
 										/>
 									))}
 								</div>
-							) : activeRooms?.length > 0 ? (
+							) : (activeRooms?.length ?? 0) > 0 ? (
 								<div className="space-y-3">
-									{activeRooms.map((room: any) => (
+									{activeRooms?.map((room: GameRoom) => (
 										<div
 											key={room.id}
 											className="flex items-center justify-between p-3 bg-muted/20 border rounded-xl hover:bg-muted/30 transition-colors"
@@ -270,7 +293,7 @@ export default function Games() {
 												<span className="text-xs font-black uppercase tracking-tighter text-primary">
 													{room.type}
 												</span>
-												<span className="text-sm font-bold truncate max-w-[120px]">
+												<span className="text-sm font-bold truncate max-w-30">
 													{room.creator.username}'s Room
 												</span>
 											</div>
@@ -286,10 +309,14 @@ export default function Games() {
 									))}
 								</div>
 							) : (
-								<div className="text-center py-10 border-2 border-dashed rounded-2xl">
-									<p className="text-xs font-bold text-muted-foreground uppercase opacity-50">
+								<div
+									key="no-active-rooms"
+									className="bg-card/50 p-2 rounded-lg border flex flex-col items-center"
+								>
+									<p className="text-[10px] font-bold uppercase text-muted-foreground">
 										No Active Rooms
 									</p>
+									<p className="text-xs font-bold">Start a new game!</p>
 								</div>
 							)}
 						</section>
