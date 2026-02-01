@@ -23,7 +23,7 @@ func createTestUser(t *testing.T, app interface {
 	signupBody := map[string]string{
 		"username": username,
 		"email":    email,
-		"password": "password123",
+		"password": "TestPass123!@#",
 	}
 	b, _ := json.Marshal(signupBody)
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/signup", bytes.NewReader(b))

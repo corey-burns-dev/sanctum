@@ -264,7 +264,10 @@ test: test-backend
 
 test-backend:
 	@echo "$(BLUE)Running backend tests...$(NC)"
-	cd backend && $(GO) test ./...
+	make test-up
+	@echo "$(BLUE)Waiting for test database...$(NC)"
+	@sleep 5
+	cd backend && APP_ENV=test $(GO) test ./...
 
 test-api:
 	@echo "$(BLUE)Running API endpoint tests...$(NC)"

@@ -85,9 +85,9 @@ export default function Chat() {
     // Keep chat scrolled to bottom when messages update
     // biome-ignore lint/correctness/useExhaustiveDependencies: scroll when message list changes
     useEffect(() => {
-        // requestAnimationFrame(() => {
-        // 	messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-        // });
+        requestAnimationFrame(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+        })
     }, [messages.length])
 
     // Initialize participants from conversation details

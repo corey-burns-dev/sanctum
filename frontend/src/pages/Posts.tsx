@@ -11,6 +11,7 @@ import type { Post } from '@/api/types'
 
 // Components
 import { Navbar } from '@/components/Navbar'
+import { UserMenu } from '@/components/UserMenu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -126,23 +127,33 @@ const PostComments = memo(function PostComments({ postId }: { postId: number }) 
             <div className="space-y-3 mb-4">
                 {comments.map((comment) => (
                     <div key={comment.id} className="flex gap-3">
-                        <Avatar className="w-8 h-8 shrink-0">
-                            <AvatarImage
-                                src={
-                                    comment.user?.avatar ||
-                                    `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.user?.username}`
-                                }
-                            />
-                            <AvatarFallback className="text-xs">
-                                {comment.user?.username?.[0]?.toUpperCase() || 'U'}
-                            </AvatarFallback>
-                        </Avatar>
+                        {comment.user && (
+                            <UserMenu user={comment.user}>
+                                <Avatar className="w-8 h-8 shrink-0 cursor-pointer hover:opacity-80">
+                                    <AvatarImage
+                                        src={
+                                            comment.user.avatar ||
+                                            `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.user.username}`
+                                        }
+                                    />
+                                    <AvatarFallback className="text-xs">
+                                        {comment.user.username?.[0]?.toUpperCase() || 'U'}
+                                    </AvatarFallback>
+                                </Avatar>
+                            </UserMenu>
+                        )}
                         <div className="flex-1">
                             <div className="bg-muted rounded-lg px-3 py-2">
                                 <div className="flex items-center gap-2 mb-1">
-                                    <span className="font-semibold text-sm">
-                                        {comment.user?.username}
-                                    </span>
+                                    {comment.user ? (
+                                        <UserMenu user={comment.user}>
+                                            <span className="font-semibold text-sm cursor-pointer hover:underline">
+                                                {comment.user.username}
+                                            </span>
+                                        </UserMenu>
+                                    ) : (
+                                        <span className="font-semibold text-sm">Unknown</span>
+                                    )}
                                     <span className="text-xs text-muted-foreground">
                                         {formatDistanceToNow(new Date(comment.created_at), {
                                             addSuffix: true,
@@ -460,25 +471,37 @@ export default function Posts() {
                             <CardHeader>
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <Avatar>
-                                            <AvatarImage
-                                                src={
-                                                    post.user?.avatar ||
-                                                    `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.user?.username}`
-                                                }
-                                            />
-                                            <AvatarFallback>
-                                                {post.user?.username?.[0]?.toUpperCase() || 'U'}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                        <div>
-                                            <p className="font-semibold">{post.user?.username}</p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {formatDistanceToNow(new Date(post.created_at), {
-                                                    addSuffix: true,
-                                                })}
-                                            </p>
-                                        </div>
+                                        {post.user && (
+                                            <UserMenu user={post.user}>
+                                                <div className="flex items-center gap-3">
+                                                    <Avatar className="cursor-pointer hover:opacity-80 transition-opacity">
+                                                        <AvatarImage
+                                                            src={
+                                                                post.user.avatar ||
+                                                                `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.user.username}`
+                                                            }
+                                                        />
+                                                        <AvatarFallback>
+                                                            {post.user.username?.[0]?.toUpperCase() ||
+                                                                'U'}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <div>
+                                                        <p className="font-semibold cursor-pointer hover:underline">
+                                                            {post.user.username}
+                                                        </p>
+                                                        <p className="text-sm text-muted-foreground">
+                                                            {formatDistanceToNow(
+                                                                new Date(post.created_at),
+                                                                {
+                                                                    addSuffix: true,
+                                                                }
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </UserMenu>
+                                        )}
                                     </div>
                                 </div>
                             </CardHeader>

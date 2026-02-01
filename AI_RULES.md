@@ -135,6 +135,36 @@ function MyComponent() {
 }
 ```
 
+### State Management & Optimistic Updates
+
+* **List Appends:** When optimistically adding items to a list (e.g., chat messages, comments), ensure you handle duplication in `onSuccess`.
+  * **Race Condition:** WebSocket/Server events may arrive before the optimistic update completes.
+  * **Pattern:**
+
+    ```typescript
+    onSuccess: (serverItem, newItem) => {
+        const tempId = newItem.metadata?.tempId;
+        if (!tempId) return;
+
+        queryClient.setQueryData(['key'], (old) => {
+             if (!Array.isArray(old)) return old;
+
+             // 1. Check if item already exists (from WebSocket)
+             const exists = old.some(i => i.id === serverItem.id);
+
+             if (exists) {
+                 // 2. If exists, remove optimistic item
+                 return old.filter(i => i.metadata?.tempId !== tempId);
+             }
+
+             // 3. Otherwise replace optimistic item with real one
+             return old.map(i => i.metadata?.tempId === tempId ? serverItem : i);
+        });
+    }
+    ```
+
+  * **IDs:** Use a robust temporary ID if possible. `Date.now()` is acceptable for low-velocity user actions.
+
 ### UI Components
 
 * **Pattern:** Follow Radix UI + Tailwind (Shadcn-like architecture).

@@ -26,6 +26,8 @@ type Config struct {
 // LoadConfig loads application configuration from file and environment variables.
 func LoadConfig() (*Config, error) {
 	viper.AddConfigPath(".")
+	viper.AddConfigPath("..")
+	viper.AddConfigPath("../..")
 	viper.SetConfigName("config")
 	viper.SetConfigType("yml")
 	viper.AutomaticEnv()

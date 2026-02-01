@@ -6,6 +6,8 @@ import type {
     CreateCommentRequest,
     CreateConversationRequest,
     CreatePostRequest,
+    FriendRequest,
+    FriendshipStatus,
     GameRoom,
     LoginRequest,
     Message,
@@ -239,6 +241,42 @@ class ApiClient {
         if (params?.limit !== undefined) query.set('limit', params.limit.toString())
         const queryString = query.toString() ? `?${query.toString()}` : ''
         return this.request(`/friends${queryString}`)
+    }
+
+    async sendFriendRequest(userId: number): Promise<{ message: string; request_id: number }> {
+        return this.request(`/friends/requests/${userId}`, {
+            method: 'POST',
+        })
+    }
+
+    async getPendingRequests(): Promise<FriendRequest[]> {
+        return this.request('/friends/requests')
+    }
+
+    async getSentRequests(): Promise<FriendRequest[]> {
+        return this.request('/friends/requests/sent')
+    }
+
+    async acceptFriendRequest(requestId: number): Promise<{ message: string }> {
+        return this.request(`/friends/requests/${requestId}/accept`, {
+            method: 'POST',
+        })
+    }
+
+    async rejectFriendRequest(requestId: number): Promise<{ message: string }> {
+        return this.request(`/friends/requests/${requestId}/reject`, {
+            method: 'POST',
+        })
+    }
+
+    async getFriendshipStatus(userId: number): Promise<FriendshipStatus> {
+        return this.request(`/friends/status/${userId}`)
+    }
+
+    async removeFriend(userId: number): Promise<{ message: string }> {
+        return this.request(`/friends/${userId}`, {
+            method: 'DELETE',
+        })
     }
 
     async getMyProfile(): Promise<User> {

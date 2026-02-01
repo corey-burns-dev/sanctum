@@ -37,13 +37,13 @@ func TestSignupAndLogin(t *testing.T) {
 
 	timestamp := time.Now().UnixNano()
 	email := fmt.Sprintf("apitestuser_%d@example.com", timestamp)
-	username := fmt.Sprintf("apitestuser_%d", timestamp)
+	username := fmt.Sprintf("test_%d", timestamp)
 
 	// Signup
 	body := map[string]string{
 		"username": username,
 		"email":    email,
-		"password": "apitestpass123",
+		"password": "TestPass123!@#",
 	}
 	b, _ := json.Marshal(body)
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/signup", bytes.NewReader(b))
@@ -60,7 +60,7 @@ func TestSignupAndLogin(t *testing.T) {
 	// Login
 	loginBody := map[string]string{
 		"email":    email,
-		"password": "apitestpass123",
+		"password": "TestPass123!@#",
 	}
 	b, err = json.Marshal(loginBody)
 	if err != nil {
@@ -83,13 +83,13 @@ func TestFullAPIFlow(t *testing.T) {
 
 	timestamp := time.Now().UnixNano()
 	email := fmt.Sprintf("apitestuser2_%d@example.com", timestamp)
-	username := fmt.Sprintf("apitestuser2_%d", timestamp)
+	username := fmt.Sprintf("test2_%d", timestamp)
 
 	// --- Sign Up ---
 	signupBody := map[string]string{
 		"username": username,
 		"email":    email,
-		"password": "apitestpass123",
+		"password": "TestPass123!@#",
 	}
 	b, _ := json.Marshal(signupBody)
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/signup", bytes.NewReader(b))
@@ -123,7 +123,7 @@ func TestFullAPIFlow(t *testing.T) {
 	t.Run("Login", func(t *testing.T) {
 		loginBody := map[string]string{
 			"email":    email,
-			"password": "apitestpass123",
+			"password": "TestPass123!@#",
 		}
 		b, _ := json.Marshal(loginBody)
 		req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(b))

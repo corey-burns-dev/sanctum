@@ -13,6 +13,6 @@ npm run dev
 The dev server runs at `http://localhost:5173` by default and proxies `/health` and `/ping` to the Go backend at `http://localhost:8375`.
 
 Notes:
+
 - The app includes `@tanstack/react-query` and a small example hook `useHealth` that fetches `/health`.
 - If you prefer to use `yarn` or `npm`, adjust commands accordingly.
-

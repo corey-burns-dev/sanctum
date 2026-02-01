@@ -35,6 +35,22 @@ export interface Comment {
     updated_at: string
 }
 
+export interface FriendRequest {
+    id: number
+    sender_id: number
+    receiver_id: number
+    status: 'pending' | 'accepted' | 'rejected'
+    created_at: string
+    updated_at: string
+    sender?: User
+    receiver?: User
+}
+
+export interface FriendshipStatus {
+    status: 'none' | 'pending_sent' | 'pending_received' | 'friends'
+    request_id?: number
+}
+
 // Request/Response types
 export interface SignupRequest {
     username: string

@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { UserMenu } from '@/components/UserMenu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 const USER_COLORS = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f39c12', '#9b59b6', '#e74c3c', '#3498db']
@@ -15,17 +16,7 @@ const formatTimestamp = (timestamp: string) => {
     })
 }
 
-interface Message {
-    id: number
-    content: string
-    sender_id: number
-    created_at: string
-    sender?: {
-        id: number
-        username: string
-        avatar?: string
-    }
-}
+import type { Message } from '@/api/types'
 
 interface MessageListProps {
     messages: Message[]
@@ -62,27 +53,51 @@ export const MessageList = memo(function MessageList({
 
                 return (
                     <div key={msg.id} className="flex items-start gap-3 group">
-                        <Avatar className="w-8 h-8 shrink-0 mt-0.5">
-                            <AvatarImage
-                                src={
-                                    sender?.avatar ||
-                                    `https://api.dicebear.com/7.x/avataaars/svg?seed=${sender?.username}`
-                                }
-                            />
-                            <AvatarFallback className="text-xs">
-                                {sender?.username?.[0]?.toUpperCase() || 'U'}
-                            </AvatarFallback>
-                        </Avatar>
+                        {sender ? (
+                            <UserMenu user={sender}>
+                                <Avatar className="w-8 h-8 shrink-0 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity">
+                                    <AvatarImage
+                                        src={
+                                            sender.avatar ||
+                                            `https://api.dicebear.com/7.x/avataaars/svg?seed=${sender.username}`
+                                        }
+                                    />
+                                    <AvatarFallback className="text-xs">
+                                        {sender.username?.[0]?.toUpperCase() || 'U'}
+                                    </AvatarFallback>
+                                </Avatar>
+                            </UserMenu>
+                        ) : (
+                            <Avatar className="w-8 h-8 shrink-0 mt-0.5">
+                                <AvatarImage
+                                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=unknown`}
+                                />
+                                <AvatarFallback className="text-xs">U</AvatarFallback>
+                            </Avatar>
+                        )}
                         <div className="flex-1 min-w-0">
                             <div className="flex items-baseline gap-2 mb-0.5">
-                                <span
-                                    className="font-semibold text-sm"
-                                    style={{
-                                        color: getUserColor(msg.sender_id),
-                                    }}
-                                >
-                                    {isOwnMessage ? 'You' : sender?.username || 'Unknown'}
-                                </span>
+                                {sender ? (
+                                    <UserMenu user={sender}>
+                                        <span
+                                            className="font-semibold text-sm cursor-pointer hover:underline"
+                                            style={{
+                                                color: getUserColor(msg.sender_id),
+                                            }}
+                                        >
+                                            {isOwnMessage ? 'You' : sender.username}
+                                        </span>
+                                    </UserMenu>
+                                ) : (
+                                    <span
+                                        className="font-semibold text-sm"
+                                        style={{
+                                            color: getUserColor(msg.sender_id),
+                                        }}
+                                    >
+                                        Unknown
+                                    </span>
+                                )}
                                 <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
                                     {formatTimestamp(msg.created_at)}
                                 </span>

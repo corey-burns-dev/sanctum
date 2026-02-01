@@ -160,6 +160,36 @@ export function useSendMessage(conversationId: number) {
 
             return { previousMessages }
         },
+        onSuccess: (serverMessage, newMessage) => {
+            const tempId = newMessage.metadata?.tempId
+            if (!tempId) return
+
+            queryClient.setQueryData<Message[]>(chatKeys.messages(conversationId), (old) => {
+                if (!Array.isArray(old)) return old
+
+                // Check if the server message (real ID) is already in the list (e.g. from WebSocket)
+                const alreadyExists = old.some((m) => m.id === serverMessage.id)
+
+                if (alreadyExists) {
+                    // If it exists, remove the optimistic message BUT keep the real one
+                    return old.filter((m) => {
+                        // Keep the confirmed message
+                        if (m.id === serverMessage.id) return true
+
+                        // Remove the temporary optimistic one
+                        const mMeta = m.metadata as Record<string, unknown> | undefined
+                        return mMeta?.tempId !== tempId
+                    })
+                }
+
+                // Otherwise, replace the optimistic message with the server version
+                return old.map((m) => {
+                    const mMeta = m.metadata as Record<string, unknown> | undefined
+                    if (mMeta?.tempId === tempId) return serverMessage
+                    return m
+                })
+            })
+        },
         onError: (error, _newMessage, context) => {
             handleAuthOrFKError(error)
             if (context?.previousMessages) {
@@ -171,9 +201,6 @@ export function useSendMessage(conversationId: number) {
         },
         onSettled: () => {
             // Refetch after mutation
-            queryClient.invalidateQueries({
-                queryKey: chatKeys.messages(conversationId),
-            })
             queryClient.invalidateQueries({ queryKey: chatKeys.conversations() })
         },
     })
