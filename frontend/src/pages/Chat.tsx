@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Compass, Send, UserCircle, Users, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Compass, Send, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { Conversation, Message, User } from '@/api/types'

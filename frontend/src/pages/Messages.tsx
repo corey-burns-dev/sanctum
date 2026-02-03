@@ -205,10 +205,7 @@ export default function Messages() {
     const getConversationAvatar = useCallback(
         (conv: Conversation) => {
             const otherUser = conv.participants?.find((p) => p.id !== currentUser?.id)
-            return (
-                otherUser?.avatar ||
-                `https://api.dicebear.com/7.x/avataaars/svg?seed=${getConversationName(conv)}`
-            )
+            return otherUser?.avatar || `https://i.pravatar.cc/150?u=${getConversationName(conv)}`
         },
         [currentUser, getConversationName]
     )
@@ -403,7 +400,7 @@ export default function Messages() {
                                                 <AvatarImage
                                                     src={
                                                         sender?.avatar ||
-                                                        `https://api.dicebear.com/7.x/avataaars/svg?seed=${sender?.username}`
+                                                        `https://i.pravatar.cc/150?u=${sender?.username}`
                                                     }
                                                 />
                                                 <AvatarFallback className="text-xs">

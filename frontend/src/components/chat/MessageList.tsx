@@ -59,7 +59,7 @@ export const MessageList = memo(function MessageList({
                                     <AvatarImage
                                         src={
                                             sender.avatar ||
-                                            `https://api.dicebear.com/7.x/avataaars/svg?seed=${sender.username}`
+                                            `https://i.pravatar.cc/150?u=${sender.username}`
                                         }
                                     />
                                     <AvatarFallback className="text-xs">
@@ -69,9 +69,7 @@ export const MessageList = memo(function MessageList({
                             </UserMenu>
                         ) : (
                             <Avatar className="w-8 h-8 shrink-0 mt-0.5">
-                                <AvatarImage
-                                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=unknown`}
-                                />
+                                <AvatarImage src={`https://i.pravatar.cc/150?u=unknown`} />
                                 <AvatarFallback className="text-xs">U</AvatarFallback>
                             </Avatar>
                         )}

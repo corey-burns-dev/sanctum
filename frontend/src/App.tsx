@@ -271,14 +271,30 @@ function RoutesWithPrefetch() {
     )
 }
 
+import { BottomBar } from '@/components/BottomBar'
+import { MobileHeader } from '@/components/MobileHeader'
+
 function MainLayout({ children }: { children: ReactNode }) {
     const isAuthenticated = useIsAuthenticated()
+
     return (
         <div className="flex h-screen w-screen bg-background text-foreground transition-all duration-300">
-            {isAuthenticated && <Sidebar />}
-            <div className="flex-1 flex flex-col min-w-0 transition-all duration-300 overflow-hidden">
+            {/* Mobile Header - Top */}
+            {isAuthenticated && <MobileHeader />}
+
+            {/* Desktop Sidebar */}
+            {isAuthenticated && (
+                <div className="hidden md:block h-full shrink-0">
+                    <Sidebar />
+                </div>
+            )}
+
+            <div className="flex-1 flex flex-col min-w-0 transition-all duration-300 overflow-hidden pt-16 pb-16 md:pt-0 md:pb-0">
                 {children}
             </div>
+
+            {/* Mobile Nav - Bottom */}
+            {isAuthenticated && <BottomBar />}
         </div>
     )
 }

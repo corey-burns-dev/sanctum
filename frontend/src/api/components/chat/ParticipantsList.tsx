@@ -50,7 +50,7 @@ export const ParticipantsList = memo(function ParticipantsList({
                                     <div className="relative">
                                         <Avatar className="w-6 h-6">
                                             <AvatarImage
-                                                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`}
+                                                src={`https://i.pravatar.cc/150?u=${user.username}`}
                                             />
                                             <AvatarFallback className="text-[10px]">
                                                 {user.username?.[0]?.toUpperCase()}

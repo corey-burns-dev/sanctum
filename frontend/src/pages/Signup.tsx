@@ -1,8 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Eye, EyeOff, UserPlus } from 'lucide-react'
+import { AlertCircle, Eye, EyeOff, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -17,6 +18,7 @@ export default function Signup() {
     const {
         register,
         handleSubmit,
+        setError,
         formState: { errors, isSubmitting },
     } = useForm<SignupFormData>({
         resolver: zodResolver(signupSchema),
@@ -31,10 +33,14 @@ export default function Signup() {
                 email: data.email,
                 password: data.password,
             })
-            // Navigation happens automatically in the hook
+            toast.success('Account created successfully!')
         } catch (error) {
             console.error('Signup error:', error)
-            // Error handling is done by React Hook Form through the schema
+            const message = error instanceof Error ? error.message : 'Failed to create account'
+            toast.error(message)
+            setError('root', {
+                message: message,
+            })
         }
     }
 
@@ -49,6 +55,12 @@ export default function Signup() {
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                        {errors.root && (
+                            <div className="bg-destructive/15 p-3 rounded-md flex items-center gap-2 text-sm text-destructive">
+                                <AlertCircle className="w-4 h-4 shrink-0" />
+                                <p>{errors.root.message}</p>
+                            </div>
+                        )}
                         <div className="space-y-2">
                             <Label htmlFor="username">Username</Label>
                             <Input

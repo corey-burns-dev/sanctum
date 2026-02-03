@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query'
 import { Gamepad2, Layers, Spade, Trophy, UserCircle, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '@/api/client'
-import { Navbar } from '@/components/Navbar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 

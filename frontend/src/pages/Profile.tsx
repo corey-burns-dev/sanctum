@@ -115,7 +115,7 @@ export default function Profile() {
                                         <AvatarImage
                                             src={
                                                 user.avatar ||
-                                                `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`
+                                                `https://i.pravatar.cc/150?u=${user.username}`
                                             }
                                         />
                                         <AvatarFallback className="text-2xl">

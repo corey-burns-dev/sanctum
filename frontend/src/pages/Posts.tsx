@@ -10,7 +10,7 @@ import type { Post } from '@/api/types'
 import { UserMenu } from '@/components/UserMenu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 // Hooks
 import { useCreateComment, useDeleteComment, usePostComments } from '@/hooks/useComments'
@@ -129,7 +129,7 @@ const PostComments = memo(function PostComments({ postId }: { postId: number }) 
                                     <AvatarImage
                                         src={
                                             comment.user.avatar ||
-                                            `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.user.username}`
+                                            `https://i.pravatar.cc/150?u=${comment.user.username}`
                                         }
                                     />
                                     <AvatarFallback className="text-xs">
@@ -217,7 +217,7 @@ const PostComments = memo(function PostComments({ postId }: { postId: number }) 
                         <AvatarImage
                             src={
                                 currentUser.avatar ||
-                                `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.username}`
+                                `https://i.pravatar.cc/150?u=${currentUser.username}`
                             }
                         />
                         <AvatarFallback className="text-xs">
@@ -252,6 +252,48 @@ const PostComments = memo(function PostComments({ postId }: { postId: number }) 
     )
 })
 
+const PostCaption = ({
+    title,
+    content,
+    username,
+}: {
+    title?: string
+    content: string
+    username?: string
+}) => {
+    const [isExpanded, setIsExpanded] = useState(false)
+    const maxLength = 120
+    const shouldTruncate = content.length > maxLength
+
+    return (
+        <div className="space-y-1 text-sm">
+            {/* For Image posts where username is shown inline */}
+            {username && (
+                <span className="font-bold mr-2 hover:underline cursor-pointer">{username}</span>
+            )}
+
+            {/* Post Title */}
+            {title && <span className="font-bold mr-2">{title}</span>}
+
+            {/* Post Content */}
+            <span>
+                {shouldTruncate && !isExpanded ? `${content.slice(0, maxLength)}...` : content}
+            </span>
+
+            {/* More/Less Button */}
+            {shouldTruncate && (
+                <button
+                    type="button"
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    className="text-muted-foreground ml-1 hover:text-foreground font-medium"
+                >
+                    {isExpanded ? 'less' : 'more'}
+                </button>
+            )}
+        </div>
+    )
+}
+
 export default function Posts() {
     const [newPostTitle, setNewPostTitle] = useState('')
     const [newPostContent, setNewPostContent] = useState('')
@@ -265,7 +307,7 @@ export default function Posts() {
     const createPostMutation = useCreatePost()
     const likePostMutation = useLikePost()
     const _unlikePostMutation = useUnlikePost()
-    const deletePostMutation = useDeletePost()
+    const _deletePostMutation = useDeletePost()
     const [editingPostId, setEditingPostId] = useState<number | null>(null)
     const [editingPostTitle, setEditingPostTitle] = useState('')
     const [editingPostContent, setEditingPostContent] = useState('')
@@ -384,12 +426,6 @@ export default function Posts() {
         }
     }
 
-    const removePost = (postId: number) => {
-        deletePostMutation.mutate(postId, {
-            onError: (err) => console.error('Failed to delete post:', err),
-        })
-    }
-
     if (isLoading) {
         return (
             <div className="flex justify-center py-6">
@@ -410,7 +446,7 @@ export default function Posts() {
                                     <AvatarImage
                                         src={
                                             currentUser?.avatar ||
-                                            `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser?.username}`
+                                            `https://i.pravatar.cc/150?u=${currentUser?.username}`
                                         }
                                     />
                                     <AvatarFallback>
@@ -530,144 +566,202 @@ export default function Posts() {
                 {/* Posts Feed */}
                 <div className="space-y-6">
                     {posts.map((post) => (
-                        <Card key={post.id}>
-                            <CardHeader>
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        {post.user && (
-                                            <UserMenu user={post.user}>
-                                                <div className="flex items-center gap-3">
-                                                    <Avatar className="cursor-pointer hover:opacity-80 transition-opacity">
-                                                        <AvatarImage
-                                                            src={
-                                                                post.user.avatar ||
-                                                                `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.user.username}`
-                                                            }
-                                                        />
-                                                        <AvatarFallback>
-                                                            {post.user.username?.[0]?.toUpperCase() ||
-                                                                'U'}
-                                                        </AvatarFallback>
-                                                    </Avatar>
-                                                    <div>
-                                                        <p className="font-semibold cursor-pointer hover:underline">
-                                                            {post.user.username}
-                                                        </p>
-                                                        <p className="text-sm text-muted-foreground">
-                                                            {formatDistanceToNow(
-                                                                new Date(post.created_at),
-                                                                {
-                                                                    addSuffix: true,
-                                                                }
-                                                            )}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </UserMenu>
-                                        )}
-                                    </div>
+                        <Card key={post.id} className="border-none shadow-none text-sm">
+                            <div className="flex items-center justify-between p-3">
+                                <div className="flex items-center gap-3">
+                                    {post.user && (
+                                        <UserMenu user={post.user}>
+                                            <div className="flex items-center gap-3">
+                                                <Avatar className="w-8 h-8 cursor-pointer ring-1 ring-border">
+                                                    <AvatarImage
+                                                        src={
+                                                            post.user.avatar ||
+                                                            `https://i.pravatar.cc/150?u=${post.user.username}`
+                                                        }
+                                                    />
+                                                    <AvatarFallback>
+                                                        {post.user.username?.[0]?.toUpperCase() ||
+                                                            'U'}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                <span className="font-semibold text-sm cursor-pointer">
+                                                    {post.user.username}
+                                                </span>
+                                            </div>
+                                        </UserMenu>
+                                    )}
                                 </div>
-                            </CardHeader>
-                            <CardContent>
-                                {editingPostId === post.id ? (
-                                    <div>
-                                        <input
-                                            type="text"
-                                            placeholder="Post title"
-                                            value={editingPostTitle}
-                                            onChange={(e) => setEditingPostTitle(e.target.value)}
-                                            className="w-full mb-2 px-3 py-2 border rounded-md"
-                                        />
-                                        <Textarea
-                                            value={editingPostContent}
-                                            onChange={(e) => setEditingPostContent(e.target.value)}
-                                            rows={4}
-                                            className="mb-2"
-                                        />
-                                        <div className="flex justify-end gap-2">
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={cancelEditPost}
+                                {currentUser && currentUser.id === post.user_id && (
+                                    <div className="flex gap-2">
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-8 w-8 p-0"
+                                            onClick={() => startEditPost(post)}
+                                        >
+                                            <span className="sr-only">Edit</span>
+                                            <svg
+                                                aria-hidden="true"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="16"
+                                                height="16"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeWidth="2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
                                             >
-                                                Cancel
-                                            </Button>
-                                            <Button size="sm" onClick={() => saveEditPost(post.id)}>
-                                                Save
-                                            </Button>
-                                        </div>
+                                                <circle cx="12" cy="12" r="1" />
+                                                <circle cx="19" cy="12" r="1" />
+                                                <circle cx="5" cy="12" r="1" />
+                                            </svg>
+                                        </Button>
                                     </div>
-                                ) : (
-                                    <>
-                                        <h3 className="font-semibold text-lg mb-2">{post.title}</h3>
-                                        <p className="mb-4">{post.content}</p>
-                                    </>
                                 )}
+                            </div>
 
-                                {post.image_url && (
-                                    <div className="mb-4 rounded-lg overflow-hidden">
+                            {/* Post Media / Content */}
+                            <div className="-mx-4 md:mx-0">
+                                {post.image_url ? (
+                                    <div className="relative aspect-square w-full bg-muted overflow-hidden md:rounded-sm">
                                         <img
                                             src={post.image_url}
-                                            alt={`Post: ${post.title}`}
-                                            className="w-full h-auto object-cover"
+                                            alt={`Post by ${post.user?.username}`}
+                                            className="w-full h-full object-cover"
                                             loading="lazy"
                                         />
                                     </div>
-                                )}
-
-                                <div className="flex items-center justify-between pt-4 border-t">
-                                    <div className="flex items-center gap-6">
-                                        <Button
-                                            variant={post.liked ? 'default' : 'ghost'}
-                                            size="sm"
-                                            onClick={() => handleLikeToggle(post)}
-                                            disabled={!isAuthenticated || likingPostId === post.id}
-                                            aria-label={`Like post by ${post.user?.username}`}
-                                        >
-                                            <Heart
-                                                className={`w-4 h-4 mr-2 ${post.liked ? 'fill-current' : ''}`}
-                                            />
-                                            {post.likes_count}
-                                        </Button>
-                                        {/* Post owner actions */}
-                                        {currentUser && currentUser.id === post.user_id && (
-                                            <>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => startEditPost(post)}
-                                                >
-                                                    Edit
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="destructive"
-                                                    onClick={() => removePost(post.id)}
-                                                >
-                                                    Delete
-                                                </Button>
-                                            </>
+                                ) : (
+                                    <div className="p-4 bg-muted/10 md:rounded-sm border-y md:border">
+                                        {editingPostId === post.id ? (
+                                            <div className="space-y-4">
+                                                <input
+                                                    type="text"
+                                                    value={editingPostTitle}
+                                                    onChange={(e) =>
+                                                        setEditingPostTitle(e.target.value)
+                                                    }
+                                                    className="w-full font-bold bg-transparent border-none focus:ring-0 p-0 text-base"
+                                                    placeholder="Title"
+                                                />
+                                                <Textarea
+                                                    value={editingPostContent}
+                                                    onChange={(e) =>
+                                                        setEditingPostContent(e.target.value)
+                                                    }
+                                                    className="min-h-[100px] border-none focus-visible:ring-0 p-0 -ml-1 resize-none"
+                                                />
+                                                <div className="flex justify-end gap-2 pt-2">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={cancelEditPost}
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() => saveEditPost(post.id)}
+                                                    >
+                                                        Save
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                <PostCaption
+                                                    title={post.title}
+                                                    content={post.content}
+                                                />
+                                            </div>
                                         )}
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => toggleComments(post.id)}
-                                            className={
-                                                expandedComments.has(post.id) ? 'text-blue-500' : ''
-                                            }
-                                            aria-label={`${
-                                                expandedComments.has(post.id) ? 'Hide' : 'Show'
-                                            } comments for post by ${post.user?.username}`}
-                                        >
-                                            <MessageCircle className="w-4 h-4 mr-2" />
-                                            {`Comments (${post.comments_count ?? 0})`}
-                                        </Button>
                                     </div>
+                                )}
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="px-3 pt-3 pb-2 grid gap-1">
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleLikeToggle(post)}
+                                        className="hover:opacity-70 transition-opacity"
+                                        disabled={!isAuthenticated}
+                                    >
+                                        <Heart
+                                            className={cn(
+                                                'w-6 h-6 transition-all',
+                                                post.liked
+                                                    ? 'fill-red-500 text-red-500 scale-110'
+                                                    : 'text-foreground'
+                                            )}
+                                        />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleComments(post.id)}
+                                        className="hover:opacity-70 transition-opacity"
+                                    >
+                                        <MessageCircle className="w-6 h-6 -rotate-90" />
+                                    </button>
+                                    <button
+                                        className="hover:opacity-70 transition-opacity ml-auto"
+                                        type="button"
+                                    >
+                                        <span className="sr-only">Share</span>
+                                        <svg
+                                            aria-hidden="true"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            width="24"
+                                            height="24"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            className="w-6 h-6"
+                                        >
+                                            <path d="M5 12h14" />
+                                            <path d="m12 5 7 7-7 7" />
+                                        </svg>
+                                    </button>
                                 </div>
 
-                                {/* Comments Section */}
+                                {/* Likes Count */}
+                                <div className="font-semibold text-sm mt-1">
+                                    {post.likes_count} likes
+                                </div>
+
+                                {/* Caption (if image post) */}
+                                {post.image_url && (
+                                    <PostCaption
+                                        username={post.user?.username}
+                                        content={post.content}
+                                    />
+                                )}
+
+                                {/* Comments Link */}
+                                <button
+                                    type="button"
+                                    className="text-muted-foreground text-sm text-left mt-1"
+                                    onClick={() => toggleComments(post.id)}
+                                >
+                                    {(post.comments_count ?? 0) > 0
+                                        ? `View all ${post.comments_count} comments`
+                                        : 'Add a comment...'}
+                                </button>
+                                <p className="text-[10px] text-muted-foreground bg-transparent uppercase tracking-wider mt-1">
+                                    {formatDistanceToNow(new Date(post.created_at), {
+                                        addSuffix: false,
+                                    })}{' '}
+                                    AGO
+                                </p>
+
+                                {/* Collapsed Comments Section */}
                                 {expandedComments.has(post.id) && <PostComments postId={post.id} />}
-                            </CardContent>
+                            </div>
                         </Card>
                     ))}
 
@@ -677,21 +771,23 @@ export default function Posts() {
                             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                         </div>
                     )}
-
                     {/* End of feed */}
                     {!hasNextPage && posts.length > 0 && (
-                        <div className="text-center py-4 text-muted-foreground text-sm">
-                            You've reached the end!
+                        <div className="flex justify-center py-8 text-muted-foreground">
+                            <div className="w-2 h-2 rounded-full bg-border" />
                         </div>
                     )}
 
                     {/* Empty state */}
                     {posts.length === 0 && (
-                        <div className="text-center py-12">
-                            <p className="text-muted-foreground mb-4">No posts yet</p>
-                            {isAuthenticated && (
-                                <p className="text-sm">Be the first to create a post!</p>
-                            )}
+                        <div className="text-center py-20">
+                            <div className="w-20 h-20 mx-auto bg-muted rounded-full flex items-center justify-center mb-6">
+                                <Image className="w-10 h-10 text-muted-foreground" />
+                            </div>
+                            <h3 className="font-bold text-lg mb-2">No Posts Yet</h3>
+                            <p className="text-muted-foreground">
+                                Start capturing your moments to see them here.
+                            </p>
                         </div>
                     )}
                 </div>

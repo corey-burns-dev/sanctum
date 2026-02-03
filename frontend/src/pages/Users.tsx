@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query'
 import { Calendar, ExternalLink, Mail } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { apiClient } from '@/api/client'
-import { Navbar } from '@/components/Navbar'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -92,7 +91,7 @@ export default function Users() {
                                                             <AvatarImage
                                                                 src={
                                                                     user.avatar ||
-                                                                    `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`
+                                                                    `https://i.pravatar.cc/150?u=${user.username}`
                                                                 }
                                                             />
                                                             <AvatarFallback>

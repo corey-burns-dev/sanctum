@@ -6,21 +6,16 @@ COPY backend/go.mod backend/go.sum* ./
 RUN go mod download
 
 COPY backend/ .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o main .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o main ./cmd/server
 
-FROM alpine:3.21
+FROM gcr.io/distroless/static-debian12
 
-RUN apk --no-cache add ca-certificates curl && \
-    addgroup -S appgroup && adduser -S appuser -G appgroup
-
-WORKDIR /home/appuser
+WORKDIR /
 
 COPY --from=builder /app/main .
-RUN chown appuser:appgroup main
 
-USER appuser
+USER nonroot:nonroot
 
-ENV PORT=8375
 EXPOSE 8375
 
-CMD ["./main"]
+ENTRYPOINT ["/main"]

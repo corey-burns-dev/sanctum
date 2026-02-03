@@ -1,8 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Eye, EyeOff, LogIn } from 'lucide-react'
+import { AlertCircle, Eye, EyeOff, LogIn } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -16,6 +17,7 @@ export default function Login() {
     const {
         register,
         handleSubmit,
+        setError,
         formState: { errors, isSubmitting },
     } = useForm<LoginFormData>({
         resolver: zodResolver(loginSchema),
@@ -26,10 +28,14 @@ export default function Login() {
     const onSubmit = async (data: LoginFormData) => {
         try {
             await loginMutation.mutateAsync(data)
-            // Navigation happens automatically in the hook
+            toast.success('Successfully logged in!')
         } catch (error) {
             console.error('Login error:', error)
-            // Error handling is done by React Hook Form through the schema
+            const message = error instanceof Error ? error.message : 'Invalid email or password'
+            toast.error(message)
+            setError('root', {
+                message: message,
+            })
         }
     }
 
@@ -44,6 +50,12 @@ export default function Login() {
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                        {errors.root && (
+                            <div className="bg-destructive/15 p-3 rounded-md flex items-center gap-2 text-sm text-destructive">
+                                <AlertCircle className="w-4 h-4 shrink-0" />
+                                <p>{errors.root.message}</p>
+                            </div>
+                        )}
                         <div className="space-y-2">
                             <Label htmlFor="email">Email</Label>
                             <Input
@@ -56,6 +68,7 @@ export default function Login() {
                                 <p className="text-sm text-red-600">{errors.email.message}</p>
                             )}
                         </div>
+
                         <div className="space-y-2">
                             <Label htmlFor="password">Password</Label>
                             <div className="relative">

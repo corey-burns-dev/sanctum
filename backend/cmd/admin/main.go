@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"vibeshift/config"
-	"vibeshift/database"
-	"vibeshift/models"
+	"vibeshift/internal/config"
+	"vibeshift/internal/database"
+	"vibeshift/internal/models"
 
 	"gorm.io/gorm"
 )

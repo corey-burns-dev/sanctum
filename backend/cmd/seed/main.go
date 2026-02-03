@@ -2,15 +2,23 @@
 package main
 
 import (
+	"flag"
 	"log"
-	"vibeshift/config"
-	"vibeshift/database"
-	"vibeshift/seed"
+	"vibeshift/internal/config"
+	"vibeshift/internal/database"
+	"vibeshift/internal/seed"
 )
 
 func main() {
+	// Parse command line flags
+	numUsers := flag.Int("users", 50, "Number of users to create")
+	numPosts := flag.Int("posts", 200, "Number of posts to create")
+	shouldClean := flag.Bool("clean", true, "Clean database before seeding")
+	flag.Parse()
+
 	log.Println("🌱 Database Seeder")
 	log.Println("==================")
+	log.Printf("Target: %d users, %d posts, clean=%v\n", *numUsers, *numPosts, *shouldClean)
 
 	// Load configuration
 	cfg, err := config.LoadConfig()
@@ -24,8 +32,14 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	// Run seeder
-	if err := seed.Seed(database.DB); err != nil {
+	// Run seeder with options
+	opts := seed.Options{
+		NumUsers:    *numUsers,
+		NumPosts:    *numPosts,
+		ShouldClean: *shouldClean,
+	}
+
+	if err := seed.Seed(database.DB, opts); err != nil {
 		log.Fatalf("❌ Seeding failed: %v", err)
 	}
 
