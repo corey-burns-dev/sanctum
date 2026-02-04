@@ -1,11 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
 import { Heart, Image, Loader2, MessageCircle, Send, Smile, Video } from 'lucide-react'
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 // API
 import { apiClient } from '@/api/client'
 // Types
 import type { Post } from '@/api/types'
+import { PostCaption } from '@/components/posts/PostCaption'
 // Components
 import { UserMenu } from '@/components/UserMenu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -13,14 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 // Hooks
-import { useCreateComment, useDeleteComment, usePostComments } from '@/hooks/useComments'
-import {
-    useCreatePost,
-    useDeletePost,
-    useInfinitePosts,
-    useLikePost,
-    useUnlikePost,
-} from '@/hooks/usePosts'
+import { useCreatePost, useInfinitePosts, useLikePost } from '@/hooks/usePosts'
 import { getCurrentUser, useIsAuthenticated } from '@/hooks/useUsers'
 import { cn } from '@/lib/utils'
 
@@ -52,262 +47,18 @@ function handleAuthOrFKError(error: unknown) {
     return false
 }
 
-// Component for individual post comments
-const PostComments = memo(function PostComments({ postId }: { postId: number }) {
-    const [newComment, setNewComment] = useState('')
-    const currentUser = getCurrentUser()
-    const { data: comments = [], isLoading } = usePostComments(postId)
-    const createCommentMutation = useCreateComment(postId)
-    const queryClientLocal = useQueryClient()
-    const deleteCommentMutation = useDeleteComment(postId)
-    const [editingCommentId, setEditingCommentId] = useState<number | null>(null)
-    const [editingCommentText, setEditingCommentText] = useState('')
-
-    const handleCreateComment = useCallback(() => {
-        if (!newComment.trim()) return
-        createCommentMutation.mutate(
-            { content: newComment },
-            {
-                onSuccess: () => {
-                    setNewComment('')
-                },
-                onError: (error) => {
-                    console.error('Failed to create comment:', error)
-                },
-            }
-        )
-    }, [newComment, createCommentMutation])
-
-    const startEditComment = (commentId: number, text: string) => {
-        setEditingCommentId(commentId)
-        setEditingCommentText(text)
-    }
-
-    const cancelEditComment = () => {
-        setEditingCommentId(null)
-        setEditingCommentText('')
-    }
-
-    const saveEditComment = async (commentId: number) => {
-        if (!editingCommentText.trim()) return
-        try {
-            await apiClient.updateComment(postId, commentId, {
-                content: editingCommentText,
-            })
-            await queryClientLocal.invalidateQueries({
-                queryKey: ['comments', 'list', postId],
-            })
-            cancelEditComment()
-        } catch (err) {
-            console.error('Failed to update comment:', err)
-        }
-    }
-
-    const removeComment = (commentId: number) => {
-        deleteCommentMutation.mutate(commentId, {
-            onError: (err) => console.error('Failed to delete comment:', err),
-        })
-    }
-
-    if (isLoading) {
-        return (
-            <div className="flex justify-center py-4">
-                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-            </div>
-        )
-    }
-
-    return (
-        <div className="mt-4 pt-4 border-t">
-            {/* Existing Comments */}
-            <div className="space-y-3 mb-4">
-                {comments.map((comment) => (
-                    <div key={comment.id} className="flex gap-3">
-                        {comment.user && (
-                            <UserMenu user={comment.user}>
-                                <Avatar className="w-8 h-8 shrink-0 cursor-pointer hover:opacity-80">
-                                    <AvatarImage
-                                        src={
-                                            comment.user.avatar ||
-                                            `https://i.pravatar.cc/150?u=${comment.user.username}`
-                                        }
-                                    />
-                                    <AvatarFallback className="text-xs">
-                                        {comment.user.username?.[0]?.toUpperCase() || 'U'}
-                                    </AvatarFallback>
-                                </Avatar>
-                            </UserMenu>
-                        )}
-                        <div className="flex-1">
-                            <div className="bg-muted rounded-lg px-3 py-2">
-                                <div className="flex items-center gap-2 mb-1">
-                                    {comment.user ? (
-                                        <UserMenu user={comment.user}>
-                                            <span className="font-semibold text-sm cursor-pointer hover:underline">
-                                                {comment.user.username}
-                                            </span>
-                                        </UserMenu>
-                                    ) : (
-                                        <span className="font-semibold text-sm">Unknown</span>
-                                    )}
-                                    <span className="text-xs text-muted-foreground">
-                                        {formatDistanceToNow(new Date(comment.created_at), {
-                                            addSuffix: true,
-                                        })}
-                                    </span>
-                                </div>
-                                {editingCommentId === comment.id ? (
-                                    <div>
-                                        <Textarea
-                                            value={editingCommentText}
-                                            onChange={(e) => setEditingCommentText(e.target.value)}
-                                            rows={2}
-                                            className="mb-2"
-                                        />
-                                        <div className="flex gap-2 justify-end">
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={cancelEditComment}
-                                            >
-                                                Cancel
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                onClick={() => saveEditComment(comment.id)}
-                                            >
-                                                Save
-                                            </Button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <p className="text-sm">{comment.content}</p>
-                                )}
-
-                                {/* Comment actions */}
-                                {currentUser && currentUser.id === comment.user_id && (
-                                    <div className="flex gap-2 mt-2 text-sm">
-                                        <button
-                                            type="button"
-                                            className="text-blue-500"
-                                            onClick={() =>
-                                                startEditComment(comment.id, comment.content)
-                                            }
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="text-red-500"
-                                            onClick={() => removeComment(comment.id)}
-                                        >
-                                            Delete
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-            {/* Add Comment */}
-            {currentUser && (
-                <div className="flex gap-3">
-                    <Avatar className="w-8 h-8 shrink-0">
-                        <AvatarImage
-                            src={
-                                currentUser.avatar ||
-                                `https://i.pravatar.cc/150?u=${currentUser.username}`
-                            }
-                        />
-                        <AvatarFallback className="text-xs">
-                            {currentUser.username?.[0]?.toUpperCase()}
-                        </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 flex gap-2">
-                        <Textarea
-                            placeholder="Write a comment..."
-                            value={newComment}
-                            onChange={(e) => setNewComment(e.target.value)}
-                            className="resize-none text-sm"
-                            rows={2}
-                            disabled={createCommentMutation.isPending}
-                        />
-                        <Button
-                            size="sm"
-                            onClick={handleCreateComment}
-                            disabled={!newComment.trim() || createCommentMutation.isPending}
-                            className="self-end"
-                        >
-                            {createCommentMutation.isPending ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                                <Send className="w-4 h-4" />
-                            )}
-                        </Button>
-                    </div>
-                </div>
-            )}
-        </div>
-    )
-})
-
-const PostCaption = ({
-    title,
-    content,
-    username,
-}: {
-    title?: string
-    content: string
-    username?: string
-}) => {
-    const [isExpanded, setIsExpanded] = useState(false)
-    const maxLength = 120
-    const shouldTruncate = content.length > maxLength
-
-    return (
-        <div className="space-y-1 text-sm">
-            {/* For Image posts where username is shown inline */}
-            {username && (
-                <span className="font-bold mr-2 hover:underline cursor-pointer">{username}</span>
-            )}
-
-            {/* Post Title */}
-            {title && <span className="font-bold mr-2">{title}</span>}
-
-            {/* Post Content */}
-            <span>
-                {shouldTruncate && !isExpanded ? `${content.slice(0, maxLength)}...` : content}
-            </span>
-
-            {/* More/Less Button */}
-            {shouldTruncate && (
-                <button
-                    type="button"
-                    onClick={() => setIsExpanded(!isExpanded)}
-                    className="text-muted-foreground ml-1 hover:text-foreground font-medium"
-                >
-                    {isExpanded ? 'less' : 'more'}
-                </button>
-            )}
-        </div>
-    )
-}
-
 export default function Posts() {
     const [newPostTitle, setNewPostTitle] = useState('')
     const [newPostContent, setNewPostContent] = useState('')
     const [newPostImage, setNewPostImage] = useState('')
     const [isExpandingPost, setIsExpandingPost] = useState(false)
-    const [expandedComments, setExpandedComments] = useState<Set<number>>(new Set())
 
     const isAuthenticated = useIsAuthenticated()
     const currentUser = getCurrentUser()
+    const navigate = useNavigate()
     const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfinitePosts(10)
     const createPostMutation = useCreatePost()
     const likePostMutation = useLikePost()
-    const _unlikePostMutation = useUnlikePost()
-    const _deletePostMutation = useDeletePost()
     const [editingPostId, setEditingPostId] = useState<number | null>(null)
     const [editingPostTitle, setEditingPostTitle] = useState('')
     const [editingPostContent, setEditingPostContent] = useState('')
@@ -372,18 +123,6 @@ export default function Posts() {
         )
     }
 
-    const toggleComments = (postId: number) => {
-        setExpandedComments((prev) => {
-            const newSet = new Set(prev)
-            if (newSet.has(postId)) {
-                newSet.delete(postId)
-            } else {
-                newSet.add(postId)
-            }
-            return newSet
-        })
-    }
-
     const handleLikeToggle = (post: Post) => {
         if (likingPostId === post.id) return // Prevent double-clicks
 
@@ -435,12 +174,12 @@ export default function Posts() {
     }
 
     return (
-        <div className="flex-1 overflow-y-auto py-6">
-            <div className="max-w-2xl mx-auto px-4">
+        <div className="flex-1 overflow-y-auto py-8">
+            <div className="max-w-3xl mx-auto px-4">
                 {/* Create Post */}
                 {isAuthenticated && (
-                    <Card className="mb-6 overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow">
-                        <CardContent className="p-4 pt-6">
+                    <Card className="mb-6 overflow-hidden border bg-card/95 shadow-sm hover:shadow-md transition-shadow rounded-2xl">
+                        <CardContent className="p-5">
                             <div className="flex gap-3 mb-4">
                                 <Avatar className="w-10 h-10 ring-2 ring-primary/5">
                                     <AvatarImage
@@ -566,12 +305,28 @@ export default function Posts() {
                 {/* Posts Feed */}
                 <div className="space-y-6">
                     {posts.map((post) => (
-                        <Card key={post.id} className="border-none shadow-none text-sm">
-                            <div className="flex items-center justify-between p-3">
+                        <Card
+                            key={post.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => navigate(`/posts/${post.id}`)}
+                            onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                    event.preventDefault()
+                                    navigate(`/posts/${post.id}`)
+                                }
+                            }}
+                            className="border bg-card/95 shadow-sm rounded-2xl overflow-hidden text-sm transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+                        >
+                            <div className="flex items-center justify-between px-4 py-3">
                                 <div className="flex items-center gap-3">
                                     {post.user && (
                                         <UserMenu user={post.user}>
-                                            <div className="flex items-center gap-3">
+                                            <button
+                                                type="button"
+                                                className="flex items-center gap-3 text-left"
+                                                onClick={(event) => event.stopPropagation()}
+                                            >
                                                 <Avatar className="w-8 h-8 cursor-pointer ring-1 ring-border">
                                                     <AvatarImage
                                                         src={
@@ -587,7 +342,7 @@ export default function Posts() {
                                                 <span className="font-semibold text-sm cursor-pointer">
                                                     {post.user.username}
                                                 </span>
-                                            </div>
+                                            </button>
                                         </UserMenu>
                                     )}
                                 </div>
@@ -597,7 +352,10 @@ export default function Posts() {
                                             size="sm"
                                             variant="ghost"
                                             className="h-8 w-8 p-0"
-                                            onClick={() => startEditPost(post)}
+                                            onClick={(event) => {
+                                                event.stopPropagation()
+                                                startEditPost(post)
+                                            }}
                                         >
                                             <span className="sr-only">Edit</span>
                                             <svg
@@ -622,9 +380,9 @@ export default function Posts() {
                             </div>
 
                             {/* Post Media / Content */}
-                            <div className="-mx-4 md:mx-0">
+                            <div className="px-4 pb-3">
                                 {post.image_url ? (
-                                    <div className="relative aspect-square w-full bg-muted overflow-hidden md:rounded-sm">
+                                    <div className="relative aspect-square w-full bg-muted overflow-hidden rounded-xl">
                                         <img
                                             src={post.image_url}
                                             alt={`Post by ${post.user?.username}`}
@@ -633,7 +391,7 @@ export default function Posts() {
                                         />
                                     </div>
                                 ) : (
-                                    <div className="p-4 bg-muted/10 md:rounded-sm border-y md:border">
+                                    <div className="p-4 bg-muted/30 rounded-xl border border-border/60">
                                         {editingPostId === post.id ? (
                                             <div className="space-y-4">
                                                 <input
@@ -644,6 +402,7 @@ export default function Posts() {
                                                     }
                                                     className="w-full font-bold bg-transparent border-none focus:ring-0 p-0 text-base"
                                                     placeholder="Title"
+                                                    onClick={(event) => event.stopPropagation()}
                                                 />
                                                 <Textarea
                                                     value={editingPostContent}
@@ -651,18 +410,25 @@ export default function Posts() {
                                                         setEditingPostContent(e.target.value)
                                                     }
                                                     className="min-h-[100px] border-none focus-visible:ring-0 p-0 -ml-1 resize-none"
+                                                    onClick={(event) => event.stopPropagation()}
                                                 />
                                                 <div className="flex justify-end gap-2 pt-2">
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
-                                                        onClick={cancelEditPost}
+                                                        onClick={(event) => {
+                                                            event.stopPropagation()
+                                                            cancelEditPost()
+                                                        }}
                                                     >
                                                         Cancel
                                                     </Button>
                                                     <Button
                                                         size="sm"
-                                                        onClick={() => saveEditPost(post.id)}
+                                                        onClick={(event) => {
+                                                            event.stopPropagation()
+                                                            saveEditPost(post.id)
+                                                        }}
                                                     >
                                                         Save
                                                     </Button>
@@ -681,11 +447,14 @@ export default function Posts() {
                             </div>
 
                             {/* Action Buttons */}
-                            <div className="px-3 pt-3 pb-2 grid gap-1">
+                            <div className="px-4 pt-1 pb-4 grid gap-1">
                                 <div className="flex items-center gap-4">
                                     <button
                                         type="button"
-                                        onClick={() => handleLikeToggle(post)}
+                                        onClick={(event) => {
+                                            event.stopPropagation()
+                                            handleLikeToggle(post)
+                                        }}
                                         className="hover:opacity-70 transition-opacity"
                                         disabled={!isAuthenticated}
                                     >
@@ -700,7 +469,10 @@ export default function Posts() {
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => toggleComments(post.id)}
+                                        onClick={(event) => {
+                                            event.stopPropagation()
+                                            navigate(`/posts/${post.id}`)
+                                        }}
                                         className="hover:opacity-70 transition-opacity"
                                     >
                                         <MessageCircle className="w-6 h-6 -rotate-90" />
@@ -708,6 +480,7 @@ export default function Posts() {
                                     <button
                                         className="hover:opacity-70 transition-opacity ml-auto"
                                         type="button"
+                                        onClick={(event) => event.stopPropagation()}
                                     >
                                         <span className="sr-only">Share</span>
                                         <svg
@@ -745,8 +518,11 @@ export default function Posts() {
                                 {/* Comments Link */}
                                 <button
                                     type="button"
-                                    className="text-muted-foreground text-sm text-left mt-1"
-                                    onClick={() => toggleComments(post.id)}
+                                    className="text-muted-foreground text-sm text-left mt-1 hover:text-foreground"
+                                    onClick={(event) => {
+                                        event.stopPropagation()
+                                        navigate(`/posts/${post.id}`)
+                                    }}
                                 >
                                     {(post.comments_count ?? 0) > 0
                                         ? `View all ${post.comments_count} comments`
@@ -758,9 +534,6 @@ export default function Posts() {
                                     })}{' '}
                                     AGO
                                 </p>
-
-                                {/* Collapsed Comments Section */}
-                                {expandedComments.has(post.id) && <PostComments postId={post.id} />}
                             </div>
                         </Card>
                     ))}

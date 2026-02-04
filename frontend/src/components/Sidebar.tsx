@@ -7,7 +7,6 @@ import {
     MessageCircle,
     MessageSquare,
     Search,
-    User,
     Users,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -40,7 +39,6 @@ export function Sidebar() {
         { icon: MessageCircle, label: 'Messages', path: '/messages' },
         { icon: Users, label: 'Friends', path: '/friends' },
         { icon: Gamepad2, label: 'Games', path: '/games' },
-        { icon: User, label: 'Profile', path: '/profile' },
     ]
 
     if (!isAuthenticated) return null
@@ -48,7 +46,7 @@ export function Sidebar() {
     return (
         <nav
             className={cn(
-                'relative h-full min-h-screen w-16 border-r bg-background flex flex-col transition-all duration-300 z-50 group/sidebar shrink-0',
+                'relative h-full min-h-screen w-16 border-r bg-background flex flex-col transition-all duration-300 z-40 group/sidebar shrink-0',
                 isHovered && 'w-64 shadow-xl'
             )}
             onMouseEnter={() => setIsHovered(true)}
@@ -127,9 +125,6 @@ export function Sidebar() {
                                     <span className="text-sm font-semibold truncate w-full">
                                         {currentUser?.username}
                                     </span>
-                                    <span className="text-xs text-muted-foreground truncate w-full">
-                                        View Account
-                                    </span>
                                 </div>
                             </button>
                         </DropdownMenuTrigger>
@@ -141,12 +136,6 @@ export function Sidebar() {
                         >
                             <DropdownMenuLabel>My Account</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem asChild>
-                                <Link to="/profile" className="flex items-center w-full">
-                                    <User className="mr-2 h-4 w-4" />
-                                    <span>Profile</span>
-                                </Link>
-                            </DropdownMenuItem>
                             <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                                 <div className="flex items-center justify-between w-full">
                                     <div className="flex items-center">

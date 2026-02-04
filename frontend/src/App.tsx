@@ -12,6 +12,7 @@ import { routePrefetchMap } from '@/utils/prefetch'
 const Login = lazy(() => import('@/pages/Login'))
 const Signup = lazy(() => import('@/pages/Signup'))
 const Posts = lazy(() => import('@/pages/Posts'))
+const PostDetail = lazy(() => import('@/pages/PostDetail'))
 const Profile = lazy(() => import('@/pages/Profile'))
 const Friends = lazy(() => import('@/pages/Friends'))
 const Messages = lazy(() => import('@/pages/Messages'))
@@ -90,6 +91,7 @@ function RoutesWithPrefetch() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/posts" element={<Posts />} />
+                <Route path="/posts/:id" element={<PostDetail />} />
                 <Route
                     path="/chat"
                     element={
@@ -273,6 +275,7 @@ function RoutesWithPrefetch() {
 
 import { BottomBar } from '@/components/BottomBar'
 import { MobileHeader } from '@/components/MobileHeader'
+import { TopBar } from '@/components/TopBar'
 
 function MainLayout({ children }: { children: ReactNode }) {
     const isAuthenticated = useIsAuthenticated()
@@ -282,6 +285,9 @@ function MainLayout({ children }: { children: ReactNode }) {
             {/* Mobile Header - Top */}
             {isAuthenticated && <MobileHeader />}
 
+            {/* Desktop Top Bar */}
+            {isAuthenticated && <TopBar />}
+
             {/* Desktop Sidebar */}
             {isAuthenticated && (
                 <div className="hidden md:block h-full shrink-0">
@@ -289,7 +295,7 @@ function MainLayout({ children }: { children: ReactNode }) {
                 </div>
             )}
 
-            <div className="flex-1 flex flex-col min-w-0 transition-all duration-300 overflow-hidden pt-16 pb-16 md:pt-0 md:pb-0">
+            <div className="flex-1 flex flex-col min-w-0 transition-all duration-300 overflow-hidden pt-16 pb-16 md:pt-16 md:pb-0">
                 {children}
             </div>
 

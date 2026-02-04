@@ -43,3 +43,7 @@ n:\*\* `go run main.go`
 - **Docker:** `Dockerfile.dev` for development container.- Base Path: `/api`
 - Health Checks: `/health` (and proxied from frontend).
 - Documentation: `/swagger/*` (when enabled).
+
+## Rules
+
+- **Execution:** Do NOT run tools like `golangci-lint` directly in the terminal. Using `make` commands is required for proper execution environment. If a `make` command doesn't exist, create one.

@@ -1,0 +1,4 @@
+\033[1;34mLinting frontend code with Biome...\033[0m 
+cd frontend && bun --bun biome check --write .
+Checked 99 files in 64ms. Fixed 1 file.
+\033[1;32m✓ Frontend linting passed\033[0m 
