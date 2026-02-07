@@ -1,15 +1,3 @@
-import { ModeToggle } from '@/components/mode-toggle'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { getCurrentUser, useIsAuthenticated, useLogout, useStreams } from '@/hooks'
-import { cn } from '@/lib/utils'
 import {
     Compass,
     Gamepad2,
@@ -25,6 +13,18 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { ModeToggle } from '@/components/mode-toggle'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { getCurrentUser, useIsAuthenticated, useLogout, useStreams } from '@/hooks'
+import { cn } from '@/lib/utils'
 
 export function Sidebar() {
     const location = useLocation()

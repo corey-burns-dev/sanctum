@@ -129,7 +129,7 @@ interface GameRoom {
     type: string
     status: string
     creator_id: number
-    opponent_id: number | null
+    opponent_id?: number | null
     creator: {
         username: string
     }

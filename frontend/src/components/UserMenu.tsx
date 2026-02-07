@@ -1,3 +1,5 @@
+import { MessageCircle, User as UserIcon, UserMinus, UserPlus, Video } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import type { User } from '@/api/types'
 import { UserContextMenu } from '@/components/UserContextMenu'
 import {
@@ -11,8 +13,6 @@ import {
 import { useCreateConversation } from '@/hooks/useChat'
 import { useFriendshipStatus, useRemoveFriend, useSendFriendRequest } from '@/hooks/useFriends'
 import { getCurrentUser } from '@/hooks/useUsers'
-import { MessageCircle, User as UserIcon, UserMinus, UserPlus, Video } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
 
 interface UserMenuProps {
     user: User

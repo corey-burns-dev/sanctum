@@ -1,8 +1,3 @@
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { getCurrentUser } from '@/hooks/useUsers'
-import { useVideoChat } from '@/hooks/useVideoChat'
-import { cn } from '@/lib/utils'
 import {
     Camera,
     CameraOff,
@@ -17,6 +12,11 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { getCurrentUser } from '@/hooks/useUsers'
+import { useVideoChat } from '@/hooks/useVideoChat'
+import { cn } from '@/lib/utils'
 
 // Small reusable component to render a <video> element bound to a MediaStream
 function VideoTile({

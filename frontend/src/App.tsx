@@ -1,13 +1,13 @@
+import { useQueryClient } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
+import { Link, Route, BrowserRouter as Router, Routes, useLocation } from 'react-router-dom'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { Sidebar } from '@/components/Sidebar'
 import { Button } from '@/components/ui/button'
 import { Toaster } from '@/components/ui/sonner'
 import { useIsAuthenticated } from '@/hooks'
 import { routePrefetchMap } from '@/utils/prefetch'
-import { useQueryClient } from '@tanstack/react-query'
-import type { ReactNode } from 'react'
-import { lazy, Suspense, useEffect } from 'react'
-import { Link, Route, BrowserRouter as Router, Routes, useLocation } from 'react-router-dom'
 
 const Login = lazy(() => import('@/pages/Login'))
 const Signup = lazy(() => import('@/pages/Signup'))
