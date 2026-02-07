@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Post represents a post in the Vibeshift application.
+// Post represents a post in the Sanctum application.
 type Post struct {
 	ID       uint   `gorm:"primaryKey" json:"id"`
 	Title    string `gorm:"not null" json:"title"`

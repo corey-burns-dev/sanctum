@@ -1,6 +1,6 @@
-# 🧠 VibeShift: AI Coding Standards & Context
+# 🧠 Sanctum: AI Coding Standards & Context
 
-> **Project Name:** VibeShift
+> **Project Name:** Sanctum
 > **Purpose:** AI Context & Style Guide for maintaining code quality, consistency, and architectural integrity.
 
 ---
@@ -116,7 +116,7 @@
 
 ## 7. 🤖 AI Instructions (Meta-Rules)
 
-**When generating code for VibeShift, you must adhere to these rules:**
+**When generating code for Sanctum, you must adhere to these rules:**
 
 1. **Compile Check:** Always verify the response is syntactically correct and compiles.
 2. **Package Declaration:** Always provide the `package` line at the top of the file.

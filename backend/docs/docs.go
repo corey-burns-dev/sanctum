@@ -262,7 +262,7 @@ var SwaggerInfo = &swag.Spec{
 	Host:             "localhost:8375",
 	BasePath:         "/api",
 	Schemes:          []string{"http", "https"},
-	Title:            "Vibeshift API",
+	Title:            "Sanctum API",
 	Description:      "Social media platform API with posts, comments, messaging, and friends",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,

@@ -1,6 +1,6 @@
-# 🧠 VibeShift: AI Coding Standards & Context
+# 🧠 Sanctum: AI Coding Standards & Context
 
-> **Project Name:** VibeShift  
+> **Project Name:** Sanctum  
 > **Purpose:** AI Context & Style Guide for maintaining code quality, consistency, and architectural integrity  
 > **Last Updated:** 2026-01-31
 
@@ -709,7 +709,7 @@ make deps-vuln        # Scan for vulnerabilities
 
 ## 12. 🤖 AI Instructions (Meta-Rules)
 
-**When generating code for VibeShift, you MUST adhere to these rules:**
+**When generating code for Sanctum, you MUST adhere to these rules:**
 
 ### 1. **Compile Check**
 
@@ -945,8 +945,8 @@ If you're new to any of these technologies:
 
 **Last Updated:** 2026-01-31  
 **Version:** 2.0  
-**Maintained By:** VibeShift Team
+**Maintained By:** Sanctum Team
 
 ---
 
-*This document is the source of truth for all AI-assisted code generation and code reviews in the VibeShift project. When in doubt, follow these guidelines.*
+*This document is the source of truth for all AI-assisted code generation and code reviews in the Sanctum project. When in doubt, follow these guidelines.*

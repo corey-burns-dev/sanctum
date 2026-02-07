@@ -146,7 +146,7 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 
 	// Metrics endpoint for Prometheus
 	api.Get("/metrics", monitor.New(monitor.Config{
-		Title: "Vibeshift Backend Metrics",
+		Title: "Sanctum Backend Metrics",
 	}))
 
 	// Swagger documentation

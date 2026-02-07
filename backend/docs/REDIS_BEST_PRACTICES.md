@@ -1,4 +1,4 @@
-# Redis Best Practices for Vibeshift Backend
+# Redis Best Practices for Sanctum Backend
 
 ## Current Redis Usage
 

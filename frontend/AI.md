@@ -1,4 +1,4 @@
-# Vibeshift Frontend Context
+# Sanctum Frontend Context
 
 ## Tech Stack
 

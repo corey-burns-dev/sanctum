@@ -15,7 +15,7 @@ export function MobileHeader() {
             <div className="flex h-14 items-center justify-between gap-2 rounded-2xl border border-border/70 bg-background/80 px-3 shadow-lg backdrop-blur-xl">
                 <div className="min-w-0">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                        Vibeshift
+                        Sanctum
                     </p>
                     <p className="truncate text-sm font-semibold text-foreground">{pageTitle}</p>
                 </div>

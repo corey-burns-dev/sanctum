@@ -1,4 +1,4 @@
-// Command main runs the database seeder for Vibeshift.
+// Command main runs the database seeder for Sanctum.
 package main
 
 import (

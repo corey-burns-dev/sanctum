@@ -1,4 +1,4 @@
-# Vibeshift Full-Stack Engineering Review
+# Sanctum Full-Stack Engineering Review
 
 **Date:** 2026-02-06
 **Scope:** Backend (Go/Fiber), Frontend (React/TypeScript), Video Chat (WebRTC), Theme, UX

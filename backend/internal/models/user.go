@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// User represents a user in the Vibeshift application.
+// User represents a user in the Sanctum application.
 type User struct {
 	ID        uint           `gorm:"primaryKey" json:"id"`
 	Username  string         `gorm:"unique;not null" json:"username"`

@@ -24,7 +24,7 @@ NC := \033[0m # No Color
 # Default target
 help:
 	@echo "$(BLUE)╔════════════════════════════════════════════════════════════════╗$(NC)"
-	@echo "$(BLUE)║           Vibeshift - Full Stack Development CLI               ║$(NC)"
+	@echo "$(BLUE)║           Sanctum - Full Stack Development CLI               ║$(NC)"
 	@echo "$(BLUE)╚════════════════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
 	@echo "$(GREEN)Development:$(NC)"

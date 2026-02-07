@@ -86,7 +86,7 @@ function HomePage() {
                         Social Gaming Hub
                     </p>
                     <h1 className="mb-3 text-3xl font-extrabold tracking-tight text-foreground md:text-5xl">
-                        Vibeshift keeps your people, play, and live moments in one place.
+                        Sanctum keeps your people, play, and live moments in one place.
                     </h1>
                     <p className="max-w-2xl text-sm text-muted-foreground md:text-base">
                         Scroll, chat, and queue games from a single workspace. No tab maze, no

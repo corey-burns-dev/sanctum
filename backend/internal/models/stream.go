@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Stream represents a live stream in the Vibeshift application.
+// Stream represents a live stream in the Sanctum application.
 type Stream struct {
 	ID           uint       `gorm:"primaryKey" json:"id"`
 	UserID       uint       `gorm:"not null;index" json:"user_id"`

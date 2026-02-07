@@ -1,4 +1,4 @@
-// Package main provides admin management utilities for Vibeshift.
+// Package main provides admin management utilities for Sanctum.
 package main
 
 import (
