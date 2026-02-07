@@ -50,7 +50,7 @@ export default function Signup() {
                 <CardHeader className="space-y-1">
                     <CardTitle className="text-2xl text-center">Create an account</CardTitle>
                     <CardDescription className="text-center">
-                        Join Vibeshift and connect with friends
+                        Join Sanctum and connect with friends
                     </CardDescription>
                 </CardHeader>
                 <CardContent>

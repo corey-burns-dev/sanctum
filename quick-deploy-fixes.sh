@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# VibeShift - Quick Security & Deployment Fixes
+# Sanctum - Quick Security & Deployment Fixes
 # This script addresses the most critical issues found in the deployment readiness audit
 
 BLUE='\033[1;34m'
@@ -11,7 +11,7 @@ RED='\033[1;31m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║        VibeShift - Quick Deployment Fixes                       ║${NC}"
+echo -e "${BLUE}║        Sanctum - Quick Deployment Fixes                       ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -54,7 +54,7 @@ echo -e "${BLUE}2️⃣  Creating .env.example with safe defaults${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 cat > .env.example << 'EOF'
-# VibeShift Environment Variables Template
+# Sanctum Environment Variables Template
 # Copy this file to .env and update with your actual values
 
 # Database Configuration

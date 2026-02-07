@@ -1,6 +1,6 @@
-# Contributing to Vibeshift
+# Contributing to Sanctum
 
-Welcome! We're excited to have you contribute to Vibeshift. This guide will help you get started with development and ensure your contributions align with our code quality standards.
+Welcome! We're excited to have you contribute to Sanctum. This guide will help you get started with development and ensure your contributions align with our code quality standards.
 
 ## 🚀 Quick Start
 

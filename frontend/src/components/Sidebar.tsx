@@ -28,7 +28,7 @@ export function Sidebar() {
                 </div>
                 <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                        Vibeshift
+                        Sanctum
                     </p>
                     <p className="text-sm font-semibold">Play. Connect. Stream.</p>
                 </div>

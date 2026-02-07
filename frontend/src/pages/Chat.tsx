@@ -1,4 +1,12 @@
-import { Hash, Send, Users } from 'lucide-react'
+import {
+    Hash,
+    PanelLeftClose,
+    PanelLeftOpen,
+    PanelRightClose,
+    PanelRightOpen,
+    Send,
+    Users,
+} from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { Conversation, Message, User } from '@/api/types'
@@ -24,7 +32,7 @@ export default function Chat() {
     const { id: urlChatId } = useParams<{ id: string }>()
     const navigate = useNavigate()
     const [newMessage, setNewMessage] = useState('')
-    const [roomFilter, setRoomFilter] = useState<'joined' | 'all'>('joined')
+    const [showChatrooms, setShowChatrooms] = useState(true)
     const [showParticipants, setShowParticipants] = useState(true)
     const [messageError, setMessageError] = useState<string | null>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -100,13 +108,6 @@ export default function Chat() {
         },
         [activeRooms]
     )
-
-    const displayedRooms = useMemo(() => {
-        if (roomFilter === 'joined') {
-            return activeRooms
-        }
-        return conversations
-    }, [roomFilter, activeRooms, conversations])
 
     const [participants, setParticipants] = useState<
         Record<number, { id: number; username?: string; online?: boolean; typing?: boolean }>
@@ -248,7 +249,6 @@ export default function Chat() {
             joinChatroom.mutate(id, {
                 onSuccess: () => {
                     navigate(`/chat/${id}`)
-                    setRoomFilter('joined')
                 },
             })
         },
@@ -282,92 +282,95 @@ export default function Chat() {
             )}
 
             <div className="flex min-h-0 flex-1 overflow-hidden">
-                <aside className="hidden w-72 shrink-0 border-r border-border/70 bg-card/40 md:flex md:flex-col">
-                    <div className="border-b border-border/70 px-3 py-3">
-                        <h2 className="flex items-center gap-2 text-sm font-semibold">
-                            <Hash className="h-4 w-4 text-primary" />
-                            Chatrooms
-                        </h2>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                            Keep it focused. Pick a room and chat.
-                        </p>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-1 border-b border-border/70 p-2">
+                <aside
+                    className={cn(
+                        'hidden shrink-0 border-r border-border/70 bg-card/40 transition-all duration-200 md:flex md:flex-col',
+                        showChatrooms ? 'w-72' : 'w-12'
+                    )}
+                >
+                    <div className="flex h-12 items-center border-b border-border/70 px-2">
                         <button
                             type="button"
-                            onClick={() => setRoomFilter('joined')}
-                            className={cn(
-                                'rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors',
-                                roomFilter === 'joined'
-                                    ? 'bg-primary/15 text-primary'
-                                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
-                            )}
+                            onClick={() => setShowChatrooms((prev) => !prev)}
+                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border/70 text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+                            aria-label={
+                                showChatrooms
+                                    ? 'Collapse chatrooms panel'
+                                    : 'Expand chatrooms panel'
+                            }
                         >
-                            Joined ({activeRooms.length})
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setRoomFilter('all')}
-                            className={cn(
-                                'rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors',
-                                roomFilter === 'all'
-                                    ? 'bg-primary/15 text-primary'
-                                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
-                            )}
-                        >
-                            All ({conversations.length})
-                        </button>
-                    </div>
-
-                    <ScrollArea className="min-h-0 flex-1">
-                        <div className="space-y-1.5 p-2">
-                            {allLoading ? (
-                                <div className="p-4 text-center text-xs text-muted-foreground">
-                                    Loading chatrooms...
-                                </div>
-                            ) : displayedRooms.length === 0 ? (
-                                <div className="p-4 text-center text-xs text-muted-foreground">
-                                    {roomFilter === 'joined'
-                                        ? 'No joined chatrooms yet.'
-                                        : 'No chatrooms available.'}
-                                </div>
+                            {showChatrooms ? (
+                                <PanelLeftClose className="h-4 w-4" />
                             ) : (
-                                displayedRooms.map((room) => {
-                                    const joined = isRoomJoined(room)
-                                    const selected = selectedChatId === room.id
-
-                                    return (
-                                        <button
-                                            key={room.id}
-                                            type="button"
-                                            onClick={() => handleSelectConversation(room.id)}
-                                            className={cn(
-                                                'w-full rounded-lg border px-3 py-2 text-left transition-colors',
-                                                selected
-                                                    ? 'border-primary/30 bg-primary/10'
-                                                    : 'border-transparent hover:border-border/60 hover:bg-muted/60'
-                                            )}
-                                        >
-                                            <div className="flex items-center justify-between gap-2">
-                                                <p className="truncate text-sm font-semibold text-foreground">
-                                                    {room.name || `Room ${room.id}`}
-                                                </p>
-                                                {!joined && roomFilter === 'all' && (
-                                                    <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                                                        Join
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                                                {room.participants?.length || 0} members
-                                            </p>
-                                        </button>
-                                    )
-                                })
+                                <PanelLeftOpen className="h-4 w-4" />
                             )}
-                        </div>
-                    </ScrollArea>
+                        </button>
+                        {showChatrooms && (
+                            <h2 className="ml-2 flex items-center gap-2 text-sm font-semibold">
+                                <Hash className="h-4 w-4 text-primary" />
+                                Chatrooms
+                            </h2>
+                        )}
+                    </div>
+
+                    {showChatrooms && (
+                        <>
+                            <div className="border-b border-border/70 px-3 py-2">
+                                <p className="text-[11px] text-muted-foreground">
+                                    {conversations.length} rooms
+                                </p>
+                            </div>
+
+                            <ScrollArea className="min-h-0 flex-1">
+                                <div className="grid grid-cols-2 gap-1.5 p-2">
+                                    {allLoading ? (
+                                        <div className="col-span-2 p-4 text-center text-xs text-muted-foreground">
+                                            Loading chatrooms...
+                                        </div>
+                                    ) : conversations.length === 0 ? (
+                                        <div className="col-span-2 p-4 text-center text-xs text-muted-foreground">
+                                            No chatrooms available.
+                                        </div>
+                                    ) : (
+                                        conversations.map((room) => {
+                                            const joined = isRoomJoined(room)
+                                            const selected = selectedChatId === room.id
+
+                                            return (
+                                                <button
+                                                    key={room.id}
+                                                    type="button"
+                                                    onClick={() =>
+                                                        handleSelectConversation(room.id)
+                                                    }
+                                                    className={cn(
+                                                        'w-full rounded-lg border px-2.5 py-2 text-left transition-colors',
+                                                        selected
+                                                            ? 'border-primary/30 bg-primary/10'
+                                                            : 'border-transparent hover:border-border/60 hover:bg-muted/60'
+                                                    )}
+                                                >
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <p className="truncate text-[13px] font-semibold text-foreground">
+                                                            {room.name || `Room ${room.id}`}
+                                                        </p>
+                                                        {!joined && (
+                                                            <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                                                                Join
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                                                        {room.participants?.length || 0} members
+                                                    </p>
+                                                </button>
+                                            )
+                                        })
+                                    )}
+                                </div>
+                            </ScrollArea>
+                        </>
+                    )}
                 </aside>
 
                 <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -390,20 +393,7 @@ export default function Chat() {
                             )}
                         </div>
 
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setShowParticipants((prev) => !prev)}
-                            className={cn(
-                                'h-8 gap-1.5 rounded-lg border px-2.5 text-xs',
-                                showParticipants
-                                    ? 'border-primary/20 bg-primary/10 text-primary'
-                                    : 'border-transparent text-muted-foreground hover:bg-muted/70'
-                            )}
-                        >
-                            <Users className="h-3.5 w-3.5" />
-                            Members
-                        </Button>
+                        <div className="flex items-center gap-1.5" />
                     </div>
 
                     <ScrollArea className="min-h-0 flex-1">
@@ -469,23 +459,49 @@ export default function Chat() {
                 <aside
                     className={cn(
                         'hidden shrink-0 border-l border-border/70 bg-card/35 transition-all duration-200 lg:flex lg:flex-col',
-                        showParticipants ? 'w-60 opacity-100' : 'w-0 opacity-0 pointer-events-none'
+                        showParticipants ? 'w-60' : 'w-12'
                     )}
                 >
-                    <div className="flex h-12 items-center border-b border-border/70 px-3">
-                        <h2 className="flex items-center gap-2 text-sm font-semibold">
-                            <Users className="h-4 w-4" />
-                            Members
-                        </h2>
+                    <div className="flex h-12 items-center border-b border-border/70 px-2">
+                        {showParticipants && (
+                            <h2 className="ml-1 flex items-center gap-2 text-sm font-semibold">
+                                <Users className="h-4 w-4" />
+                                Members
+                            </h2>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => setShowParticipants((prev) => !prev)}
+                            className={cn(
+                                'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border/70 text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground',
+                                showParticipants ? 'ml-auto' : 'mx-auto'
+                            )}
+                            aria-label={
+                                showParticipants ? 'Collapse members panel' : 'Expand members panel'
+                            }
+                        >
+                            {showParticipants ? (
+                                <PanelRightClose className="h-4 w-4" />
+                            ) : (
+                                <PanelRightOpen className="h-4 w-4" />
+                            )}
+                        </button>
                     </div>
-                    <ScrollArea className="min-h-0 flex-1">
-                        <div className="p-2">
-                            <ParticipantsList
-                                participants={participants}
-                                onlineUserIds={onlineUserIds}
-                            />
+                    {showParticipants && (
+                        <ScrollArea className="min-h-0 flex-1">
+                            <div className="p-2">
+                                <ParticipantsList
+                                    participants={participants}
+                                    onlineUserIds={onlineUserIds}
+                                />
+                            </div>
+                        </ScrollArea>
+                    )}
+                    {showParticipants && (
+                        <div className="border-t border-border/70 px-3 py-2 text-[11px] text-muted-foreground">
+                            {Object.keys(participants).length} people in room
                         </div>
-                    </ScrollArea>
+                    )}
                 </aside>
             </div>
         </div>

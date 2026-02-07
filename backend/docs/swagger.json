@@ -6,7 +6,7 @@
     "swagger": "2.0",
     "info": {
         "description": "Social media platform API with posts, comments, messaging, and friends",
-        "title": "Vibeshift API",
+        "title": "Sanctum API",
         "termsOfService": "http://swagger.io/terms/",
         "contact": {
             "name": "API Support",

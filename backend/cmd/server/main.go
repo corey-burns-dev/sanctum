@@ -1,4 +1,4 @@
-// Command main is the entry point for the Vibeshift backend server.
+// Command main is the entry point for the Sanctum backend server.
 package main
 
 import (
@@ -14,7 +14,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// @title Vibeshift API
+// @title Sanctum API
 // @version 1.0
 // @description Social media platform API with posts, comments, messaging, and friends
 // @termsOfService http://swagger.io/terms/

@@ -1,4 +1,4 @@
-# Vibeshift Production Configuration Template
+# Sanctum Production Configuration Template
 # Copy this to config.production.yml and update values
 
 APP_ENV: production

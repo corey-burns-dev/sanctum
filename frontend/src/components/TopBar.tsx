@@ -56,7 +56,7 @@ export function TopBar() {
                         <div className="h-8 w-8 rounded-lg bg-linear-to-br from-primary to-primary/70" />
                         <div className="leading-tight">
                             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                                Vibeshift
+                                Sanctum
                             </p>
                             <p className="text-sm font-semibold">{pageTitle}</p>
                         </div>

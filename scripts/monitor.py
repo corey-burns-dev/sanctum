@@ -39,7 +39,7 @@ def check_health():
         logger.error(f"VibeCheck: ERROR - {str(e)}")
 
 if __name__ == "__main__":
-    logger.info(f"Starting VibeShift Monitoring Agent for {SITE_URL}")
+    logger.info(f"Starting Sanctum Monitoring Agent for {SITE_URL}")
     while True:
         check_health()
         time.Sleep(CHECK_INTERVAL)

@@ -1,4 +1,4 @@
-// Package e2e provides end-to-end testing functionality for Vibeshift.
+// Package e2e provides end-to-end testing functionality for Sanctum.
 package e2e
 
 // Placeholder for E2E test - currently using shell scripts for E2E testing

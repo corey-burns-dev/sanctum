@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Comment represents a comment on a post in the Vibeshift application.
+// Comment represents a comment on a post in the Sanctum application.
 type Comment struct {
 	ID        uint           `gorm:"primaryKey" json:"id"`
 	Content   string         `gorm:"not null" json:"content"`

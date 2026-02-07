@@ -1,6 +1,6 @@
 # Redis Key Conventions & TTLs
 
-This document lists recommended key naming conventions and TTLs for the Vibeshift backend Redis usage.
+This document lists recommended key naming conventions and TTLs for the Sanctum backend Redis usage.
 
 Guiding principles
 

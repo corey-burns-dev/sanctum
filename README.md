@@ -1,6 +1,6 @@
-# Vibeshift
+# Sanctum
 
-Vibeshift is a Reddit-style social platform focused on creativity, hobbies, and shared interests, without politics, religion, or news-driven discourse.
+Sanctum is a Reddit-style social platform focused on creativity, hobbies, and shared interests, without politics, religion, or news-driven discourse.
 
 ## Features
 

@@ -1,8 +1,8 @@
-# ✅ Vibeshift - Complete Test Suite
+# ✅ Sanctum - Complete Test Suite
 
 ## Overview
 
-Your Vibeshift social media application now has a **comprehensive test suite** with **11 passing tests** covering all endpoints and functionality.
+Your Sanctum social media application now has a **comprehensive test suite** with **11 passing tests** covering all endpoints and functionality.
 
 ## What Works
 

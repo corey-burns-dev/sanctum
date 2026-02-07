@@ -24,7 +24,7 @@ cd backend && go test  # Still hangs!
 
 ### Why This Happens
 
-VibeShift uses a **Docker-first architecture** where:
+Sanctum uses a **Docker-first architecture** where:
 
 - Host system: No Go installed (by design)
 - Docker containers: Go 1.25 pre-installed
@@ -520,5 +520,5 @@ go test
 ---
 
 **Last Updated:** 2026-01-31  
-**Critical for:** All AI agents working with VibeShift  
+**Critical for:** All AI agents working with Sanctum  
 **Impact:** Prevents 100% of Go command hanging issues

@@ -3,7 +3,7 @@
 set -e
 
 API_BASE="http://localhost:8375/api"
-echo "🧪 Testing VibeShift API Routes"
+echo "🧪 Testing Sanctum API Routes"
 echo "================================"
 
 # Signup
