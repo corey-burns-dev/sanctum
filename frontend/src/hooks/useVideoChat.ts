@@ -1,0 +1,373 @@
+// WebRTC video chat hook — manages camera/mic, peer connections, and signaling via WebSocket
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+interface PeerInfo {
+    userId: number
+    username: string
+}
+
+interface RemoteStream {
+    userId: number
+    username: string
+    stream: MediaStream
+}
+
+interface VideoChatSignal {
+    type: string
+    room_id?: string
+    user_id?: number
+    target_id?: number
+    username?: string
+    // biome-ignore lint/suspicious/noExplicitAny: signaling payload varies (SDP, ICE)
+    payload?: any
+}
+
+const ICE_SERVERS: RTCConfiguration = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+    ],
+}
+
+interface UseVideoChatOptions {
+    roomId: string
+    enabled?: boolean
+}
+
+export function useVideoChat({ roomId, enabled = true }: UseVideoChatOptions) {
+    const [localStream, setLocalStream] = useState<MediaStream | null>(null)
+    const [remoteStreams, setRemoteStreams] = useState<RemoteStream[]>([])
+    const [isConnected, setIsConnected] = useState(false)
+    const [isMuted, setIsMuted] = useState(false)
+    const [isVideoOff, setIsVideoOff] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const [peers, setPeers] = useState<PeerInfo[]>([])
+
+    const wsRef = useRef<WebSocket | null>(null)
+    const peerConnectionsRef = useRef<Map<number, RTCPeerConnection>>(new Map())
+    const localStreamRef = useRef<MediaStream | null>(null)
+    const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+    // Remove a remote stream and close peer connection
+    const removePeer = useCallback((userId: number) => {
+        const pc = peerConnectionsRef.current.get(userId)
+        if (pc) {
+            pc.close()
+            peerConnectionsRef.current.delete(userId)
+        }
+        setRemoteStreams((prev) => prev.filter((s) => s.userId !== userId))
+        setPeers((prev) => prev.filter((p) => p.userId !== userId))
+    }, [])
+
+    // Create a peer connection for a remote user
+    const createPeerConnection = useCallback(
+        (userId: number, username: string): RTCPeerConnection => {
+            // Clean up existing connection if any
+            const existing = peerConnectionsRef.current.get(userId)
+            if (existing) {
+                existing.close()
+            }
+
+            const pc = new RTCPeerConnection(ICE_SERVERS)
+            peerConnectionsRef.current.set(userId, pc)
+
+            // Add local tracks to the connection
+            if (localStreamRef.current) {
+                for (const track of localStreamRef.current.getTracks()) {
+                    pc.addTrack(track, localStreamRef.current)
+                }
+            }
+
+            // When we receive remote tracks
+            pc.ontrack = (event) => {
+                const [remoteStream] = event.streams
+                if (remoteStream) {
+                    setRemoteStreams((prev) => {
+                        const filtered = prev.filter((s) => s.userId !== userId)
+                        return [...filtered, { userId, username, stream: remoteStream }]
+                    })
+                }
+            }
+
+            // Send ICE candidates to the remote peer via signaling
+            pc.onicecandidate = (event) => {
+                if (event.candidate && wsRef.current?.readyState === WebSocket.OPEN) {
+                    const signal: VideoChatSignal = {
+                        type: 'ice-candidate',
+                        target_id: userId,
+                        payload: event.candidate.toJSON(),
+                    }
+                    wsRef.current.send(JSON.stringify(signal))
+                }
+            }
+
+            pc.oniceconnectionstatechange = () => {
+                if (
+                    pc.iceConnectionState === 'failed' ||
+                    pc.iceConnectionState === 'disconnected'
+                ) {
+                    removePeer(userId)
+                }
+            }
+
+            return pc
+        },
+        [removePeer]
+    )
+
+    // Initiate a call to a remote peer (create offer)
+    const callPeer = useCallback(
+        async (userId: number, username: string) => {
+            const pc = createPeerConnection(userId, username)
+            try {
+                const offer = await pc.createOffer()
+                await pc.setLocalDescription(offer)
+
+                if (wsRef.current?.readyState === WebSocket.OPEN) {
+                    const signal: VideoChatSignal = {
+                        type: 'offer',
+                        target_id: userId,
+                        payload: pc.localDescription,
+                    }
+                    wsRef.current.send(JSON.stringify(signal))
+                }
+            } catch (err) {
+                console.error('Failed to create offer for peer', userId, err)
+            }
+        },
+        [createPeerConnection]
+    )
+
+    // Handle incoming signaling messages
+    const handleSignal = useCallback(
+        async (signal: VideoChatSignal) => {
+            switch (signal.type) {
+                case 'room_users': {
+                    // We just joined — call each existing user
+                    // biome-ignore lint/suspicious/noExplicitAny: server payload uses snake_case keys
+                    const users = signal.payload?.users as any[] | undefined
+                    if (users) {
+                        const peerList = users.map((u) => ({
+                            userId: (u.userId ?? u.user_id) as number,
+                            username: u.username as string,
+                        }))
+                        setPeers(peerList)
+                        for (const peer of peerList) {
+                            await callPeer(peer.userId, peer.username)
+                        }
+                    }
+                    break
+                }
+
+                case 'user_joined': {
+                    const userId = signal.user_id
+                    const username = signal.username ?? 'Unknown'
+                    if (userId) {
+                        setPeers((prev) => {
+                            if (prev.some((p) => p.userId === userId)) return prev
+                            return [...prev, { userId, username }]
+                        })
+                    }
+                    // Don't call them — they will call us (they received room_users)
+                    break
+                }
+
+                case 'user_left':
+                    if (signal.user_id) {
+                        removePeer(signal.user_id)
+                    }
+                    break
+
+                case 'offer': {
+                    const fromId = signal.user_id
+                    const fromName = signal.username ?? 'Unknown'
+                    if (!fromId) break
+
+                    const pc = createPeerConnection(fromId, fromName)
+                    try {
+                        await pc.setRemoteDescription(new RTCSessionDescription(signal.payload))
+                        const answer = await pc.createAnswer()
+                        await pc.setLocalDescription(answer)
+
+                        if (wsRef.current?.readyState === WebSocket.OPEN) {
+                            const resp: VideoChatSignal = {
+                                type: 'answer',
+                                target_id: fromId,
+                                payload: pc.localDescription,
+                            }
+                            wsRef.current.send(JSON.stringify(resp))
+                        }
+                    } catch (err) {
+                        console.error('Failed to handle offer from', fromId, err)
+                    }
+                    break
+                }
+
+                case 'answer': {
+                    const fromId = signal.user_id
+                    if (!fromId) break
+                    const pc = peerConnectionsRef.current.get(fromId)
+                    if (pc) {
+                        try {
+                            await pc.setRemoteDescription(new RTCSessionDescription(signal.payload))
+                        } catch (err) {
+                            console.error('Failed to set remote description from', fromId, err)
+                        }
+                    }
+                    break
+                }
+
+                case 'ice-candidate': {
+                    const fromId = signal.user_id
+                    if (!fromId) break
+                    const pc = peerConnectionsRef.current.get(fromId)
+                    if (pc && signal.payload) {
+                        try {
+                            await pc.addIceCandidate(new RTCIceCandidate(signal.payload))
+                        } catch (err) {
+                            console.error('Failed to add ICE candidate from', fromId, err)
+                        }
+                    }
+                    break
+                }
+
+                case 'error':
+                    setError(signal.payload?.message ?? 'Unknown error')
+                    break
+            }
+        },
+        [callPeer, createPeerConnection, removePeer]
+    )
+
+    // Connect WebSocket and acquire media
+    const connect = useCallback(async () => {
+        if (!enabled || !roomId) return
+
+        const token = localStorage.getItem('token')
+        if (!token) {
+            setError('Not authenticated')
+            return
+        }
+
+        // Acquire camera + mic
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: true,
+            })
+            localStreamRef.current = stream
+            setLocalStream(stream)
+        } catch (err) {
+            console.error('Failed to get media devices:', err)
+            setError('Could not access camera/microphone. Please check permissions.')
+            return
+        }
+
+        // Open signaling WebSocket
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+        const host = window.location.hostname
+        const port = import.meta.env.VITE_API_PORT || '8375'
+        const wsUrl = `${protocol}//${host}:${port}/api/ws/videochat?token=${token}&room=${encodeURIComponent(roomId)}`
+        const ws = new WebSocket(wsUrl)
+        wsRef.current = ws
+
+        ws.onopen = () => {
+            setIsConnected(true)
+            setError(null)
+        }
+
+        ws.onmessage = (event) => {
+            try {
+                const signal = JSON.parse(event.data) as VideoChatSignal
+                handleSignal(signal)
+            } catch (err) {
+                console.error('Failed to parse signaling message:', err)
+            }
+        }
+
+        ws.onclose = () => {
+            setIsConnected(false)
+        }
+
+        ws.onerror = () => {
+            setError('WebSocket connection failed')
+            setIsConnected(false)
+        }
+    }, [enabled, roomId, handleSignal])
+
+    // Disconnect everything
+    const disconnect = useCallback(() => {
+        // Close all peer connections
+        for (const [, pc] of peerConnectionsRef.current) {
+            pc.close()
+        }
+        peerConnectionsRef.current.clear()
+
+        // Close WebSocket
+        if (wsRef.current) {
+            wsRef.current.close()
+            wsRef.current = null
+        }
+
+        // Stop all local tracks
+        if (localStreamRef.current) {
+            for (const track of localStreamRef.current.getTracks()) {
+                track.stop()
+            }
+            localStreamRef.current = null
+        }
+
+        setLocalStream(null)
+        setRemoteStreams([])
+        setPeers([])
+        setIsConnected(false)
+        setError(null)
+    }, [])
+
+    // Toggle mute
+    const toggleMute = useCallback(() => {
+        if (localStreamRef.current) {
+            const audioTracks = localStreamRef.current.getAudioTracks()
+            for (const track of audioTracks) {
+                track.enabled = !track.enabled
+            }
+            setIsMuted((prev) => !prev)
+        }
+    }, [])
+
+    // Toggle video
+    const toggleVideo = useCallback(() => {
+        if (localStreamRef.current) {
+            const videoTracks = localStreamRef.current.getVideoTracks()
+            for (const track of videoTracks) {
+                track.enabled = !track.enabled
+            }
+            setIsVideoOff((prev) => !prev)
+        }
+    }, [])
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (reconnectTimeoutRef.current) {
+                clearTimeout(reconnectTimeoutRef.current)
+            }
+            disconnect()
+        }
+    }, [disconnect])
+
+    return {
+        localStream,
+        remoteStreams,
+        isConnected,
+        isMuted,
+        isVideoOff,
+        error,
+        peers,
+        connect,
+        disconnect,
+        toggleMute,
+        toggleVideo,
+    }
+}

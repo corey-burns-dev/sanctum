@@ -1,17 +1,3 @@
-import {
-    Compass,
-    Gamepad2,
-    Home,
-    LogOut,
-    Menu,
-    MessageCircle,
-    MessageSquare,
-    Radio,
-    Search,
-    Users,
-} from 'lucide-react'
-import { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
 import { ModeToggle } from '@/components/mode-toggle'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -24,6 +10,21 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { getCurrentUser, useIsAuthenticated, useLogout, useStreams } from '@/hooks'
 import { cn } from '@/lib/utils'
+import {
+    Compass,
+    Gamepad2,
+    Home,
+    LogOut,
+    Menu,
+    MessageCircle,
+    MessageSquare,
+    Radio,
+    Search,
+    Users,
+    Video,
+} from 'lucide-react'
+import { useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 
 export function Sidebar() {
     const location = useLocation()
@@ -37,6 +38,7 @@ export function Sidebar() {
         { icon: Search, label: 'Search', path: '/users' },
         { icon: Compass, label: 'Explore', path: '/posts' },
         { icon: Radio, label: 'Streams', path: '/streams' },
+        { icon: Video, label: 'Video Chat', path: '/videochat' },
         { icon: MessageSquare, label: 'Chatrooms', path: '/chat' },
         { icon: MessageCircle, label: 'Messages', path: '/messages' },
         { icon: Users, label: 'Friends', path: '/friends' },

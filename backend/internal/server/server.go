@@ -32,20 +32,21 @@ import (
 
 // Server holds all dependencies and provides handlers
 type Server struct {
-	config      *config.Config
-	db          *gorm.DB
-	redis       *redis.Client
-	userRepo    repository.UserRepository
-	postRepo    repository.PostRepository
-	commentRepo repository.CommentRepository
-	chatRepo    repository.ChatRepository
-	friendRepo  repository.FriendRepository
-	gameRepo    repository.GameRepository
-	streamRepo  repository.StreamRepository
-	notifier    *notifications.Notifier
-	hub         *notifications.Hub
-	chatHub     *notifications.ChatHub
-	gameHub     *notifications.GameHub
+	config       *config.Config
+	db           *gorm.DB
+	redis        *redis.Client
+	userRepo     repository.UserRepository
+	postRepo     repository.PostRepository
+	commentRepo  repository.CommentRepository
+	chatRepo     repository.ChatRepository
+	friendRepo   repository.FriendRepository
+	gameRepo     repository.GameRepository
+	streamRepo   repository.StreamRepository
+	notifier     *notifications.Notifier
+	hub          *notifications.Hub
+	chatHub      *notifications.ChatHub
+	gameHub      *notifications.GameHub
+	videoChatHub *notifications.VideoChatHub
 	// Add other repositories as needed
 }
 
@@ -89,6 +90,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		server.hub = notifications.NewHub()
 		server.chatHub = notifications.NewChatHub()
 		server.gameHub = notifications.NewGameHub(db, server.notifier)
+		server.videoChatHub = notifications.NewVideoChatHub()
 	}
 
 	return server, nil
@@ -246,9 +248,10 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 
 	// Websocket endpoints - protected by AuthRequired
 	ws := api.Group("/ws", s.AuthRequired())
-	ws.Get("/", s.WebsocketHandler())         // General notifications
-	ws.Get("/chat", s.WebSocketChatHandler()) // Real-time chat
-	ws.Get("/game", s.WebSocketGameHandler()) // Multiplayer games
+	ws.Get("/", s.WebsocketHandler())                   // General notifications
+	ws.Get("/chat", s.WebSocketChatHandler())           // Real-time chat
+	ws.Get("/game", s.WebSocketGameHandler())           // Multiplayer games
+	ws.Get("/videochat", s.WebSocketVideoChatHandler()) // WebRTC video chat signaling
 }
 
 // HealthCheck handles health check requests
@@ -455,6 +458,15 @@ func (s *Server) Start() error {
 		}()
 	}
 
+	// Wire video chat hub to Redis subscriber if available
+	if s.videoChatHub != nil && s.notifier != nil {
+		go func() {
+			if err := s.videoChatHub.StartWiring(context.Background(), s.notifier); err != nil {
+				log.Printf("failed to start video chat hub wiring: %v", err)
+			}
+		}()
+	}
+
 	log.Printf("Server starting on port %s...", s.config.Port)
 	return app.Listen(":" + s.config.Port)
 }
@@ -477,6 +489,12 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.gameHub != nil {
 		if err := s.gameHub.Shutdown(ctx); err != nil {
 			log.Printf("error shutting down game hub: %v", err)
+		}
+	}
+
+	if s.videoChatHub != nil {
+		if err := s.videoChatHub.Shutdown(ctx); err != nil {
+			log.Printf("error shutting down video chat hub: %v", err)
 		}
 	}
 
