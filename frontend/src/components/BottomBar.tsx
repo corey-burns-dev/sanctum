@@ -1,5 +1,5 @@
-import { Compass, Gamepad2, Home, MessageCircle } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
+import { isRouteActive, mobileNav } from '@/components/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getCurrentUser } from '@/hooks'
 import { cn } from '@/lib/utils'
@@ -8,55 +8,49 @@ export function BottomBar() {
     const location = useLocation()
     const currentUser = getCurrentUser()
 
-    const navItems = [
-        { icon: Home, label: 'Home', path: '/' },
-        { icon: Compass, label: 'Explore', path: '/posts' },
-        { icon: Gamepad2, label: 'Games', path: '/games' },
-        { icon: MessageCircle, label: 'Messages', path: '/chat' },
-    ]
-
     return (
-        <nav className="fixed bottom-0 left-0 right-0 h-16 border-t bg-background px-6 flex items-center justify-between z-50 md:hidden pb-safe">
-            {navItems.map((item) => {
-                const isActive = location.pathname === item.path
-                return (
+        <nav className="fixed inset-x-0 bottom-3 z-50 px-3 md:hidden">
+            <div className="mx-auto max-w-lg rounded-2xl border border-border/70 bg-background/78 p-2 shadow-xl backdrop-blur-xl">
+                <div className="grid grid-cols-5 gap-1">
+                    {mobileNav.map((item) => {
+                        const active = isRouteActive(location.pathname, item.path)
+
+                        return (
+                            <Link
+                                key={item.path}
+                                to={item.path}
+                                className={cn(
+                                    'flex flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-semibold transition-colors',
+                                    active
+                                        ? 'bg-primary/15 text-primary'
+                                        : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+                                )}
+                            >
+                                <item.icon className="h-4 w-4" />
+                                <span className="leading-none">{item.label}</span>
+                            </Link>
+                        )
+                    })}
+
                     <Link
-                        key={item.path}
-                        to={item.path}
+                        to="/profile"
                         className={cn(
-                            'p-2 rounded-lg transition-colors',
-                            isActive
-                                ? 'text-primary'
-                                : 'text-muted-foreground hover:text-foreground'
+                            'flex flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-semibold transition-colors',
+                            isRouteActive(location.pathname, '/profile')
+                                ? 'bg-primary/15 text-primary'
+                                : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
                         )}
                     >
-                        <item.icon
-                            className={cn(
-                                'w-6 h-6 transition-transform duration-200',
-                                isActive && 'scale-110 fill-current'
-                            )}
-                            strokeWidth={isActive ? 2.5 : 2}
-                        />
-                        <span className="sr-only">{item.label}</span>
+                        <Avatar className="h-6 w-6 border border-border/60">
+                            <AvatarImage src={currentUser?.avatar || ''} />
+                            <AvatarFallback>
+                                {currentUser?.username?.[0]?.toUpperCase() || 'U'}
+                            </AvatarFallback>
+                        </Avatar>
+                        <span className="leading-none">Profile</span>
                     </Link>
-                )
-            })}
-
-            <Link to="/profile">
-                <Avatar
-                    className={cn(
-                        'w-7 h-7 ring-2 transition-all',
-                        location.pathname === '/profile'
-                            ? 'ring-primary'
-                            : 'ring-transparent hover:ring-muted-foreground/30'
-                    )}
-                >
-                    <AvatarImage src={currentUser?.avatar || ''} />
-                    <AvatarFallback>
-                        {currentUser?.username?.[0]?.toUpperCase() || 'U'}
-                    </AvatarFallback>
-                </Avatar>
-            </Link>
+                </div>
+            </div>
         </nav>
     )
 }

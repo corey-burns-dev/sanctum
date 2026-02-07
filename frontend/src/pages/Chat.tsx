@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Compass, Send, Users } from 'lucide-react'
+import { Hash, Send, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { Conversation, Message, User } from '@/api/types'
@@ -24,8 +24,7 @@ export default function Chat() {
     const { id: urlChatId } = useParams<{ id: string }>()
     const navigate = useNavigate()
     const [newMessage, setNewMessage] = useState('')
-    const [page, setPage] = useState(1)
-    const ITEMS_PER_PAGE = 5
+    const [roomFilter, setRoomFilter] = useState<'joined' | 'all'>('joined')
     const [showParticipants, setShowParticipants] = useState(true)
     const [messageError, setMessageError] = useState<string | null>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -37,29 +36,12 @@ export default function Chat() {
 
     const currentUser = useMemo(() => getCurrentUser(), [])
 
-    // Chatroom queries
     const { data: allChatrooms = [], isLoading: allLoading, error: allError } = useAllChatrooms()
-    const {
-        data: joinedChatrooms = [],
-        isLoading: _joinedLoading,
-        error: _joinedError,
-    } = useJoinedChatrooms()
+    const { data: joinedChatrooms = [] } = useJoinedChatrooms()
     const joinChatroom = useJoinChatroom()
 
     const conversations = allChatrooms as Conversation[]
-    const convLoading = allLoading
-    const convError = allError
-
-    const paginatedConversations = useMemo(() => {
-        const start = (page - 1) * ITEMS_PER_PAGE
-        return conversations.slice(start, start + ITEMS_PER_PAGE)
-    }, [conversations, page])
-
-    const totalPages = Math.ceil(conversations.length / ITEMS_PER_PAGE)
-
-    const activeRooms = useMemo(() => {
-        return joinedChatrooms as Conversation[]
-    }, [joinedChatrooms])
+    const activeRooms = useMemo(() => joinedChatrooms as Conversation[], [joinedChatrooms])
 
     const selectedChatId = useMemo(
         () => (urlChatId ? Number.parseInt(urlChatId, 10) : null),
@@ -68,14 +50,11 @@ export default function Chat() {
 
     const { data: selectedConversation } = useConversation(selectedChatId || 0)
 
-    // Auto-select first conversation when loaded if none in URL
     useEffect(() => {
-        if (activeRooms && activeRooms.length > 0 && !selectedChatId) {
+        if (activeRooms.length > 0 && !selectedChatId) {
             navigate(`/chat/${activeRooms[0].id}`, { replace: true })
-        } else if (conversations && conversations.length > 0 && !selectedChatId) {
-            // If no active rooms, don't auto-select yet, let user pick
         }
-    }, [activeRooms, conversations, selectedChatId, navigate])
+    }, [activeRooms, selectedChatId, navigate])
 
     const { data: messages = [], isLoading } = useMessages(selectedChatId || 0)
     const sendMessage = useSendMessage(selectedChatId || 0)
@@ -83,8 +62,8 @@ export default function Chat() {
     const fallbackConversation = useMemo(() => {
         if (!selectedChatId) return null
         return (
-            conversations?.find((c) => c.id === selectedChatId) ||
-            activeRooms?.find((c) => c.id === selectedChatId) ||
+            conversations.find((c) => c.id === selectedChatId) ||
+            activeRooms.find((c) => c.id === selectedChatId) ||
             null
         )
     }, [conversations, activeRooms, selectedChatId])
@@ -95,7 +74,7 @@ export default function Chat() {
     )
 
     const isJoinedViaList = useMemo(
-        () => joinedChatrooms?.some((c) => c.id === selectedChatId),
+        () => joinedChatrooms.some((c) => c.id === selectedChatId),
         [joinedChatrooms, selectedChatId]
     )
 
@@ -112,6 +91,23 @@ export default function Chat() {
         )
     }, [currentConversation, currentUser, isJoinedViaList])
 
+    const isRoomJoined = useCallback(
+        (room: Conversation & { is_joined?: boolean }) => {
+            if (typeof room.is_joined === 'boolean') {
+                return room.is_joined
+            }
+            return activeRooms.some((joined) => joined.id === room.id)
+        },
+        [activeRooms]
+    )
+
+    const displayedRooms = useMemo(() => {
+        if (roomFilter === 'joined') {
+            return activeRooms
+        }
+        return conversations
+    }, [roomFilter, activeRooms, conversations])
+
     const [participants, setParticipants] = useState<
         Record<number, { id: number; username?: string; online?: boolean; typing?: boolean }>
     >({})
@@ -123,12 +119,7 @@ export default function Chat() {
     }, [messages.length])
 
     useEffect(() => {
-        if (!selectedChatId) {
-            setParticipants({})
-            return
-        }
-
-        if (!currentConversation) {
+        if (!selectedChatId || !currentConversation) {
             setParticipants({})
             return
         }
@@ -151,15 +142,13 @@ export default function Chat() {
             }
         }
 
-        if (usersList && usersList.length > 0) {
-            for (const u of usersList) {
-                if (!currentUser || u.id !== currentUser.id) {
-                    map[u.id] = {
-                        id: u.id,
-                        username: u.username,
-                        online: onlineUserIds.has(u.id),
-                        typing: false,
-                    }
+        for (const u of usersList) {
+            if (!currentUser || u.id !== currentUser.id) {
+                map[u.id] = {
+                    id: u.id,
+                    username: u.username,
+                    online: onlineUserIds.has(u.id),
+                    typing: false,
                 }
             }
         }
@@ -236,9 +225,6 @@ export default function Chat() {
         sendMessage.mutate(
             { content: messageContent, message_type: 'text', metadata: { tempId } },
             {
-                onSuccess: () => {
-                    // Hook handles everything
-                },
                 onError: (error) => {
                     console.error('Failed to send message:', error)
                     setMessageError('Failed to send message')
@@ -257,15 +243,12 @@ export default function Chat() {
         [handleSendMessage]
     )
 
-    const handleInputChange = useCallback((val: string) => {
-        setNewMessage(val)
-    }, [])
-
     const handleJoinConversation = useCallback(
         (id: number) => {
             joinChatroom.mutate(id, {
                 onSuccess: () => {
                     navigate(`/chat/${id}`)
+                    setRoomFilter('joined')
                 },
             })
         },
@@ -274,198 +257,170 @@ export default function Chat() {
 
     const handleSelectConversation = useCallback(
         (id: number) => {
-            const conv = conversations.find((c) => c.id === id)
-            if (conv && !conv.is_joined) {
+            const conv = conversations.find((c) => c.id === id) as
+                | (Conversation & {
+                      is_joined?: boolean
+                  })
+                | null
+            if (conv && !isRoomJoined(conv)) {
                 handleJoinConversation(id)
             } else {
                 navigate(`/chat/${id}`)
             }
         },
-        [conversations, navigate, handleJoinConversation]
+        [conversations, navigate, handleJoinConversation, isRoomJoined]
     )
 
     return (
-        <div className="flex-1 flex flex-col overflow-hidden bg-background">
-            {convError && (
-                <div className="bg-destructive/15 border-b border-destructive p-4">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+            {allError && (
+                <div className="border-b border-destructive bg-destructive/15 p-3">
                     <p className="text-sm text-destructive">
-                        Error loading chatrooms: {String(convError)}
+                        Error loading chatrooms: {String(allError)}
                     </p>
                 </div>
             )}
 
-            <div className="flex-1 flex overflow-hidden">
-                <div className="w-[210px] border-r bg-card flex flex-col overflow-hidden shrink-0">
-                    <div className="px-3 py-2 border-b shrink-0 h-11 flex items-center justify-between bg-muted/20">
-                        <h2 className="font-bold text-[11px] flex items-center gap-2 uppercase tracking-tighter">
-                            <Compass className="w-3.5 h-3.5 text-primary" />
-                            Discover Rooms
+            <div className="flex min-h-0 flex-1 overflow-hidden">
+                <aside className="hidden w-72 shrink-0 border-r border-border/70 bg-card/40 md:flex md:flex-col">
+                    <div className="border-b border-border/70 px-3 py-3">
+                        <h2 className="flex items-center gap-2 text-sm font-semibold">
+                            <Hash className="h-4 w-4 text-primary" />
+                            Chatrooms
                         </h2>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                            Keep it focused. Pick a room and chat.
+                        </p>
                     </div>
 
-                    <div className="flex-1 flex flex-col overflow-hidden">
-                        <div className="p-2 space-y-1.5 flex-1">
-                            {convLoading ? (
-                                <div className="py-16 text-center text-[11px] text-muted-foreground animate-pulse">
-                                    Scanning frequencies...
+                    <div className="grid grid-cols-2 gap-1 border-b border-border/70 p-2">
+                        <button
+                            type="button"
+                            onClick={() => setRoomFilter('joined')}
+                            className={cn(
+                                'rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors',
+                                roomFilter === 'joined'
+                                    ? 'bg-primary/15 text-primary'
+                                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+                            )}
+                        >
+                            Joined ({activeRooms.length})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setRoomFilter('all')}
+                            className={cn(
+                                'rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors',
+                                roomFilter === 'all'
+                                    ? 'bg-primary/15 text-primary'
+                                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+                            )}
+                        >
+                            All ({conversations.length})
+                        </button>
+                    </div>
+
+                    <ScrollArea className="min-h-0 flex-1">
+                        <div className="space-y-1.5 p-2">
+                            {allLoading ? (
+                                <div className="p-4 text-center text-xs text-muted-foreground">
+                                    Loading chatrooms...
                                 </div>
-                            ) : paginatedConversations.length > 0 ? (
-                                paginatedConversations.map((conv) => (
-                                    <button
-                                        key={conv.id}
-                                        type="button"
-                                        onClick={() => handleSelectConversation(conv.id)}
-                                        className={cn(
-                                            'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-all text-left border border-transparent',
-                                            selectedChatId === conv.id
-                                                ? 'bg-primary/10 border-primary/20 text-foreground'
-                                                : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground hover:border-muted'
-                                        )}
-                                    >
-                                        <div className="w-8 h-8 rounded-lg bg-linear-to-tr from-primary/20 to-primary/5 flex items-center justify-center font-black text-primary shrink-0 border border-primary/10 shadow-sm text-xs">
-                                            {conv.name?.[0].toUpperCase() || 'C'}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center justify-between mb-0.5">
-                                                <span className="text-[13px] font-bold truncate leading-none">
-                                                    {conv.name || `Room ${conv.id}`}
-                                                </span>
-                                            </div>
-                                            <p className="text-[9px] font-black uppercase opacity-50 truncate leading-none tracking-tight">
-                                                {conv.participants?.length || 0} members
-                                            </p>
-                                        </div>
-                                    </button>
-                                ))
+                            ) : displayedRooms.length === 0 ? (
+                                <div className="p-4 text-center text-xs text-muted-foreground">
+                                    {roomFilter === 'joined'
+                                        ? 'No joined chatrooms yet.'
+                                        : 'No chatrooms available.'}
+                                </div>
                             ) : (
-                                <div className="py-16 text-center text-[11px] text-muted-foreground italic">
-                                    Silence in the void.
-                                </div>
+                                displayedRooms.map((room) => {
+                                    const joined = isRoomJoined(room)
+                                    const selected = selectedChatId === room.id
+
+                                    return (
+                                        <button
+                                            key={room.id}
+                                            type="button"
+                                            onClick={() => handleSelectConversation(room.id)}
+                                            className={cn(
+                                                'w-full rounded-lg border px-3 py-2 text-left transition-colors',
+                                                selected
+                                                    ? 'border-primary/30 bg-primary/10'
+                                                    : 'border-transparent hover:border-border/60 hover:bg-muted/60'
+                                            )}
+                                        >
+                                            <div className="flex items-center justify-between gap-2">
+                                                <p className="truncate text-sm font-semibold text-foreground">
+                                                    {room.name || `Room ${room.id}`}
+                                                </p>
+                                                {!joined && roomFilter === 'all' && (
+                                                    <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                                                        Join
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                                                {room.participants?.length || 0} members
+                                            </p>
+                                        </button>
+                                    )
+                                })
                             )}
                         </div>
+                    </ScrollArea>
+                </aside>
 
-                        {/* Pagination Controls */}
-                        <div className="px-2 py-2 border-t bg-muted/5 flex items-center justify-between gap-2">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                                disabled={page === 1}
-                                className="h-7 w-7 rounded-lg"
-                            >
-                                <ChevronLeft className="w-3.5 h-3.5" />
-                            </Button>
-                            <span className="text-[9px] font-black uppercase tracking-tighter opacity-50">
-                                Page {page} / {totalPages || 1}
-                            </span>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                                disabled={page >= totalPages}
-                                className="h-7 w-7 rounded-lg"
-                            >
-                                <ChevronRight className="w-3.5 h-3.5" />
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Center - Message Window */}
-                <div className="flex-1 flex flex-col overflow-hidden bg-background">
-                    {/* Active Rooms Bar */}
-                    <div className="h-11 border-b bg-card/50 flex items-center px-3 gap-2 overflow-x-auto no-scrollbar">
-                        <div className="flex items-center gap-2 pr-3 border-r mr-2 h-7">
-                            <span className="text-[9px] font-black uppercase tracking-tighter text-muted-foreground whitespace-nowrap">
-                                Active Rooms
-                            </span>
-                        </div>
-                        {activeRooms.map((room) => (
-                            <button
-                                key={room.id}
-                                type="button"
-                                onClick={() => navigate(`/chat/${room.id}`)}
-                                className={cn(
-                                    'group flex items-center gap-2 px-2.5 py-1 rounded-full transition-all shrink-0 border',
-                                    selectedChatId === room.id
-                                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 border-primary'
-                                        : 'bg-background hover:bg-muted text-muted-foreground hover:text-foreground border-transparent'
-                                )}
-                            >
-                                <div
-                                    className={cn(
-                                        'w-4 h-4 rounded-full flex items-center justify-center font-black text-[9px] ring-1',
-                                        selectedChatId === room.id
-                                            ? 'bg-white/20 ring-white/30'
-                                            : 'bg-primary/10 text-primary ring-primary/20'
-                                    )}
-                                >
-                                    {room.name?.[0].toUpperCase() || 'C'}
-                                </div>
-                                <span className="text-[11px] font-bold whitespace-nowrap truncate max-w-[110px]">
-                                    {room.name || `Room ${room.id}`}
-                                </span>
-                            </button>
-                        ))}
-                    </div>
-
-                    <div className="border-b px-4 h-12 flex items-center justify-between shrink-0 bg-card/30 backdrop-blur-sm">
-                        <div className="flex items-center gap-3 shrink-0">
-                            {currentConversation && (
+                <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                    <div className="flex h-12 items-center justify-between border-b border-border/70 bg-card/35 px-3">
+                        <div className="min-w-0">
+                            {currentConversation ? (
                                 <>
-                                    <div className="w-7 h-7 rounded-md bg-linear-to-tr from-primary to-primary/60 flex items-center justify-center text-primary-foreground font-black text-[10px] shadow-md ring-1 ring-primary/20">
-                                        {currentConversation.name?.[0].toUpperCase() || 'C'}
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-[13px] leading-none mb-1">
-                                            {currentConversation.name ||
-                                                `Room ${currentConversation.id}`}
-                                        </h3>
-                                        <p className="text-[9px] text-primary font-black uppercase tracking-tighter leading-none flex items-center gap-1.5">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                                            {currentConversation.participants?.length || 0} Members
-                                            Active
-                                        </p>
-                                    </div>
+                                    <h3 className="truncate text-sm font-semibold text-foreground">
+                                        {currentConversation.name ||
+                                            `Room ${currentConversation.id}`}
+                                    </h3>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        {currentConversation.participants?.length || 0} participants
+                                    </p>
                                 </>
+                            ) : (
+                                <p className="text-sm font-medium text-muted-foreground">
+                                    Select a chatroom
+                                </p>
                             )}
                         </div>
 
-                        <div className="flex items-center gap-3">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setShowParticipants(!showParticipants)}
-                                className={cn(
-                                    'flex items-center gap-2 rounded-lg px-3 border transition-all h-8 text-[10px]',
-                                    showParticipants
-                                        ? 'bg-primary/10 text-primary border-primary/20'
-                                        : 'text-muted-foreground hover:bg-muted border-transparent'
-                                )}
-                            >
-                                <Users className="w-3.5 h-3.5" />
-                                <span className="font-black uppercase tracking-tighter">
-                                    {showParticipants ? 'Hide' : 'Show'} Members
-                                </span>
-                            </Button>
-                        </div>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowParticipants((prev) => !prev)}
+                            className={cn(
+                                'h-8 gap-1.5 rounded-lg border px-2.5 text-xs',
+                                showParticipants
+                                    ? 'border-primary/20 bg-primary/10 text-primary'
+                                    : 'border-transparent text-muted-foreground hover:bg-muted/70'
+                            )}
+                        >
+                            <Users className="h-3.5 w-3.5" />
+                            Members
+                        </Button>
                     </div>
 
-                    <ScrollArea className="flex-1">
-                        <div className="max-w-2xl mx-auto w-full p-4">
+                    <ScrollArea className="min-h-0 flex-1">
+                        <div className="mx-auto w-full max-w-3xl p-4">
                             <MessageList
                                 messages={messages}
                                 isLoading={isLoading}
                                 currentUserId={currentUser?.id}
                             />
-                            <div ref={messagesEndRef} className="h-3" />
+                            <div ref={messagesEndRef} className="h-2" />
                         </div>
                     </ScrollArea>
 
-                    <div className="p-3 border-t bg-card/10">
-                        <div className="max-w-2xl mx-auto">
+                    <div className="border-t border-border/70 bg-card/25 p-3">
+                        <div className="mx-auto w-full max-w-3xl">
                             {messageError && (
-                                <p className="text-[11px] text-destructive mb-2 font-medium px-4">
+                                <p className="mb-2 px-1 text-xs font-medium text-destructive">
                                     {messageError}
                                 </p>
                             )}
@@ -477,55 +432,53 @@ export default function Chat() {
                                             wsIsJoined ? 'Type a message...' : 'Connecting...'
                                         }
                                         value={newMessage}
-                                        onChange={(e) => handleInputChange(e.target.value)}
+                                        onChange={(e) => setNewMessage(e.target.value)}
                                         onKeyDown={handleKeyPress}
                                         disabled={!wsIsJoined}
-                                        className="flex-1 rounded-full bg-card border-none px-4 h-9 shadow-inner text-[13px]"
+                                        className="h-10 flex-1 rounded-full border-border/60 bg-card"
                                     />
                                     <Button
                                         onClick={handleSendMessage}
                                         disabled={!newMessage.trim() || !wsIsJoined}
-                                        className="rounded-full w-9 h-9 p-0 shadow-lg"
+                                        className="h-10 w-10 rounded-full p-0"
                                     >
-                                        <Send className="w-3.5 h-3.5" />
+                                        <Send className="h-4 w-4" />
                                     </Button>
                                 </div>
                             ) : (
-                                <div className="flex flex-col items-center justify-center p-5 gap-3 bg-muted/30 rounded-2xl border border-dashed">
-                                    <p className="text-muted-foreground text-[13px] font-medium">
-                                        Join this room to participate in the conversation.
+                                <div className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-muted/30 px-3 py-2">
+                                    <p className="text-xs text-muted-foreground">
+                                        Join this room to send messages.
                                     </p>
                                     <Button
                                         onClick={() =>
                                             selectedChatId && handleJoinConversation(selectedChatId)
                                         }
                                         disabled={joinChatroom.isPending}
-                                        className="rounded-full px-6 h-9 shadow-md text-[13px]"
+                                        size="sm"
+                                        className="rounded-lg"
                                     >
-                                        {joinChatroom.isPending ? 'Joining...' : 'Join Chatroom'}
+                                        {joinChatroom.isPending ? 'Joining...' : 'Join'}
                                     </Button>
                                 </div>
                             )}
                         </div>
                     </div>
-                </div>
+                </section>
 
-                {/* Right Sidebar - Active Users */}
-                <div
+                <aside
                     className={cn(
-                        'border-l bg-card flex flex-col overflow-hidden transition-all duration-300 ease-in-out',
-                        showParticipants
-                            ? 'w-[210px] opacity-100'
-                            : 'w-0 opacity-0 border-none pointer-events-none'
+                        'hidden shrink-0 border-l border-border/70 bg-card/35 transition-all duration-200 lg:flex lg:flex-col',
+                        showParticipants ? 'w-60 opacity-100' : 'w-0 opacity-0 pointer-events-none'
                     )}
                 >
-                    <div className="px-3 py-2 border-b shrink-0 h-11 flex items-center">
-                        <h2 className="font-semibold text-[12px] flex items-center gap-2 whitespace-nowrap">
-                            <Users className="w-3.5 h-3.5" />
-                            Online Members
+                    <div className="flex h-12 items-center border-b border-border/70 px-3">
+                        <h2 className="flex items-center gap-2 text-sm font-semibold">
+                            <Users className="h-4 w-4" />
+                            Members
                         </h2>
                     </div>
-                    <ScrollArea className="flex-1">
+                    <ScrollArea className="min-h-0 flex-1">
                         <div className="p-2">
                             <ParticipantsList
                                 participants={participants}
@@ -533,7 +486,7 @@ export default function Chat() {
                             />
                         </div>
                     </ScrollArea>
-                </div>
+                </aside>
             </div>
         </div>
     )
