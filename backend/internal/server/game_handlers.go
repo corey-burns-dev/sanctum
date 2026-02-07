@@ -49,8 +49,18 @@ func (s *Server) CreateGameRoom(c *fiber.Ctx) error {
 
 // GetActiveGameRooms returns pending rooms for a game type
 func (s *Server) GetActiveGameRooms(c *fiber.Ctx) error {
-	gameType := models.GameType(c.Query("type", string(models.TicTacToe)))
-	rooms, err := s.gameRepo.GetActiveRooms(gameType)
+	gameType := c.Query("type")
+	var (
+		rooms []models.GameRoom
+		err   error
+	)
+
+	if gameType == "" {
+		rooms, err = s.gameRepo.GetAllActiveRooms()
+	} else {
+		rooms, err = s.gameRepo.GetActiveRooms(models.GameType(gameType))
+	}
+
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, models.NewInternalError(err))
 	}
@@ -80,6 +90,48 @@ func (s *Server) GetGameRoom(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(room)
+}
+
+// LeaveGameRoom explicitly leaves/cancels a room for the current user.
+func (s *Server) LeaveGameRoom(c *fiber.Ctx) error {
+	userID := c.Locals("userID").(uint)
+	id, err := strconv.ParseUint(c.Params("id"), 10, 32)
+	if err != nil {
+		return models.RespondWithError(c, fiber.StatusBadRequest, models.NewValidationError("Invalid room id"))
+	}
+
+	room, err := s.gameRepo.GetRoom(uint(id))
+	if err != nil {
+		return models.RespondWithError(c, fiber.StatusNotFound, models.NewNotFoundError("GameRoom", id))
+	}
+
+	isCreator := room.CreatorID == userID
+	isOpponent := room.OpponentID != nil && *room.OpponentID == userID
+	if !isCreator && !isOpponent {
+		return models.RespondWithError(c, fiber.StatusForbidden, models.NewForbiddenError("Not a participant in this room"))
+	}
+
+	if room.Status == models.GameFinished || room.Status == models.GameCancelled {
+		return c.JSON(fiber.Map{"message": "Room already closed", "status": room.Status})
+	}
+
+	// Deterministic cleanup policy:
+	// - pending rooms: cancel outright
+	// - active rooms: mark cancelled when any participant leaves
+	room.Status = models.GameCancelled
+	room.OpponentID = nil
+	room.WinnerID = nil
+	room.NextTurnID = 0
+
+	if err := s.gameRepo.UpdateRoom(room); err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, models.NewInternalError(err))
+	}
+
+	if s.notifier != nil {
+		_ = s.notifier.PublishGameAction(context.Background(), room.ID, `{"type":"game_cancelled","payload":{"message":"A player left the room"}}`)
+	}
+
+	return c.JSON(fiber.Map{"message": "Room closed", "status": room.Status})
 }
 
 // WebSocketGameHandler handles real-time game coordination

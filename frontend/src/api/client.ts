@@ -375,6 +375,12 @@ class ApiClient {
         return this.request(`/games/rooms/${id}`)
     }
 
+    async leaveGameRoom(id: number): Promise<{ message: string; status: string }> {
+        return this.request(`/games/rooms/${id}/leave`, {
+            method: 'POST',
+        })
+    }
+
     // biome-ignore lint/suspicious/noExplicitAny: dynamic stats object
     async getGameStats(type: string): Promise<any> {
         return this.request(`/games/stats/${type}`)

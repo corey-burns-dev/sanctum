@@ -228,6 +228,7 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	games := protected.Group("/games")
 	games.Post("/rooms", s.CreateGameRoom)
 	games.Get("/rooms/active", s.GetActiveGameRooms)
+	games.Post("/rooms/:id/leave", s.LeaveGameRoom)
 	games.Get("/stats/:type", s.GetGameStats)
 	games.Get("/rooms/:id", s.GetGameRoom)
 

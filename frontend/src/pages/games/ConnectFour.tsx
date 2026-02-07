@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { apiClient } from '@/api/client'
-import { Navbar } from '@/components/Navbar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -41,6 +40,7 @@ export default function ConnectFour() {
     const hasJoined = useRef(false)
     const [_, setConnectionError] = useState(false)
     const connectionErrorRef = useRef(false)
+    const allowLeaveOnUnmountRef = useRef(false)
 
     const { data: room, isError } = useQuery({
         queryKey: ['gameRoom', id],
@@ -97,6 +97,14 @@ export default function ConnectFour() {
             }
         }
     }, [room, currentUser, id])
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => {
+            allowLeaveOnUnmountRef.current = true
+        }, 0)
+
+        return () => window.clearTimeout(timer)
+    }, [])
 
     useEffect(() => {
         if (!id || !token) return
@@ -188,6 +196,36 @@ export default function ConnectFour() {
         return () => ws.current?.close()
     }, [id, token])
 
+    useEffect(() => {
+        if (!id || !token) return
+
+        const roomId = Number(id)
+        if (Number.isNaN(roomId)) return
+
+        const leaveWithKeepalive = () => {
+            void fetch(`/api/games/rooms/${roomId}/leave`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                keepalive: true,
+            })
+        }
+
+        const handleBeforeUnload = () => {
+            leaveWithKeepalive()
+        }
+
+        window.addEventListener('beforeunload', handleBeforeUnload)
+
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload)
+            if (!allowLeaveOnUnmountRef.current) return
+            void apiClient.leaveGameRoom(roomId)
+        }
+    }, [id, token])
+
     // biome-ignore lint/correctness/useExhaustiveDependencies: scroll when new messages arrive
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -246,11 +284,10 @@ export default function ConnectFour() {
     }
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
-            <Navbar />
-            <div className="max-w-7xl mx-auto px-4 py-8 grid lg:grid-cols-4 gap-8">
+        <div className="h-full overflow-hidden bg-background text-foreground">
+            <div className="mx-auto grid h-full max-w-7xl gap-4 px-4 py-4 lg:grid-cols-4 lg:gap-6">
                 {/* Game Area */}
-                <div className="lg:col-span-3 space-y-6">
+                <div className="space-y-4 overflow-y-auto pr-1 lg:col-span-3">
                     <Card className="border-2 shadow-xl bg-blue-900/10 border-blue-500/20">
                         <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-blue-500/10 bg-blue-500/5">
                             <div>
@@ -274,7 +311,7 @@ export default function ConnectFour() {
                                 {getStatusText()}
                             </div>
                         </CardHeader>
-                        <CardContent className="pt-10 pb-12 flex flex-col items-center overflow-hidden">
+                        <CardContent className="flex flex-col items-center overflow-hidden pb-8 pt-6">
                             {/* Column Selection indicators */}
                             <div className="grid grid-cols-7 gap-3 mb-2 w-full max-w-150 px-4">
                                 {[...Array(7)].map((_, i) => {
@@ -292,8 +329,8 @@ export default function ConnectFour() {
                             </div>
 
                             {/* The Board */}
-                            <div className="relative p-4 bg-blue-600 rounded-3xl shadow-[0_20px_50px_rgba(37,99,235,0.3)] border-8 border-blue-700">
-                                <div className="grid grid-cols-7 gap-3 bg-blue-800 p-2 rounded-2xl shadow-inner">
+                            <div className="relative rounded-3xl border-8 border-blue-700 bg-blue-600 p-3 shadow-[0_20px_50px_rgba(37,99,235,0.3)]">
+                                <div className="grid grid-cols-7 gap-2 rounded-2xl bg-blue-800 p-2 shadow-inner md:gap-3">
                                     {gameState.board.map((row, r) =>
                                         row.map((cell, c) => {
                                             const cellId = `c4-cell-${r}-${c}`
@@ -309,7 +346,7 @@ export default function ConnectFour() {
                                                         !isMyTurn ||
                                                         gameState.board[0][c] !== ''
                                                     }
-                                                    className={`w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center transition-all duration-300 relative overflow-hidden
+                                                    className={`relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full transition-all duration-300 md:h-14 md:w-14
                                                         ${cell === '' ? 'bg-blue-950/50 shadow-inner' : ''}
                                                         ${gameState.status === 'active' && isMyTurn && gameState.board[0][c] === '' ? 'cursor-pointer hover:bg-blue-900/50' : 'cursor-default'}
                                                     `}
@@ -367,30 +404,30 @@ export default function ConnectFour() {
                         </CardContent>
                     </Card>
 
-                    <div className="grid grid-cols-2 gap-6">
-                        <div className="p-6 rounded-2xl border-2 bg-card/50 border-red-500/10 hover:border-red-500/20 transition-colors">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="rounded-2xl border-2 border-red-500/10 bg-card/50 p-4 transition-colors hover:border-red-500/20">
                             <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-2xl bg-red-500 flex items-center justify-center font-black text-white shadow-lg shadow-red-500/20">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-red-500 font-black text-white shadow-lg shadow-red-500/20">
                                     X
                                 </div>
                                 <div>
                                     <p className="text-[10px] text-red-500 font-black uppercase tracking-[0.2em] mb-1">
                                         Player 1 (Creator)
                                     </p>
-                                    <p className="font-black text-lg">{room.creator.username}</p>
+                                    <p className="font-black">{room.creator.username}</p>
                                 </div>
                             </div>
                         </div>
-                        <div className="p-6 rounded-2xl border-2 bg-card/50 border-yellow-500/10 hover:border-yellow-500/20 transition-colors">
+                        <div className="rounded-2xl border-2 border-yellow-500/10 bg-card/50 p-4 transition-colors hover:border-yellow-500/20">
                             <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-2xl bg-yellow-400 flex items-center justify-center font-black text-white shadow-lg shadow-yellow-400/20">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-yellow-400 font-black text-white shadow-lg shadow-yellow-400/20">
                                     O
                                 </div>
                                 <div>
                                     <p className="text-[10px] text-yellow-500 font-black uppercase tracking-[0.2em] mb-1">
                                         Player 2 (Challenger)
                                     </p>
-                                    <p className="font-black text-lg">
+                                    <p className="font-black">
                                         {room.opponent?.username ||
                                             (gameState.status === 'pending' ? 'WAITING...' : 'BOT')}
                                     </p>
@@ -401,8 +438,8 @@ export default function ConnectFour() {
                 </div>
 
                 {/* Right Sidebar: Chat & Stats */}
-                <div className="space-y-6">
-                    <Card className="h-150 flex flex-col border-2 overflow-hidden bg-card/50 backdrop-blur-sm">
+                <div className="flex min-h-0 flex-col space-y-4">
+                    <Card className="flex min-h-0 flex-1 flex-col overflow-hidden border-2 bg-card/50 backdrop-blur-sm">
                         <div className="p-4 bg-blue-500/5 border-b font-black text-xs uppercase tracking-widest flex items-center gap-3">
                             <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                             Game Feed
@@ -457,9 +494,9 @@ export default function ConnectFour() {
                         </div>
                     </Card>
 
-                    <div className="bg-linear-to-br from-blue-900 to-indigo-900 border-2 border-blue-400/20 rounded-3xl p-8 text-center text-white shadow-2xl relative overflow-hidden group">
+                    <div className="relative overflow-hidden rounded-3xl border-2 border-blue-400/20 bg-linear-to-br from-blue-900 to-indigo-900 p-5 text-center text-white shadow-2xl group">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-700" />
-                        <Trophy className="w-14 h-14 text-yellow-400 mx-auto mb-4 drop-shadow-[0_0_15px_rgba(250,204,21,0.4)]" />
+                        <Trophy className="mx-auto mb-3 h-10 w-10 text-yellow-400 drop-shadow-[0_0_15px_rgba(250,204,21,0.4)]" />
                         <h4 className="font-black italic text-xl uppercase tracking-tighter mb-2">
                             Victory Prize
                         </h4>

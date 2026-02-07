@@ -47,19 +47,19 @@ export function TopBar() {
     if (!isAuthenticated) return null
 
     const pageTitle = getRouteTitle(location.pathname)
+    const navItems = [...topRouteNav, ...topServiceNav]
 
     return (
         <header className="fixed top-0 left-0 right-0 z-50 hidden md:block">
             <div className="border-b border-border/70 bg-background/75 shadow-lg backdrop-blur-xl">
                 <div className="flex h-14 items-center gap-3 px-3 lg:px-4">
-                    <Link to="/" className="inline-flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-lg bg-linear-to-br from-primary to-primary/70" />
-                        <div className="leading-tight">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                                Sanctum
-                            </p>
-                            <p className="text-sm font-semibold">{pageTitle}</p>
-                        </div>
+                    <Link to="/" className="mr-4 inline-flex min-w-fit flex-col leading-none">
+                        <span className="bg-linear-to-r from-primary via-emerald-400 to-cyan-400 bg-clip-text text-base font-black tracking-[0.18em] text-transparent uppercase">
+                            Sanctum
+                        </span>
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            {pageTitle}
+                        </span>
                     </Link>
 
                     <Link
@@ -70,7 +70,17 @@ export function TopBar() {
                         <span>Search people and rooms</span>
                     </Link>
 
-                    <div className="ml-auto flex items-center gap-2">
+                    <div className="ml-3 flex min-w-0 items-center gap-1 overflow-x-auto px-1">
+                        {navItems.map((item) => (
+                            <NavPill
+                                key={item.path}
+                                item={item}
+                                active={isRouteActive(location.pathname, item.path)}
+                            />
+                        ))}
+                    </div>
+
+                    <div className="ml-auto flex shrink-0 items-center gap-2">
                         <button
                             type="button"
                             className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border/60 text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
@@ -124,36 +134,6 @@ export function TopBar() {
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         ) : null}
-                    </div>
-                </div>
-
-                <div className="flex items-center border-t border-border/60 px-3 py-2 lg:px-4">
-                    <div className="flex min-w-0 items-center gap-1 overflow-x-auto pr-8">
-                        <span className="mr-1 shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                            Routes
-                        </span>
-                        {topRouteNav.map((item) => (
-                            <NavPill
-                                key={item.path}
-                                item={item}
-                                active={isRouteActive(location.pathname, item.path)}
-                            />
-                        ))}
-                    </div>
-
-                    <div className="mx-6 h-6 w-px shrink-0 bg-border/70" />
-
-                    <div className="flex min-w-0 items-center gap-1 overflow-x-auto pl-8">
-                        <span className="mr-1 shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                            Services
-                        </span>
-                        {topServiceNav.map((item) => (
-                            <NavPill
-                                key={item.path}
-                                item={item}
-                                active={isRouteActive(location.pathname, item.path)}
-                            />
-                        ))}
                     </div>
                 </div>
             </div>

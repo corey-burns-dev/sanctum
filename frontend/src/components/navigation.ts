@@ -1,14 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import {
-    Compass,
-    Gamepad2,
-    Home,
-    MessageCircle,
-    MessageSquare,
-    Radio,
-    Users,
-    Video,
-} from 'lucide-react'
+import { Gamepad2, Home, MessageCircle, MessageSquare, Radio, Users, Video } from 'lucide-react'
 
 export interface NavItem {
     icon: LucideIcon
@@ -24,7 +15,6 @@ export interface NavSection {
 
 export const topRouteNav: NavItem[] = [
     { icon: Home, label: 'Home', path: '/' },
-    { icon: Compass, label: 'Feed', path: '/posts' },
     { icon: MessageCircle, label: 'Messages', path: '/messages' },
     { icon: MessageSquare, label: 'Chatrooms', path: '/chat' },
 ]
@@ -43,7 +33,6 @@ export const sideNavSections: NavSection[] = [
 
 export const mobileNav: NavItem[] = [
     { icon: Home, label: 'Home', path: '/' },
-    { icon: Compass, label: 'Feed', path: '/posts' },
     { icon: MessageCircle, label: 'Messages', path: '/messages' },
     { icon: Gamepad2, label: 'Games', path: '/games' },
 ]

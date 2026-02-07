@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { apiClient } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { getCurrentUser } from '@/hooks'
 
 const GAME_CATEGORIES = [
     {
@@ -137,6 +138,7 @@ interface GameRoom {
 
 export default function Games() {
     const navigate = useNavigate()
+    const currentUser = getCurrentUser()
 
     const { data: activeRooms, isLoading } = useQuery({
         queryKey: ['gameRooms', 'active'],
@@ -146,17 +148,27 @@ export default function Games() {
     const handlePlayNow = async (type: string) => {
         if (type === 'tictactoe' || type === 'connect4') {
             try {
-                // 1. Check if there's an existing open room of this type
-                // We filter for pending rooms that the user didn't create
-                const openRoom = (activeRooms as GameRoom[] | undefined)?.find(
-                    (room) => room.type === type && room.status === 'pending'
+                // Fetch fresh rooms at click time to avoid stale cache races.
+                const freshRooms = await apiClient.getActiveGameRooms(type)
+                const openRoom = freshRooms.find(
+                    (room) =>
+                        room.status === 'pending' &&
+                        room.creator_id !== currentUser?.id &&
+                        !room.opponent_id
                 )
 
                 if (openRoom) {
-                    // 2. Join existing room
                     navigate(`/games/${type}/${openRoom.id}`)
+                    return
                 } else {
-                    // 3. Create new room if none found
+                    const myPendingRoom = freshRooms.find(
+                        (room) => room.status === 'pending' && room.creator_id === currentUser?.id
+                    )
+                    if (myPendingRoom) {
+                        navigate(`/games/${type}/${myPendingRoom.id}`)
+                        return
+                    }
+
                     const room = await apiClient.createGameRoom(type)
                     navigate(`/games/${type}/${room.id}`)
                 }
@@ -181,6 +193,11 @@ export default function Games() {
             navigate(routeMap[type] || '/games')
         }
     }
+
+    const joinableRooms =
+        (activeRooms as GameRoom[] | undefined)?.filter(
+            (room) => room.creator_id !== currentUser?.id && !room.opponent_id
+        ) ?? []
 
     return (
         <div className="flex-1 overflow-y-auto bg-background">
@@ -287,9 +304,9 @@ export default function Games() {
                                         />
                                     ))}
                                 </div>
-                            ) : (activeRooms?.length ?? 0) > 0 ? (
+                            ) : joinableRooms.length > 0 ? (
                                 <div className="space-y-3">
-                                    {activeRooms?.map((room: GameRoom) => (
+                                    {joinableRooms.map((room: GameRoom) => (
                                         <div
                                             key={room.id}
                                             className="flex items-center justify-between p-3 bg-muted/20 border rounded-xl hover:bg-muted/30 transition-colors"

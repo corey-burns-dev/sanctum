@@ -380,7 +380,7 @@ function MainLayout({ children }: { children: ReactNode }) {
                 className={cn(
                     'flex min-w-0 flex-1 flex-col',
                     isAuthenticated && isChatRoute ? 'overflow-hidden' : 'overflow-visible',
-                    isAuthenticated ? 'pb-20 pt-20 md:pb-0 md:pt-28' : 'pt-0'
+                    isAuthenticated ? 'pb-20 pt-20 md:pb-0 md:pt-16' : 'pt-0'
                 )}
             >
                 <div className={cn(isAuthenticated && isChatRoute ? 'min-h-0 flex-1' : 'flex-1')}>

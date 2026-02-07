@@ -1,6 +1,5 @@
 import { ArrowLeft, Construction } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { Navbar } from '@/components/Navbar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -9,7 +8,6 @@ export default function GamePlaceholder({ title }: { title: string }) {
 
     return (
         <div className="min-h-screen bg-background">
-            <Navbar />
             <div className="max-w-4xl mx-auto px-4 py-12">
                 <Button variant="ghost" onClick={() => navigate('/games')} className="mb-8 gap-2">
                     <ArrowLeft className="w-4 h-4" /> Back to Games

@@ -1,10 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { Hash, Send, Trophy } from 'lucide-react'
+import { Hash, Send } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { apiClient } from '@/api/client'
-import { Navbar } from '@/components/Navbar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -40,6 +39,7 @@ export default function TicTacToe() {
     const hasJoined = useRef(false)
     const connectionErrorRef = useRef(false)
     const shouldAutoJoinRef = useRef(false)
+    const allowLeaveOnUnmountRef = useRef(false)
 
     const { data: room, isError } = useQuery({
         queryKey: ['gameRoom', id],
@@ -103,6 +103,14 @@ export default function TicTacToe() {
             shouldAutoJoinRef.current = false
         }
     }, [room, currentUser, id])
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => {
+            allowLeaveOnUnmountRef.current = true
+        }, 0)
+
+        return () => window.clearTimeout(timer)
+    }, [])
 
     useEffect(() => {
         if (!id || !token) return
@@ -208,6 +216,36 @@ export default function TicTacToe() {
         }
     }, [id, token])
 
+    useEffect(() => {
+        if (!id || !token) return
+
+        const roomId = Number(id)
+        if (Number.isNaN(roomId)) return
+
+        const leaveWithKeepalive = () => {
+            void fetch(`/api/games/rooms/${roomId}/leave`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                keepalive: true,
+            })
+        }
+
+        const handleBeforeUnload = () => {
+            leaveWithKeepalive()
+        }
+
+        window.addEventListener('beforeunload', handleBeforeUnload)
+
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload)
+            if (!allowLeaveOnUnmountRef.current) return
+            void apiClient.leaveGameRoom(roomId)
+        }
+    }, [id, token])
+
     // Auto-join effect - separate from WebSocket connection
     useEffect(() => {
         if (!room || !currentUser || !ws.current || ws.current.readyState !== WebSocket.OPEN) return
@@ -282,13 +320,11 @@ export default function TicTacToe() {
     }
 
     return (
-        <div className="min-h-screen bg-background">
-            <Navbar />
-            <div className="max-w-6xl mx-auto px-4 py-8 grid lg:grid-cols-3 gap-8">
-                {/* Game Area */}
-                <div className="lg:col-span-2 space-y-6">
-                    <Card className="border-2">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2 bg-muted/20">
+        <div className="h-full bg-background overflow-hidden">
+            <div className="mx-auto grid h-full max-w-6xl gap-4 px-4 py-4 lg:grid-cols-3 lg:gap-6">
+                <div className="overflow-y-auto pr-1">
+                    <Card className="mx-auto w-fit border-2">
+                        <CardHeader className="flex flex-wrap items-center justify-between gap-3 bg-muted/20 pb-2">
                             <div>
                                 <CardTitle className="text-2xl font-bold flex items-center gap-2">
                                     <Hash className="w-6 h-6 text-primary" /> Tic-Tac-Toe
@@ -305,9 +341,9 @@ export default function TicTacToe() {
                                 {getStatusText()}
                             </div>
                         </CardHeader>
-                        <CardContent className="pt-12 pb-12 flex flex-col items-center">
+                        <CardContent className="flex flex-col items-center px-4 pb-4 pt-4">
                             {/* The Board */}
-                            <div className="grid grid-cols-3 gap-4 bg-muted p-4 rounded-2xl shadow-inner border-4 border-muted">
+                            <div className="grid grid-cols-3 gap-3 rounded-2xl border-4 border-muted bg-muted p-3 shadow-inner">
                                 {gameState.board.map((row, x) =>
                                     row.map((cell, y) => {
                                         const cellId = `cell-${x}-${y}`
@@ -321,7 +357,7 @@ export default function TicTacToe() {
                                                     !isMyTurn ||
                                                     cell !== ''
                                                 }
-                                                className={`w-24 h-24 md:w-32 md:h-32 flex items-center justify-center text-5xl font-black rounded-xl transition-all
+                                                className={`flex h-20 w-20 items-center justify-center rounded-xl text-5xl font-black transition-all md:h-24 md:w-24
                                                     ${cell === '' && isMyTurn ? 'bg-background hover:bg-primary/10 hover:scale-105 cursor-pointer' : 'bg-background/50 cursor-default'}
                                                     ${cell === 'X' ? 'text-primary' : 'text-indigo-500'}
                                                     shadow-[0_4px_0_0_rgba(0,0,0,0.1)] active:translate-y-1 active:shadow-none
@@ -337,7 +373,7 @@ export default function TicTacToe() {
                             {canJoin && (
                                 <Button
                                     size="lg"
-                                    className="mt-8 px-12 text-xl py-6"
+                                    className="mt-4 px-8 py-5 text-lg"
                                     onClick={joinGame}
                                 >
                                     Join & Play
@@ -347,7 +383,7 @@ export default function TicTacToe() {
                             {gameState.status === 'finished' && (
                                 <Button
                                     variant="outline"
-                                    className="mt-8"
+                                    className="mt-4"
                                     onClick={() => navigate('/games')}
                                 >
                                     Back to Games
@@ -355,43 +391,10 @@ export default function TicTacToe() {
                             )}
                         </CardContent>
                     </Card>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="p-4 rounded-xl border-2 bg-card">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary">
-                                    X
-                                </div>
-                                <div>
-                                    <p className="text-xs text-muted-foreground font-bold uppercase tracking-tight">
-                                        Creator
-                                    </p>
-                                    <p className="font-bold">{room.creator.username}</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="p-4 rounded-xl border-2 bg-card">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center font-bold text-indigo-500">
-                                    O
-                                </div>
-                                <div>
-                                    <p className="text-xs text-muted-foreground font-bold uppercase tracking-tight">
-                                        Opponent
-                                    </p>
-                                    <p className="font-bold">
-                                        {room.opponent?.username ||
-                                            (gameState.status === 'pending' ? '...' : 'Bot')}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
-                {/* Right Sidebar: Chat & Stats */}
-                <div className="space-y-6">
-                    <Card className="h-125 flex flex-col border-2 overflow-hidden">
+                <div className="flex min-h-0 flex-col">
+                    <Card className="flex min-h-0 flex-1 flex-col overflow-hidden border-2">
                         <div className="p-4 bg-muted/20 border-b font-bold flex items-center gap-2">
                             <Send className="w-4 h-4 text-primary" /> Game Chat
                         </div>
@@ -431,24 +434,37 @@ export default function TicTacToe() {
                             </div>
                         </div>
                     </Card>
+                </div>
 
-                    <div className="bg-muted/30 border-2 border-dashed rounded-xl p-6 text-center">
-                        <Trophy className="w-12 h-12 text-yellow-500 mx-auto mb-3" />
-                        <h4 className="font-bold">Victory Rewards</h4>
-                        <p className="text-sm text-muted-foreground mb-4">
-                            You get +10 VibePoints for every victory in this room.
-                        </p>
-                        <Button
-                            variant="ghost"
-                            className="w-full text-xs"
-                            onClick={() => {
-                                toast.success('LINK SECURED', {
-                                    description: 'Invite link copied to clipboard!',
-                                })
-                            }}
-                        >
-                            Copy Invite Link
-                        </Button>
+                <div className="flex flex-col gap-4 overflow-y-auto pr-1">
+                    <div className="rounded-xl border-2 bg-card p-4">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20 font-bold text-primary">
+                                X
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold uppercase tracking-tight text-muted-foreground">
+                                    Creator
+                                </p>
+                                <p className="font-bold">{room.creator.username}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="rounded-xl border-2 bg-card p-4">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-500/20 font-bold text-indigo-500">
+                                O
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold uppercase tracking-tight text-muted-foreground">
+                                    Opponent
+                                </p>
+                                <p className="font-bold">
+                                    {room.opponent?.username ||
+                                        (gameState.status === 'pending' ? '...' : 'Bot')}
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
