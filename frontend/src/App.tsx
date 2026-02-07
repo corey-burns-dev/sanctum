@@ -363,12 +363,14 @@ function RoutesWithPrefetch() {
 
 function MainLayout({ children }: { children: ReactNode }) {
     const isAuthenticated = useIsAuthenticated()
+    const location = useLocation()
+    const isChatRoute = location.pathname === '/chat' || location.pathname.startsWith('/chat/')
 
     return (
         <div
             className={cn(
                 'relative flex w-full text-foreground',
-                isAuthenticated ? 'h-[100dvh] overflow-hidden' : 'min-h-screen'
+                isAuthenticated && isChatRoute ? 'h-[100dvh] overflow-hidden' : 'min-h-screen'
             )}
         >
             {isAuthenticated && <MobileHeader />}
@@ -376,11 +378,14 @@ function MainLayout({ children }: { children: ReactNode }) {
 
             <div
                 className={cn(
-                    'flex min-w-0 flex-1 flex-col overflow-hidden',
+                    'flex min-w-0 flex-1 flex-col',
+                    isAuthenticated && isChatRoute ? 'overflow-hidden' : 'overflow-visible',
                     isAuthenticated ? 'pb-20 pt-20 md:pb-0 md:pt-28' : 'pt-0'
                 )}
             >
-                <div className="min-h-0 flex-1">{children}</div>
+                <div className={cn(isAuthenticated && isChatRoute ? 'min-h-0 flex-1' : 'flex-1')}>
+                    {children}
+                </div>
             </div>
 
             {isAuthenticated && <BottomBar />}

@@ -32,7 +32,6 @@ export default function Chat() {
     const { id: urlChatId } = useParams<{ id: string }>()
     const navigate = useNavigate()
     const [newMessage, setNewMessage] = useState('')
-    const [roomFilter, setRoomFilter] = useState<'joined' | 'all'>('joined')
     const [showChatrooms, setShowChatrooms] = useState(true)
     const [showParticipants, setShowParticipants] = useState(true)
     const [messageError, setMessageError] = useState<string | null>(null)
@@ -109,13 +108,6 @@ export default function Chat() {
         },
         [activeRooms]
     )
-
-    const displayedRooms = useMemo(() => {
-        if (roomFilter === 'joined') {
-            return activeRooms
-        }
-        return conversations
-    }, [roomFilter, activeRooms, conversations])
 
     const [participants, setParticipants] = useState<
         Record<number, { id: number; username?: string; online?: boolean; typing?: boolean }>
@@ -257,7 +249,6 @@ export default function Chat() {
             joinChatroom.mutate(id, {
                 onSuccess: () => {
                     navigate(`/chat/${id}`)
-                    setRoomFilter('joined')
                 },
             })
         },
@@ -324,47 +315,24 @@ export default function Chat() {
 
                     {showChatrooms && (
                         <>
-                            <div className="grid grid-cols-2 gap-1 border-b border-border/70 p-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setRoomFilter('joined')}
-                                    className={cn(
-                                        'rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors',
-                                        roomFilter === 'joined'
-                                            ? 'bg-primary/15 text-primary'
-                                            : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
-                                    )}
-                                >
-                                    Joined ({activeRooms.length})
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setRoomFilter('all')}
-                                    className={cn(
-                                        'rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors',
-                                        roomFilter === 'all'
-                                            ? 'bg-primary/15 text-primary'
-                                            : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
-                                    )}
-                                >
-                                    All ({conversations.length})
-                                </button>
+                            <div className="border-b border-border/70 px-3 py-2">
+                                <p className="text-[11px] text-muted-foreground">
+                                    {conversations.length} rooms
+                                </p>
                             </div>
 
                             <ScrollArea className="min-h-0 flex-1">
-                                <div className="space-y-1.5 p-2">
+                                <div className="grid grid-cols-2 gap-1.5 p-2">
                                     {allLoading ? (
-                                        <div className="p-4 text-center text-xs text-muted-foreground">
+                                        <div className="col-span-2 p-4 text-center text-xs text-muted-foreground">
                                             Loading chatrooms...
                                         </div>
-                                    ) : displayedRooms.length === 0 ? (
-                                        <div className="p-4 text-center text-xs text-muted-foreground">
-                                            {roomFilter === 'joined'
-                                                ? 'No joined chatrooms yet.'
-                                                : 'No chatrooms available.'}
+                                    ) : conversations.length === 0 ? (
+                                        <div className="col-span-2 p-4 text-center text-xs text-muted-foreground">
+                                            No chatrooms available.
                                         </div>
                                     ) : (
-                                        displayedRooms.map((room) => {
+                                        conversations.map((room) => {
                                             const joined = isRoomJoined(room)
                                             const selected = selectedChatId === room.id
 
@@ -376,17 +344,17 @@ export default function Chat() {
                                                         handleSelectConversation(room.id)
                                                     }
                                                     className={cn(
-                                                        'w-full rounded-lg border px-3 py-2 text-left transition-colors',
+                                                        'w-full rounded-lg border px-2.5 py-2 text-left transition-colors',
                                                         selected
                                                             ? 'border-primary/30 bg-primary/10'
                                                             : 'border-transparent hover:border-border/60 hover:bg-muted/60'
                                                     )}
                                                 >
                                                     <div className="flex items-center justify-between gap-2">
-                                                        <p className="truncate text-sm font-semibold text-foreground">
+                                                        <p className="truncate text-[13px] font-semibold text-foreground">
                                                             {room.name || `Room ${room.id}`}
                                                         </p>
-                                                        {!joined && roomFilter === 'all' && (
+                                                        {!joined && (
                                                             <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                                                                 Join
                                                             </span>
