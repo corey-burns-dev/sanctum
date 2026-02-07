@@ -1,15 +1,16 @@
 # Vibeshift
 
-A professional full-stack application with Go backend, React frontend, Redis, and PostgreSQL. All orchestrated through Docker Compose and a comprehensive Makefile.
+Vibeshift is a Reddit-style social platform focused on creativity, hobbies, and shared interests, without politics, religion, or news-driven discourse.
 
 ## Features
 
+- **Community Feed:** Threaded post-and-reply experience for interest-based communities
 - **Backend:** Go REST API with health and ping endpoints
 - **Frontend:** React 19 with TanStack Query, Tailwind CSS, and shadcn components
 - **Databases:** PostgreSQL for persistence, Redis for caching
 - **Development:** Hot reloading for both backend and frontend
 - **Containerization:** Docker multi-stage builds for optimized images
-- **Professional CLI:** Organized Makefile for all development tasks
+- **Developer Workflow:** Organized Makefile for common development tasks
 
 ## Prerequisites
 
@@ -162,164 +163,12 @@ make dev
 make dev-backend
 ```
 
-- Backend: `http://localhost:8375`
-- Postgres: `localhost:5432`
-- Redis: `localhost:6379`
-
-### Frontend-Only Development (with backend proxy)
+### Frontend-Only Development
 
 ```bash
+make install
 make dev-frontend
 ```
-
-- Frontend: `http://localhost:5173`
-- API proxied to `http://localhost:8375/health` and `/ping`
-
-### Check Logs
-
-```bash
-# Backend logs
-make logs-backend
-
-# All logs
-make logs-all
-
-# Follow specific service
-docker-compose logs -f frontend
-```
-
-### Frontend Code Quality
-
-```bash
-# Format frontend code
-make fmt-frontend
-
-# Lint frontend code
-make lint-frontend
-
-# Install frontend dependencies
-make install
-```
-
-## Environment Variables
-
-See `.env.example` for a complete list. Key variables:
-
-- `GO_PORT` — Backend server port (default: 8375)
-- `POSTGRES_DB` — PostgreSQL database name (default: aichat)
-- `POSTGRES_USER` — PostgreSQL user (default: user)
-- `POSTGRES_PASSWORD` — PostgreSQL password (required)
-- `VITE_API_URL` — Frontend API URL (default: `http://localhost:8375`)
-
-Note about YAML config and `make env`:
-
-- **`config.yml`**: This repository now uses a YAML config file at `config.yml` (copy `config.example.yml` → `config.yml` and update values).
-- **`make env`**: Docker Compose still expects a `.env` file. Run `make env` to generate a `.env` from `config.yml` automatically.
-- **`yq` recommended**: If you have `yq` installed (v4 preferred, but v3 is supported), `make env` will use it for robust YAML parsing. If `yq` is not available, `make env` falls back to a simple `sed` parser.
-
-Examples:
-
-```bash
-# Generate/update .env from config.yml
-make env
-
-# Start backend services (Postgres, Redis, app)
-make dev-backend
-```
-
-### Redis Configuration
-
-`REDIS_URL` accepts either a plain `host:port` value or a URL form. Examples:
-
-```bash
-# URL form (supports password and DB index)
-export REDIS_URL="redis://:mypassword@redis:6379/1"
-
-# TLS (secure) URL form
-export REDIS_URL="rediss://:mypassword@redis:6379/1"
-
-# Plain host:port form (no scheme)
-export REDIS_URL="redis:6379"
-```
-
-**Note:** When `REDIS_URL` uses the `rediss://` scheme, the client will enable TLS when connecting. Ensure your Redis instance is configured for TLS when using `rediss://`.
-
-## API Endpoints
-
-- `GET /health` - Health check: `{"status": "ok", "service": "ai-chat"}`
-- `GET /ping` - Ping: `{"message": "pong"}`
-
-## Troubleshooting
-
-### Services not starting?
-
-Check logs:
-
-```bash
-make logs-all
-```
-
-### Database connection errors?
-
-Ensure PostgreSQL is healthy:
-
-```bash
-docker-compose ps
-```
-
-Look for `(healthy)` status on postgres service.
-
-### Frontend can't connect to backend?
-
-In development, the frontend proxies requests to `http://localhost:8375`. Ensure the backend is running:
-
-```bash
-make dev-backend
-```
-
-## Development Guide
-
-### Adding New Features
-
-1. Edit `main.go` or add new files
-2. The dev environment will auto-reload
-3. Test with `curl` or your preferred tool
-
-## Deployment
-
-For production deployment:
-
-1. Ensure `.env` has production values (use a secure password)
-2. Build and run:
-
-   ```bash
-   make prod
-   ```
-
-3. View logs:
-
-   ```bash
-   make logs
-   ```
-
-4. Stop:
-
-   ```bash
-   make down
-   ```
-
-## CI / Integration Tests
-
-- The repository's integration workflow uses Docker Compose. On GitHub Actions runners the workflow will install the Docker Compose CLI plugin and provide a `docker-compose` compatibility symlink so tests run regardless of the runner's preinstalled compose tooling.
-- If you run the integration script locally, ensure you have a Compose-capable Docker CLI (`docker compose`) or the legacy `docker-compose` binary available.
-
-## Contributing
-
-1. Fork the repo
-2. Create a feature branch
-3. Make changes
-4. Test with dev environment
-5. Submit a PR
 
 ## License
 
