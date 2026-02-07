@@ -11,6 +11,7 @@ import { TopBar } from '@/components/TopBar'
 import { Button } from '@/components/ui/button'
 import { Toaster } from '@/components/ui/sonner'
 import { useIsAuthenticated } from '@/hooks'
+import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications'
 import { cn } from '@/lib/utils'
 import { routePrefetchMap } from '@/utils/prefetch'
 
@@ -24,7 +25,6 @@ const Messages = lazy(() => import('@/pages/Messages'))
 const Chat = lazy(() => import('@/pages/Chat'))
 const UsersPage = lazy(() => import('@/pages/Users'))
 const Games = lazy(() => import('@/pages/Games'))
-const TicTacToe = lazy(() => import('@/pages/games/TicTacToe'))
 const ConnectFour = lazy(() => import('@/pages/games/ConnectFour'))
 const Chess = lazy(() => import('@/pages/games/Chess'))
 const Checkers = lazy(() => import('@/pages/games/Checkers'))
@@ -221,14 +221,6 @@ function RoutesWithPrefetch() {
                     }
                 />
                 <Route
-                    path="/games/tictactoe/:id"
-                    element={
-                        <ProtectedRoute>
-                            <TicTacToe />
-                        </ProtectedRoute>
-                    }
-                />
-                <Route
                     path="/games/connect4/:id"
                     element={
                         <ProtectedRoute>
@@ -363,14 +355,19 @@ function RoutesWithPrefetch() {
 
 function MainLayout({ children }: { children: ReactNode }) {
     const isAuthenticated = useIsAuthenticated()
+    useRealtimeNotifications(isAuthenticated)
     const location = useLocation()
     const isChatRoute = location.pathname === '/chat' || location.pathname.startsWith('/chat/')
+    const isGameRoomRoute = /^\/games\/connect4\/[^/]+$/.test(location.pathname)
+    const isViewportLockedRoute = isChatRoute || isGameRoomRoute
 
     return (
         <div
             className={cn(
                 'relative flex w-full text-foreground',
-                isAuthenticated && isChatRoute ? 'h-[100dvh] overflow-hidden' : 'min-h-screen'
+                isAuthenticated && isViewportLockedRoute
+                    ? 'h-[100dvh] overflow-hidden'
+                    : 'min-h-screen'
             )}
         >
             {isAuthenticated && <MobileHeader />}
@@ -379,11 +376,17 @@ function MainLayout({ children }: { children: ReactNode }) {
             <div
                 className={cn(
                     'flex min-w-0 flex-1 flex-col',
-                    isAuthenticated && isChatRoute ? 'overflow-hidden' : 'overflow-visible',
+                    isAuthenticated && isViewportLockedRoute
+                        ? 'overflow-hidden'
+                        : 'overflow-visible',
                     isAuthenticated ? 'pb-20 pt-20 md:pb-0 md:pt-16' : 'pt-0'
                 )}
             >
-                <div className={cn(isAuthenticated && isChatRoute ? 'min-h-0 flex-1' : 'flex-1')}>
+                <div
+                    className={cn(
+                        isAuthenticated && isViewportLockedRoute ? 'min-h-0 flex-1' : 'flex-1'
+                    )}
+                >
                     {children}
                 </div>
             </div>

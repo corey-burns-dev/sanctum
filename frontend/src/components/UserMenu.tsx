@@ -52,17 +52,32 @@ export function UserMenu({ user, children }: UserMenuProps) {
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
 
-                    <DropdownMenuItem onClick={handleViewProfile}>
+                    <DropdownMenuItem
+                        onClick={(event) => {
+                            event.stopPropagation()
+                            handleViewProfile()
+                        }}
+                    >
                         <UserIcon className="mr-2 h-4 w-4" />
                         <span>View Profile</span>
                     </DropdownMenuItem>
 
-                    <DropdownMenuItem onClick={handleMessage}>
+                    <DropdownMenuItem
+                        onClick={(event) => {
+                            event.stopPropagation()
+                            handleMessage()
+                        }}
+                    >
                         <MessageCircle className="mr-2 h-4 w-4" />
                         <span>Message</span>
                     </DropdownMenuItem>
 
-                    <DropdownMenuItem onClick={handleVideoChat}>
+                    <DropdownMenuItem
+                        onClick={(event) => {
+                            event.stopPropagation()
+                            handleVideoChat()
+                        }}
+                    >
                         <Video className="mr-2 h-4 w-4" />
                         <span>Video Chat</span>
                     </DropdownMenuItem>
@@ -70,7 +85,13 @@ export function UserMenu({ user, children }: UserMenuProps) {
                     <DropdownMenuSeparator />
 
                     {canAddFriend && (
-                        <DropdownMenuItem onClick={handleAddFriend} disabled={addFriendDisabled}>
+                        <DropdownMenuItem
+                            onClick={(event) => {
+                                event.stopPropagation()
+                                handleAddFriend()
+                            }}
+                            disabled={addFriendDisabled}
+                        >
                             <UserPlus className="mr-2 h-4 w-4" />
                             <span>{addFriendLabel}</span>
                         </DropdownMenuItem>
@@ -78,7 +99,10 @@ export function UserMenu({ user, children }: UserMenuProps) {
 
                     {isFriend && (
                         <DropdownMenuItem
-                            onClick={handleRemoveFriend}
+                            onClick={(event) => {
+                                event.stopPropagation()
+                                handleRemoveFriend()
+                            }}
                             className="text-destructive focus:text-destructive"
                             disabled={removeFriendPending}
                         >

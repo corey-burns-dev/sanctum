@@ -12,7 +12,7 @@ export const gameKeys = {
 }
 
 // Get active game rooms
-export function useActiveGameRooms(type = 'tictactoe') {
+export function useActiveGameRooms(type = 'connect4') {
     return useQuery({
         queryKey: gameKeys.roomsActive(),
         queryFn: () => apiClient.getActiveGameRooms(type),

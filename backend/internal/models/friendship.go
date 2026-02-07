@@ -38,10 +38,8 @@ func (Friendship) TableName() string {
 	return "friendships"
 }
 
-// BeforeCreate ensures RequesterID < AddresseeID for consistent ordering
+// BeforeCreate preserves requester/addressee direction.
+// Direction is required to distinguish sent vs received pending requests.
 func (f *Friendship) BeforeCreate(_ *gorm.DB) error {
-	if f.RequesterID > f.AddresseeID {
-		f.RequesterID, f.AddresseeID = f.AddresseeID, f.RequesterID
-	}
 	return nil
 }

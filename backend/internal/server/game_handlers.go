@@ -5,12 +5,22 @@ import (
 	"encoding/json"
 	"log"
 	"strconv"
+	"time"
 	"vibeshift/internal/models"
 	"vibeshift/internal/notifications"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"
 )
+
+const pendingRoomMaxIdle = 10 * time.Minute
+
+func isPendingRoomStale(room models.GameRoom, now time.Time) bool {
+	if room.Status != models.GamePending {
+		return false
+	}
+	return now.Sub(room.UpdatedAt) > pendingRoomMaxIdle
+}
 
 // CreateGameRoom handles the creation of a new game room
 func (s *Server) CreateGameRoom(c *fiber.Ctx) error {
@@ -25,8 +35,20 @@ func (s *Server) CreateGameRoom(c *fiber.Ctx) error {
 
 	// Prevent Room Bloat: Check for existing pending rooms for this user
 	existingRooms, _ := s.gameRepo.GetActiveRooms(req.Type)
+	now := time.Now()
 	for _, r := range existingRooms {
 		if r.CreatorID == userID {
+			if isPendingRoomStale(r, now) {
+				r.Status = models.GameCancelled
+				r.OpponentID = nil
+				r.WinnerID = nil
+				r.NextTurnID = 0
+				if err := s.gameRepo.UpdateRoom(&r); err != nil {
+					log.Printf("failed to auto-cancel stale room %d: %v", r.ID, err)
+				}
+				continue
+			}
+
 			// If already has a pending room, return it instead of creating a new one
 			return c.Status(fiber.StatusOK).JSON(r)
 		}
@@ -65,7 +87,23 @@ func (s *Server) GetActiveGameRooms(c *fiber.Ctx) error {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, models.NewInternalError(err))
 	}
 
-	return c.JSON(rooms)
+	now := time.Now()
+	filteredRooms := make([]models.GameRoom, 0, len(rooms))
+	for _, room := range rooms {
+		if isPendingRoomStale(room, now) {
+			room.Status = models.GameCancelled
+			room.OpponentID = nil
+			room.WinnerID = nil
+			room.NextTurnID = 0
+			if updateErr := s.gameRepo.UpdateRoom(&room); updateErr != nil {
+				log.Printf("failed to auto-cancel stale room %d: %v", room.ID, updateErr)
+			}
+			continue
+		}
+		filteredRooms = append(filteredRooms, room)
+	}
+
+	return c.JSON(filteredRooms)
 }
 
 // GetGameStats fetches stats for a user and game type

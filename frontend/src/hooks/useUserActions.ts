@@ -46,10 +46,11 @@ export function useUserActions(user: User) {
         removeFriend.mutate(user.id)
     }
 
-    const canAddFriend =
-        status === 'none' || status === 'pending_sent' || status === 'pending_received'
-    const addFriendDisabled = sendRequest.isPending || isLoading || status === 'pending_sent'
-    const addFriendLabel = status === 'pending_sent' ? 'Request Sent' : 'Add Friend'
+    const canAddFriend = status === 'none' || status === 'pending_sent'
+    const addFriendDisabled =
+        sendRequest.isPending || isLoading || status === 'pending_sent' || status === 'pending'
+    const addFriendLabel =
+        status === 'pending_sent' || status === 'pending' ? 'Request Sent' : 'Add Friend'
     const isFriend = status === 'friends'
     const removeFriendPending = removeFriend.isPending
 

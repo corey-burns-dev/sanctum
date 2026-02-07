@@ -109,21 +109,8 @@ func (s *Server) SetupMiddleware(app *fiber.App) {
 	// Structured Logging middleware
 	app.Use(middleware.StructuredLogger())
 
-	// Global rate limiting (100 requests per minute per IP)
-	app.Use(limiter.New(limiter.Config{
-		Max:        100,
-		Expiration: 1 * time.Minute,
-		KeyGenerator: func(c *fiber.Ctx) string {
-			return c.IP()
-		},
-		LimitReached: func(c *fiber.Ctx) error {
-			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
-				"error": "Too many requests, please try again later.",
-			})
-		},
-	}))
-
-	// CORS middleware with WebSocket support
+	// CORS middleware should run before middlewares that can short-circuit (e.g. limiter)
+	// so browser clients still receive CORS headers on error responses.
 	origins := s.config.AllowedOrigins
 	if origins == "" {
 		origins = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
@@ -134,6 +121,24 @@ func (s *Server) SetupMiddleware(app *fiber.App) {
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, Upgrade, Connection, Sec-WebSocket-Key, Sec-WebSocket-Version",
 		AllowCredentials: true,
 		MaxAge:           86400, // 24 hours
+	}))
+
+	// Global rate limiting (100 requests per minute per IP)
+	app.Use(limiter.New(limiter.Config{
+		Max:        100,
+		Expiration: 1 * time.Minute,
+		// Never rate-limit preflight requests; they should be handled by CORS.
+		Next: func(c *fiber.Ctx) bool {
+			return c.Method() == fiber.MethodOptions
+		},
+		KeyGenerator: func(c *fiber.Ctx) string {
+			return c.IP()
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"error": "Too many requests, please try again later.",
+			})
+		},
 	}))
 }
 

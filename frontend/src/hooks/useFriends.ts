@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { apiClient } from '../api/client'
 import { handleAuthOrFKError } from '../lib/handleAuthOrFKError'
 
@@ -52,13 +53,20 @@ export function useSendFriendRequest() {
     return useMutation({
         mutationFn: (userId: number) => apiClient.sendFriendRequest(userId),
         onSuccess: (_, userId) => {
+            toast.success('Friend request sent')
+            queryClient.invalidateQueries({
+                queryKey: friendKeys.incomingRequests(),
+            })
             queryClient.invalidateQueries({
                 queryKey: friendKeys.outgoingRequests(),
             })
+            queryClient.invalidateQueries({ queryKey: friendKeys.lists() })
             queryClient.invalidateQueries({ queryKey: friendKeys.status(userId) })
+            queryClient.invalidateQueries({ queryKey: friendKeys.all })
         },
         onError: (error) => {
             handleAuthOrFKError(error)
+            toast.error(error instanceof Error ? error.message : 'Failed to send friend request')
         },
     })
 }

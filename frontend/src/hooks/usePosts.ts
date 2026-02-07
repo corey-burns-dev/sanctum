@@ -39,6 +39,9 @@ export function useInfinitePosts(limit = 10) {
             return allPages.length * limit
         },
         initialPageParam: 0,
+        refetchOnMount: 'always',
+        refetchOnWindowFocus: true,
+        refetchOnReconnect: true,
     })
 }
 

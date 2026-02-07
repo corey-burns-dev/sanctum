@@ -2,6 +2,8 @@
 package server
 
 import (
+	"time"
+
 	"vibeshift/internal/models"
 
 	"github.com/gofiber/fiber/v2"
@@ -69,6 +71,18 @@ func (s *Server) SendFriendRequest(c *fiber.Ctx) error {
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
+
+	// Notify both users so UI updates immediately.
+	s.publishUserEvent(friendship.AddresseeID, "friend_request_received", map[string]interface{}{
+		"request_id": friendship.ID,
+		"from_user":  userSummary(friendship.Requester),
+		"created_at": time.Now().UTC().Format(time.RFC3339Nano),
+	})
+	s.publishUserEvent(friendship.RequesterID, "friend_request_sent", map[string]interface{}{
+		"request_id": friendship.ID,
+		"to_user":    userSummary(friendship.Addressee),
+		"created_at": time.Now().UTC().Format(time.RFC3339Nano),
+	})
 
 	return c.Status(fiber.StatusCreated).JSON(friendship)
 }
@@ -138,6 +152,17 @@ func (s *Server) AcceptFriendRequest(c *fiber.Ctx) error {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
 
+	s.publishUserEvent(friendship.RequesterID, "friend_request_accepted", map[string]interface{}{
+		"request_id":  friendship.ID,
+		"friend_user": userSummary(friendship.Addressee),
+		"created_at":  time.Now().UTC().Format(time.RFC3339Nano),
+	})
+	s.publishUserEvent(friendship.AddresseeID, "friend_added", map[string]interface{}{
+		"request_id":  friendship.ID,
+		"friend_user": userSummary(friendship.Requester),
+		"created_at":  time.Now().UTC().Format(time.RFC3339Nano),
+	})
+
 	return c.JSON(friendship)
 }
 
@@ -157,10 +182,10 @@ func (s *Server) RejectFriendRequest(c *fiber.Ctx) error {
 		return models.RespondWithError(c, fiber.StatusNotFound, err)
 	}
 
-	// Check if user is the addressee
-	if friendship.AddresseeID != userID {
+	// Addressee can reject, requester can cancel their own pending request.
+	if friendship.AddresseeID != userID && friendship.RequesterID != userID {
 		return models.RespondWithError(c, fiber.StatusForbidden,
-			models.NewUnauthorizedError("You can only reject friend requests sent to you"))
+			models.NewUnauthorizedError("You can only reject or cancel your own pending requests"))
 	}
 
 	// Check if already processed
@@ -173,6 +198,21 @@ func (s *Server) RejectFriendRequest(c *fiber.Ctx) error {
 	if deleteErr := s.friendRepo.Delete(ctx, uint(requestID)); deleteErr != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, deleteErr)
 	}
+
+	eventType := "friend_request_rejected"
+	if friendship.RequesterID == userID {
+		eventType = "friend_request_cancelled"
+	}
+	s.publishUserEvent(friendship.RequesterID, eventType, map[string]interface{}{
+		"request_id":  friendship.ID,
+		"by_user_id":  userID,
+		"rejected_at": time.Now().UTC().Format(time.RFC3339Nano),
+	})
+	s.publishUserEvent(friendship.AddresseeID, eventType, map[string]interface{}{
+		"request_id":  friendship.ID,
+		"by_user_id":  userID,
+		"rejected_at": time.Now().UTC().Format(time.RFC3339Nano),
+	})
 
 	return c.SendStatus(fiber.StatusNoContent)
 }
@@ -213,12 +253,26 @@ func (s *Server) GetFriendshipStatus(c *fiber.Ctx) error {
 	}
 
 	status := "none"
+	var requestID uint
 	if friendship != nil {
-		status = string(friendship.Status)
+		switch friendship.Status {
+		case models.FriendshipStatusAccepted:
+			status = "friends"
+		case models.FriendshipStatusPending:
+			requestID = friendship.ID
+			if friendship.RequesterID == userID {
+				status = "pending_sent"
+			} else {
+				status = "pending_received"
+			}
+		default:
+			status = string(friendship.Status)
+		}
 	}
 
 	return c.JSON(fiber.Map{
 		"status":     status,
+		"request_id": requestID,
 		"friendship": friendship,
 	})
 }
@@ -247,6 +301,15 @@ func (s *Server) RemoveFriend(c *fiber.Ctx) error {
 	if removeErr := s.friendRepo.RemoveFriendship(ctx, userID, uint(targetUserID)); removeErr != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, removeErr)
 	}
+
+	s.publishUserEvent(userID, "friend_removed", map[string]interface{}{
+		"user_id":    uint(targetUserID),
+		"removed_at": time.Now().UTC().Format(time.RFC3339Nano),
+	})
+	s.publishUserEvent(uint(targetUserID), "friend_removed", map[string]interface{}{
+		"user_id":    userID,
+		"removed_at": time.Now().UTC().Format(time.RFC3339Nano),
+	})
 
 	return c.SendStatus(fiber.StatusOK)
 }

@@ -158,7 +158,31 @@ func (h *GameHub) handleJoin(userID uint, action GameAction) {
 		return
 	}
 
-	_ = h.notifier.PublishGameAction(context.Background(), action.RoomID, `{"type": "game_started", "payload": {"status": "active", "next_turn": `+fmt.Sprint(room.NextTurnID)+`}}`)
+	started := GameAction{
+		Type:   "game_started",
+		RoomID: action.RoomID,
+		Payload: map[string]interface{}{
+			"status":        "active",
+			"next_turn":     room.NextTurnID,
+			"opponent_id":   userID,
+			"creator_id":    room.CreatorID,
+			"room_id":       room.ID,
+			"updated_at":    room.UpdatedAt,
+			"current_state": room.CurrentState,
+		},
+	}
+
+	// Always broadcast directly to currently connected sockets in this process.
+	h.BroadcastToRoom(action.RoomID, started)
+
+	// Also publish through Redis for cross-process fanout when available.
+	if h.notifier != nil {
+		_ = h.notifier.PublishGameAction(
+			context.Background(),
+			action.RoomID,
+			`{"type": "game_started", "payload": {"status": "active", "next_turn": `+fmt.Sprint(room.NextTurnID)+`}}`,
+		)
+	}
 }
 
 func (h *GameHub) handleMove(userID uint, action GameAction) {

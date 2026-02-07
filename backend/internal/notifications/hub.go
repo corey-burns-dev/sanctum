@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 
 	"github.com/gofiber/websocket/v2"
@@ -65,10 +66,39 @@ func (h *Hub) Broadcast(userID uint, message string) {
 	}
 }
 
+// IsOnline reports whether a user currently has at least one active websocket connection.
+func (h *Hub) IsOnline(userID uint) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	conns, ok := h.conns[userID]
+	return ok && len(conns) > 0
+}
+
+// BroadcastAll sends message to every connected websocket client.
+func (h *Hub) BroadcastAll(message string) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for _, conns := range h.conns {
+		for c := range conns {
+			if err := c.WriteMessage(websocket.TextMessage, []byte(message)); err != nil {
+				log.Printf("websocket write error: %v", err)
+			}
+		}
+	}
+}
+
 // StartWiring connects the Notifier to this hub: it subscribes to Redis pattern and
 // forwards messages to matching userID connections.
 func (h *Hub) StartWiring(ctx context.Context, n *Notifier) error {
 	return n.StartPatternSubscriber(ctx, func(channel, payload string) {
+		if channel == "notifications:broadcast" {
+			h.BroadcastAll(payload)
+			return
+		}
+		if !strings.HasPrefix(channel, "notifications:user:") {
+			log.Printf("invalid notification channel: %s", channel)
+			return
+		}
 		// channel form: notifications:user:<id>
 		var userID uint
 		// simple parse

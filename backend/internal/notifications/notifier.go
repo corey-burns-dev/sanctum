@@ -30,6 +30,14 @@ func (n *Notifier) PublishUser(
 	return n.rdb.Publish(ctx, channel, payload).Err()
 }
 
+// PublishBroadcast sends a notification payload to all connected users.
+func (n *Notifier) PublishBroadcast(ctx context.Context, payload string) error {
+	if n.rdb == nil {
+		return nil
+	}
+	return n.rdb.Publish(ctx, "notifications:broadcast", payload).Err()
+}
+
 // StartPatternSubscriber subscribes to pattern `notifications:user:*` and calls onMessage
 // for each incoming message. onMessage receives channel and payload.
 func (n *Notifier) StartPatternSubscriber(
@@ -37,7 +45,7 @@ func (n *Notifier) StartPatternSubscriber(
 	if n.rdb == nil {
 		return nil
 	}
-	sub := n.rdb.PSubscribe(ctx, "notifications:user:*")
+	sub := n.rdb.PSubscribe(ctx, "notifications:user:*", "notifications:broadcast")
 	ch := sub.Channel()
 
 	go func() {

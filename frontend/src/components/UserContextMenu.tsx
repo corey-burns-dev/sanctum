@@ -48,17 +48,32 @@ export function UserContextMenu({ user, children }: UserContextMenuProps) {
                 </ContextMenuLabel>
                 <ContextMenuSeparator />
 
-                <ContextMenuItem onClick={handleViewProfile}>
+                <ContextMenuItem
+                    onClick={(event) => {
+                        event.stopPropagation()
+                        handleViewProfile()
+                    }}
+                >
                     <UserIcon className="mr-2 h-4 w-4" />
                     <span>View Profile</span>
                 </ContextMenuItem>
 
-                <ContextMenuItem onClick={handleMessage}>
+                <ContextMenuItem
+                    onClick={(event) => {
+                        event.stopPropagation()
+                        handleMessage()
+                    }}
+                >
                     <MessageCircle className="mr-2 h-4 w-4" />
                     <span>Message</span>
                 </ContextMenuItem>
 
-                <ContextMenuItem onClick={handleVideoChat}>
+                <ContextMenuItem
+                    onClick={(event) => {
+                        event.stopPropagation()
+                        handleVideoChat()
+                    }}
+                >
                     <Video className="mr-2 h-4 w-4" />
                     <span>Video Chat</span>
                 </ContextMenuItem>
@@ -66,7 +81,13 @@ export function UserContextMenu({ user, children }: UserContextMenuProps) {
                 <ContextMenuSeparator />
 
                 {canAddFriend && (
-                    <ContextMenuItem onClick={handleAddFriend} disabled={addFriendDisabled}>
+                    <ContextMenuItem
+                        onClick={(event) => {
+                            event.stopPropagation()
+                            handleAddFriend()
+                        }}
+                        disabled={addFriendDisabled}
+                    >
                         <UserPlus className="mr-2 h-4 w-4" />
                         <span>{addFriendLabel}</span>
                     </ContextMenuItem>
@@ -74,7 +95,10 @@ export function UserContextMenu({ user, children }: UserContextMenuProps) {
 
                 {isFriend && (
                     <ContextMenuItem
-                        onClick={handleRemoveFriend}
+                        onClick={(event) => {
+                            event.stopPropagation()
+                            handleRemoveFriend()
+                        }}
                         className="text-destructive focus:text-destructive"
                         disabled={removeFriendPending}
                     >

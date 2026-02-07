@@ -3,6 +3,7 @@ package server
 
 import (
 	"encoding/json"
+	"time"
 	"vibeshift/internal/models"
 	"vibeshift/internal/notifications"
 
@@ -243,6 +244,21 @@ func (s *Server) SendMessage(c *fiber.Ctx) error {
 			UserID:         userID,
 			Username:       message.Sender.Username,
 			Payload:        message,
+		})
+	}
+
+	// Also notify participants over the general notifications websocket so message lists
+	// and unread counters update even when users are not inside the chat page.
+	for _, participant := range conv.Participants {
+		if participant.ID == userID {
+			continue
+		}
+		s.publishUserEvent(participant.ID, "message_received", map[string]interface{}{
+			"conversation_id": conv.ID,
+			"message_id":      message.ID,
+			"from_user":       userSummaryPtr(message.Sender),
+			"preview":         message.Content,
+			"created_at":      time.Now().UTC().Format(time.RFC3339Nano),
 		})
 	}
 

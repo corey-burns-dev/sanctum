@@ -1,23 +1,17 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Gamepad2, Layers, Spade, Trophy, UserCircle, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { apiClient } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { getCurrentUser } from '@/hooks'
+import { gameKeys, getCurrentUser } from '@/hooks'
 
 const GAME_CATEGORIES = [
     {
         name: 'Classic Board Games',
         icon: <Layers className="w-5 h-5 text-blue-500" />,
         games: [
-            {
-                id: 'tictactoe',
-                name: 'Tic-Tac-Toe',
-                description: '3x3 Strategy',
-                reward: '+10 VP',
-                color: 'primary',
-            },
             {
                 id: 'connect4',
                 name: 'Connect Four',
@@ -139,14 +133,29 @@ interface GameRoom {
 export default function Games() {
     const navigate = useNavigate()
     const currentUser = getCurrentUser()
+    const queryClient = useQueryClient()
 
     const { data: activeRooms, isLoading } = useQuery({
-        queryKey: ['gameRooms', 'active'],
+        queryKey: gameKeys.roomsActive(),
         queryFn: () => apiClient.getActiveGameRooms(),
+        refetchInterval: 2000,
+        refetchIntervalInBackground: true,
+        refetchOnWindowFocus: true,
     })
 
+    const closeRoom = async (roomId: number) => {
+        try {
+            await apiClient.leaveGameRoom(roomId)
+            await queryClient.invalidateQueries({ queryKey: gameKeys.roomsActive() })
+            toast.success('Room closed')
+        } catch (error) {
+            console.error('Failed to close room', error)
+            toast.error('Failed to close room')
+        }
+    }
+
     const handlePlayNow = async (type: string) => {
-        if (type === 'tictactoe' || type === 'connect4') {
+        if (type === 'connect4') {
             try {
                 // Fetch fresh rooms at click time to avoid stale cache races.
                 const freshRooms = await apiClient.getActiveGameRooms(type)
@@ -196,7 +205,18 @@ export default function Games() {
 
     const joinableRooms =
         (activeRooms as GameRoom[] | undefined)?.filter(
-            (room) => room.creator_id !== currentUser?.id && !room.opponent_id
+            (room) =>
+                room.status === 'pending' &&
+                room.creator_id !== currentUser?.id &&
+                !room.opponent_id
+        ) ?? []
+
+    const myPendingRooms =
+        (activeRooms as GameRoom[] | undefined)?.filter(
+            (room) =>
+                room.status === 'pending' &&
+                room.creator_id === currentUser?.id &&
+                !room.opponent_id
         ) ?? []
 
     return (
@@ -304,43 +324,99 @@ export default function Games() {
                                         />
                                     ))}
                                 </div>
-                            ) : joinableRooms.length > 0 ? (
-                                <div className="space-y-3">
-                                    {joinableRooms.map((room: GameRoom) => (
-                                        <div
-                                            key={room.id}
-                                            className="flex items-center justify-between p-3 bg-muted/20 border rounded-xl hover:bg-muted/30 transition-colors"
-                                        >
-                                            <div className="flex flex-col">
-                                                <span className="text-xs font-black uppercase tracking-tighter text-primary">
-                                                    {room.type}
-                                                </span>
-                                                <span className="text-sm font-bold truncate max-w-30">
-                                                    {room.creator.username}'s Room
-                                                </span>
-                                            </div>
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                className="h-8 text-[10px] font-black uppercase"
-                                                onClick={() =>
-                                                    navigate(`/games/${room.type}/${room.id}`)
-                                                }
-                                            >
-                                                Join
-                                            </Button>
-                                        </div>
-                                    ))}
-                                </div>
                             ) : (
-                                <div
-                                    key="no-active-rooms"
-                                    className="bg-card/50 p-2 rounded-lg border flex flex-col items-center"
-                                >
-                                    <p className="text-[10px] font-bold uppercase text-muted-foreground">
-                                        No Active Rooms
-                                    </p>
-                                    <p className="text-xs font-bold">Start a new game!</p>
+                                <div className="space-y-4">
+                                    {myPendingRooms.length > 0 && (
+                                        <div className="space-y-3">
+                                            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                                                Your Open Rooms
+                                            </p>
+                                            {myPendingRooms.map((room: GameRoom) => (
+                                                <div
+                                                    key={room.id}
+                                                    className="flex items-center justify-between p-3 bg-primary/5 border border-primary/30 rounded-xl"
+                                                >
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xs font-black uppercase tracking-tighter text-primary">
+                                                            {room.type}
+                                                        </span>
+                                                        <span className="text-sm font-bold truncate max-w-30">
+                                                            Waiting for opponent
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            className="h-8 text-[10px] font-black uppercase"
+                                                            onClick={() =>
+                                                                navigate(
+                                                                    `/games/${room.type}/${room.id}`
+                                                                )
+                                                            }
+                                                        >
+                                                            Open
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="destructive"
+                                                            className="h-8 text-[10px] font-black uppercase"
+                                                            onClick={() => void closeRoom(room.id)}
+                                                        >
+                                                            Close
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {joinableRooms.length > 0 && (
+                                        <div className="space-y-3">
+                                            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                                                Joinable Rooms
+                                            </p>
+                                            {joinableRooms.map((room: GameRoom) => (
+                                                <div
+                                                    key={room.id}
+                                                    className="flex items-center justify-between p-3 bg-muted/20 border rounded-xl hover:bg-muted/30 transition-colors"
+                                                >
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xs font-black uppercase tracking-tighter text-primary">
+                                                            {room.type}
+                                                        </span>
+                                                        <span className="text-sm font-bold truncate max-w-30">
+                                                            {room.creator.username}'s Room
+                                                        </span>
+                                                    </div>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-8 text-[10px] font-black uppercase"
+                                                        onClick={() =>
+                                                            navigate(
+                                                                `/games/${room.type}/${room.id}`
+                                                            )
+                                                        }
+                                                    >
+                                                        Join
+                                                    </Button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {myPendingRooms.length === 0 && joinableRooms.length === 0 && (
+                                        <div
+                                            key="no-active-rooms"
+                                            className="bg-card/50 p-2 rounded-lg border flex flex-col items-center"
+                                        >
+                                            <p className="text-[10px] font-bold uppercase text-muted-foreground">
+                                                No Active Rooms
+                                            </p>
+                                            <p className="text-xs font-bold">Start a new game!</p>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </section>

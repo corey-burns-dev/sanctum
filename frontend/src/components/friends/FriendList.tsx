@@ -4,9 +4,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useCreateConversation } from '@/hooks/useChat'
 import { useFriends, useRemoveFriend } from '@/hooks/useFriends'
+import { usePresenceStore } from '@/hooks/usePresence'
 
 export function FriendList() {
     const { data: friends, isLoading } = useFriends()
+    const onlineUserIds = usePresenceStore((state) => state.onlineUserIds)
     const removeFriend = useRemoveFriend()
     const createConversation = useCreateConversation()
     const navigate = useNavigate()
@@ -56,9 +58,13 @@ export function FriendList() {
                         <div className="flex-1 overflow-hidden">
                             <CardTitle className="text-base truncate">{friend.username}</CardTitle>
                             <CardDescription className="truncate text-xs">
-                                {friend.email}
+                                {onlineUserIds.has(friend.id) ? 'Online now' : friend.email}
                             </CardDescription>
                         </div>
+                        <span
+                            className={`h-2.5 w-2.5 rounded-full ${onlineUserIds.has(friend.id) ? 'bg-emerald-500' : 'bg-gray-400'}`}
+                            title={onlineUserIds.has(friend.id) ? 'Online' : 'Offline'}
+                        />
                     </CardHeader>
                     <CardContent>
                         <div className="flex gap-2 mt-2">

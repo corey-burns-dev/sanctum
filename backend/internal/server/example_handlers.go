@@ -3,9 +3,10 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"strconv"
-	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"
@@ -32,57 +33,103 @@ func (s *Server) GetUserCached(c *fiber.Ctx) error {
 }
 
 // WebsocketHandler returns a websocket handler that registers connections with the Hub.
-// Clients should connect and send an initial auth message: "user:<id>"
+// Authentication is handled by route middleware and userID is read from connection locals.
 func (s *Server) WebsocketHandler() fiber.Handler {
 	return websocket.New(func(conn *websocket.Conn) {
-		// Expect the client to send an auth message first in the form: "user:<id>"
-		_, msg, err := conn.ReadMessage()
-		if err != nil {
-			if cerr := conn.Close(); cerr != nil {
-				log.Printf("websocket read auth error, close failed: %v", cerr)
-			}
-			return
-		}
-		txt := string(msg)
-		if !strings.HasPrefix(txt, "user:") {
-			if werr := conn.WriteMessage(websocket.TextMessage, []byte("first message must be auth: user:<id>")); werr != nil {
-				log.Printf("websocket write error: %v", werr)
-			}
+		userIDVal := conn.Locals("userID")
+		if userIDVal == nil {
 			if cerr := conn.Close(); cerr != nil {
 				log.Printf("websocket close error: %v", cerr)
 			}
 			return
 		}
-		idStr := strings.TrimPrefix(txt, "user:")
-		id64, err := strconv.ParseUint(idStr, 10, 32)
-		if err != nil {
-			if werr := conn.WriteMessage(websocket.TextMessage, []byte("invalid user id")); werr != nil {
-				log.Printf("websocket write error: %v", werr)
-			}
+		uid, ok := userIDVal.(uint)
+		if !ok {
 			if cerr := conn.Close(); cerr != nil {
 				log.Printf("websocket close error: %v", cerr)
 			}
 			return
 		}
-		uid := uint(id64)
 
 		// Register connection
+		wasOnline := false
 		if s.hub != nil {
+			wasOnline = s.hub.IsOnline(uid)
 			s.hub.Register(uid, conn)
-			defer s.hub.Unregister(uid, conn)
 		}
+		if !wasOnline {
+			s.notifyFriendsPresence(uid, "online")
+		}
+		s.sendFriendsOnlineSnapshot(conn, uid)
 
-		// Read loop (publish messages to user's notification channel)
+		// Read loop keeps the connection alive; server notifications are pushed via Hub.
 		for {
-			_, msg, err := conn.ReadMessage()
+			_, _, err := conn.ReadMessage()
 			if err != nil {
 				break
 			}
-			if s.notifier != nil {
-				if perr := s.notifier.PublishUser(context.Background(), uid, string(msg)); perr != nil {
-					log.Printf("failed to publish user message: %v", perr)
-				}
+		}
+
+		if s.hub != nil {
+			s.hub.Unregister(uid, conn)
+			if !s.hub.IsOnline(uid) {
+				s.notifyFriendsPresence(uid, "offline")
 			}
 		}
 	})
+}
+
+func (s *Server) notifyFriendsPresence(userID uint, status string) {
+	if s.friendRepo == nil {
+		return
+	}
+	friends, err := s.friendRepo.GetFriends(context.Background(), userID)
+	if err != nil {
+		log.Printf("failed to load friends for presence event: %v", err)
+		return
+	}
+	user, err := s.userRepo.GetByID(context.Background(), userID)
+	if err != nil {
+		log.Printf("failed to load user for presence event: %v", err)
+		return
+	}
+	for _, friend := range friends {
+		s.publishUserEvent(friend.ID, "friend_presence_changed", map[string]interface{}{
+			"user_id":    user.ID,
+			"username":   user.Username,
+			"avatar":     user.Avatar,
+			"status":     status,
+			"updated_at": time.Now().UTC().Format(time.RFC3339Nano),
+		})
+	}
+}
+
+func (s *Server) sendFriendsOnlineSnapshot(conn *websocket.Conn, userID uint) {
+	if s.friendRepo == nil || s.hub == nil {
+		return
+	}
+	friends, err := s.friendRepo.GetFriends(context.Background(), userID)
+	if err != nil {
+		log.Printf("failed to load friends for online snapshot: %v", err)
+		return
+	}
+	onlineFriendIDs := make([]uint, 0, len(friends))
+	for _, friend := range friends {
+		if s.hub.IsOnline(friend.ID) {
+			onlineFriendIDs = append(onlineFriendIDs, friend.ID)
+		}
+	}
+	msg, err := json.Marshal(map[string]interface{}{
+		"type": "friends_online_snapshot",
+		"payload": map[string]interface{}{
+			"user_ids": onlineFriendIDs,
+		},
+	})
+	if err != nil {
+		log.Printf("failed to marshal friends online snapshot: %v", err)
+		return
+	}
+	if err := conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+		log.Printf("failed to write friends online snapshot: %v", err)
+	}
 }
