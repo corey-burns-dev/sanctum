@@ -1,12 +1,13 @@
 // WebSocket hook for real-time chat
 
+import type { Message, User } from '@/api/types'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Message, User } from '@/api/types'
 
 interface ChatWebSocketMessage {
     type:
         | 'message'
+        | 'room_message'
         | 'typing'
         | 'presence'
         | 'connected'
@@ -16,6 +17,7 @@ interface ChatWebSocketMessage {
         | 'connected_users'
         | 'participant_joined'
         | 'participant_left'
+        | 'chatroom_presence'
     conversation_id?: number
     user_id?: number
     username?: string
@@ -27,28 +29,50 @@ interface ChatWebSocketMessage {
 interface UseChatWebSocketOptions {
     conversationId: number
     enabled?: boolean
+    autoJoinConversation?: boolean
+    /** All room IDs the user has open as tabs — the hook stays joined to all of them */
+    joinedRoomIds?: number[]
     onMessage?: (message: Message) => void
+    onRoomMessage?: (message: Message, conversationId: number) => void
     onTyping?: (userId: number, username: string, isTyping: boolean) => void
     onPresence?: (userId: number, username: string, status: string) => void
     onConnectedUsers?: (userIds: number[]) => void
     onParticipantsUpdate?: (participants: User[]) => void
+    onChatroomPresence?: (payload: {
+        conversation_id: number
+        participants: User[]
+        member_count?: number
+        user_id?: number
+        username?: string
+        action?: string
+        online_user_ids?: number[]
+    }) => void
 }
 
 export function useChatWebSocket({
     conversationId,
     enabled = true,
+    autoJoinConversation = true,
+    joinedRoomIds = [],
     onMessage,
+    onRoomMessage,
     onTyping,
     onPresence,
     onConnectedUsers,
     onParticipantsUpdate,
+    onChatroomPresence,
 }: UseChatWebSocketOptions) {
     const [isConnected, setIsConnected] = useState(false)
-    const [isJoined, setIsJoined] = useState(false)
+    const [joinedSet, setJoinedSet] = useState<Set<number>>(new Set())
     const wsRef = useRef<WebSocket | null>(null)
     const queryClient = useQueryClient()
     const reconnectTimeoutRef = useRef<number | undefined>(undefined)
     const currentUserRef = useRef<{ id: number; username: string } | null>(null)
+    const autoJoinConversationRef = useRef(autoJoinConversation)
+    const conversationIdRef = useRef(conversationId)
+    const joinedRoomsRef = useRef<Set<number>>(new Set())
+
+    const isJoined = joinedSet.has(conversationId)
 
     // Keep latest callbacks in refs to avoid reconnection on render
     const onMessageRef = useRef(onMessage)
@@ -56,6 +80,8 @@ export function useChatWebSocket({
     const onPresenceRef = useRef(onPresence)
     const onConnectedUsersRef = useRef(onConnectedUsers)
     const onParticipantsUpdateRef = useRef(onParticipantsUpdate)
+    const onRoomMessageRef = useRef(onRoomMessage)
+    const onChatroomPresenceRef = useRef(onChatroomPresence)
 
     useEffect(() => {
         onMessageRef.current = onMessage
@@ -63,7 +89,25 @@ export function useChatWebSocket({
         onPresenceRef.current = onPresence
         onConnectedUsersRef.current = onConnectedUsers
         onParticipantsUpdateRef.current = onParticipantsUpdate
-    }, [onMessage, onTyping, onPresence, onConnectedUsers, onParticipantsUpdate])
+        onRoomMessageRef.current = onRoomMessage
+        onChatroomPresenceRef.current = onChatroomPresence
+    }, [
+        onMessage,
+        onTyping,
+        onPresence,
+        onConnectedUsers,
+        onParticipantsUpdate,
+        onRoomMessage,
+        onChatroomPresence,
+    ])
+
+    useEffect(() => {
+        autoJoinConversationRef.current = autoJoinConversation
+    }, [autoJoinConversation])
+
+    useEffect(() => {
+        conversationIdRef.current = conversationId
+    }, [conversationId])
 
     const connect = useCallback(() => {
         if (!enabled) return
@@ -111,13 +155,15 @@ export function useChatWebSocket({
                 )
             }
 
-            // Join the conversation
-            ws.send(
-                JSON.stringify({
-                    type: 'join',
-                    conversation_id: conversationId,
-                })
-            )
+            // Re-join all rooms that were open as tabs (+ active conversation)
+            const roomsToJoin = new Set(joinedRoomsRef.current)
+            const convId = conversationIdRef.current
+            if (autoJoinConversationRef.current && convId > 0) {
+                roomsToJoin.add(convId)
+            }
+            for (const roomId of roomsToJoin) {
+                ws.send(JSON.stringify({ type: 'join', conversation_id: roomId }))
+            }
         }
 
         ws.onmessage = (event) => {
@@ -139,21 +185,27 @@ export function useChatWebSocket({
                     }
                 }
 
+                const activeConvId = conversationIdRef.current
+
                 switch (data.type) {
                     case 'connected':
                         break
 
-                    case 'joined':
-                        setIsJoined(true)
-                        // Refetch messages to get initial state
+                    case 'joined': {
+                        const joinedId = data.conversation_id || activeConvId
+                        if (joinedId) {
+                            joinedRoomsRef.current.add(joinedId)
+                            setJoinedSet(new Set(joinedRoomsRef.current))
+                        }
                         queryClient.refetchQueries({
-                            queryKey: ['chat', 'messages', conversationId],
+                            queryKey: ['chat', 'messages', joinedId],
                         })
                         break
+                    }
 
                     case 'message':
                         // Add message to cache
-                        if (data.payload && data.conversation_id === conversationId) {
+                        if (data.payload && data.conversation_id === activeConvId) {
                             const message = data.payload as Message
                             let msgMetadata: Record<string, unknown> | undefined = message.metadata
                             if (typeof msgMetadata === 'string') {
@@ -164,7 +216,7 @@ export function useChatWebSocket({
 
                             // Update messages cache
                             queryClient.setQueryData<Message[]>(
-                                ['chat', 'messages', conversationId],
+                                ['chat', 'messages', activeConvId],
                                 (old) => {
                                     if (!old) return [message]
 
@@ -210,6 +262,15 @@ export function useChatWebSocket({
                         }
                         break
 
+                    case 'room_message':
+                        if (data.payload && typeof data.conversation_id === 'number') {
+                            const roomMessage = data.payload as Message
+                            if (onRoomMessageRef.current) {
+                                onRoomMessageRef.current(roomMessage, data.conversation_id)
+                            }
+                        }
+                        break
+
                     case 'typing':
                         if (data.payload && onTypingRef.current) {
                             const { user_id, username, is_typing } = data.payload
@@ -244,10 +305,37 @@ export function useChatWebSocket({
                         }
                         break
 
+                    case 'chatroom_presence':
+                        if (data.payload && onChatroomPresenceRef.current) {
+                            const payload = data.payload as {
+                                conversation_id: number
+                                participants?: User[]
+                                member_count?: number
+                                user_id?: number
+                                username?: string
+                                action?: string
+                                online_user_ids?: number[]
+                            }
+                            onChatroomPresenceRef.current({
+                                conversation_id: payload.conversation_id,
+                                participants: Array.isArray(payload.participants)
+                                    ? payload.participants
+                                    : [],
+                                member_count: payload.member_count,
+                                user_id: payload.user_id,
+                                username: payload.username,
+                                action: payload.action,
+                                online_user_ids: Array.isArray(payload.online_user_ids)
+                                    ? payload.online_user_ids
+                                    : [],
+                            })
+                        }
+                        break
+
                     case 'read':
                         // Invalidate messages to refresh read status
                         queryClient.invalidateQueries({
-                            queryKey: ['chat', 'messages', conversationId],
+                            queryKey: ['chat', 'messages', activeConvId],
                         })
                         break
                 }
@@ -266,8 +354,10 @@ export function useChatWebSocket({
             if (ws !== wsRef.current) return
 
             console.log('WebSocket disconnected:', event.code, event.reason)
+            wsRef.current = null
             setIsConnected(false)
-            setIsJoined(false)
+            joinedRoomsRef.current.clear()
+            setJoinedSet(new Set())
 
             // Attempt to reconnect after 3 seconds if still enabled
             if (enabled) {
@@ -276,38 +366,63 @@ export function useChatWebSocket({
                 }, 3000)
             }
         }
-    }, [conversationId, enabled, queryClient])
+    }, [enabled, queryClient]) // NOTE: no conversationId — connection is persistent
 
-    // Connect on mount and when conversation changes
+    // Sync joined rooms with open tabs — join new ones, leave closed ones
+    useEffect(() => {
+        if (!isConnected) return
+        const ws = wsRef.current
+        if (!ws || ws.readyState !== WebSocket.OPEN) return
+
+        const desired = new Set(joinedRoomIds)
+        // Also include the active conversation if auto-join is on
+        if (autoJoinConversation && conversationId > 0) {
+            desired.add(conversationId)
+        }
+
+        const current = joinedRoomsRef.current
+
+        // Join rooms that are desired but not yet joined
+        for (const roomId of desired) {
+            if (!current.has(roomId)) {
+                ws.send(JSON.stringify({ type: 'join', conversation_id: roomId }))
+            }
+        }
+
+        // Leave rooms that are joined but no longer desired
+        for (const roomId of current) {
+            if (!desired.has(roomId)) {
+                ws.send(JSON.stringify({ type: 'leave', conversation_id: roomId }))
+                current.delete(roomId)
+            }
+        }
+
+        // Update ref to match desired (joined confirmations come via 'joined' messages)
+        for (const roomId of desired) {
+            current.add(roomId)
+        }
+        setJoinedSet(new Set(current))
+    }, [joinedRoomIds, conversationId, isConnected, autoJoinConversation])
+
+    // Connect on mount (persistent — does not depend on conversationId)
     useEffect(() => {
         connect()
 
         return () => {
-            // Leave conversation before disconnecting
-            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                wsRef.current.send(
-                    JSON.stringify({
-                        type: 'leave',
-                        conversation_id: conversationId,
-                    })
-                )
-            }
-
-            // Close connection
             if (wsRef.current) {
                 wsRef.current.close()
                 wsRef.current = null
             }
 
-            // Clear reconnect timeout
             if (reconnectTimeoutRef.current) {
                 clearTimeout(reconnectTimeoutRef.current)
             }
 
-            setIsJoined(false)
+            joinedRoomsRef.current.clear()
+            setJoinedSet(new Set())
             setIsConnected(false)
         }
-    }, [conversationId, connect])
+    }, [connect])
 
     // Send typing indicator
     const sendTyping = useCallback(
@@ -316,13 +431,13 @@ export function useChatWebSocket({
                 wsRef.current.send(
                     JSON.stringify({
                         type: 'typing',
-                        conversation_id: conversationId,
+                        conversation_id: conversationIdRef.current,
                         is_typing: isTyping,
                     })
                 )
             }
         },
-        [conversationId, isConnected, isJoined]
+        [isConnected, isJoined]
     )
 
     // Send message via WebSocket (alternative to HTTP)
@@ -332,13 +447,13 @@ export function useChatWebSocket({
                 wsRef.current.send(
                     JSON.stringify({
                         type: 'message',
-                        conversation_id: conversationId,
+                        conversation_id: conversationIdRef.current,
                         content,
                     })
                 )
             }
         },
-        [conversationId, isConnected, isJoined]
+        [isConnected, isJoined]
     )
 
     // Mark as read
@@ -347,11 +462,11 @@ export function useChatWebSocket({
             wsRef.current.send(
                 JSON.stringify({
                     type: 'read',
-                    conversation_id: conversationId,
+                    conversation_id: conversationIdRef.current,
                 })
             )
         }
-    }, [conversationId, isConnected, isJoined])
+    }, [isConnected, isJoined])
 
     return {
         isConnected,

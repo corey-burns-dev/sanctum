@@ -1,7 +1,5 @@
 // Chat hooks with TanStack Query
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
 import { apiClient } from '@/api/client'
 import type {
     CreateConversationRequest,
@@ -9,6 +7,7 @@ import type {
     PaginationParams,
     SendMessageRequest,
 } from '@/api/types'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { handleAuthOrFKError } from '../lib/handleAuthOrFKError'
 import { getCurrentUser } from './useUsers'
 
@@ -67,23 +66,21 @@ export function useJoinChatroom() {
     })
 }
 
-export function useConversation(id: number) {
+export function useConversation(id: number, options?: { enabled?: boolean }) {
     return useQuery({
         queryKey: chatKeys.conversation(id),
         queryFn: () => apiClient.getConversation(id),
-        enabled: id > 0,
+        enabled: (options?.enabled ?? true) && id > 0,
     })
 }
 
 export function useCreateConversation() {
     const queryClient = useQueryClient()
-    const navigate = useNavigate()
 
     return useMutation({
         mutationFn: (data: CreateConversationRequest) => apiClient.createConversation(data),
-        onSuccess: (conversation) => {
+        onSuccess: (_conversation) => {
             queryClient.invalidateQueries({ queryKey: chatKeys.conversations() })
-            navigate(`/chat/${conversation.id}`)
         },
         onError: (error) => {
             handleAuthOrFKError(error)
@@ -108,15 +105,36 @@ export function useMarkAsRead() {
     })
 }
 
+export function useLeaveConversation() {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: (conversationId: number) => apiClient.leaveConversation(conversationId),
+        onSuccess: (_resp, conversationId) => {
+            queryClient.invalidateQueries({ queryKey: chatKeys.conversations() })
+            queryClient.invalidateQueries({ queryKey: chatKeys.chatrooms() })
+            queryClient.removeQueries({ queryKey: chatKeys.messages(conversationId) })
+            queryClient.removeQueries({ queryKey: chatKeys.conversation(conversationId) })
+        },
+        onError: (error) => {
+            handleAuthOrFKError(error)
+        },
+    })
+}
+
 // ===== Messages =====
 
-export function useMessages(conversationId: number, params?: PaginationParams) {
+export function useMessages(
+    conversationId: number,
+    params?: PaginationParams,
+    options?: { enabled?: boolean }
+) {
     return useQuery({
         queryKey: params
             ? [...chatKeys.messages(conversationId), params]
             : chatKeys.messages(conversationId),
         queryFn: () => apiClient.getMessages(conversationId, params),
-        enabled: conversationId > 0,
+        enabled: (options?.enabled ?? true) && conversationId > 0,
     })
 }
 

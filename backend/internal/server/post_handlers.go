@@ -2,9 +2,7 @@
 package server
 
 import (
-	"encoding/json"
 	"errors"
-	"log"
 	"time"
 	"vibeshift/internal/models"
 
@@ -70,22 +68,11 @@ func (s *Server) CreatePost(c *fiber.Ctx) error {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
 
-	if s.notifier != nil {
-		event := map[string]interface{}{
-			"type": "post_created",
-			"payload": map[string]interface{}{
-				"post_id":    post.ID,
-				"author_id":  post.UserID,
-				"created_at": time.Now().UTC().Format(time.RFC3339Nano),
-			},
-		}
-		eventJSON, marshalErr := json.Marshal(event)
-		if marshalErr != nil {
-			log.Printf("failed to marshal post_created event: %v", marshalErr)
-		} else if publishErr := s.notifier.PublishBroadcast(c.Context(), string(eventJSON)); publishErr != nil {
-			log.Printf("failed to publish post_created event: %v", publishErr)
-		}
-	}
+	s.publishBroadcastEvent("post_created", map[string]interface{}{
+		"post_id":    post.ID,
+		"author_id":  post.UserID,
+		"created_at": time.Now().UTC().Format(time.RFC3339Nano),
+	})
 
 	return c.Status(fiber.StatusCreated).JSON(post)
 }
@@ -285,22 +272,12 @@ func (s *Server) LikePost(c *fiber.Ctx) error {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
 
-	if s.notifier != nil {
-		event := map[string]interface{}{
-			"type": "post_reaction_updated",
-			"payload": map[string]interface{}{
-				"post_id":        post.ID,
-				"likes_count":    post.LikesCount,
-				"comments_count": post.CommentsCount,
-				"updated_at":     time.Now().UTC().Format(time.RFC3339Nano),
-			},
-		}
-		if eventJSON, marshalErr := json.Marshal(event); marshalErr != nil {
-			log.Printf("failed to marshal post_reaction_updated event: %v", marshalErr)
-		} else if publishErr := s.notifier.PublishBroadcast(c.Context(), string(eventJSON)); publishErr != nil {
-			log.Printf("failed to publish post_reaction_updated event: %v", publishErr)
-		}
-	}
+	s.publishBroadcastEvent("post_reaction_updated", map[string]interface{}{
+		"post_id":        post.ID,
+		"likes_count":    post.LikesCount,
+		"comments_count": post.CommentsCount,
+		"updated_at":     time.Now().UTC().Format(time.RFC3339Nano),
+	})
 
 	return c.JSON(post)
 }
@@ -325,22 +302,12 @@ func (s *Server) UnlikePost(c *fiber.Ctx) error {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
 
-	if s.notifier != nil {
-		event := map[string]interface{}{
-			"type": "post_reaction_updated",
-			"payload": map[string]interface{}{
-				"post_id":        post.ID,
-				"likes_count":    post.LikesCount,
-				"comments_count": post.CommentsCount,
-				"updated_at":     time.Now().UTC().Format(time.RFC3339Nano),
-			},
-		}
-		if eventJSON, marshalErr := json.Marshal(event); marshalErr != nil {
-			log.Printf("failed to marshal post_reaction_updated event: %v", marshalErr)
-		} else if publishErr := s.notifier.PublishBroadcast(c.Context(), string(eventJSON)); publishErr != nil {
-			log.Printf("failed to publish post_reaction_updated event: %v", publishErr)
-		}
-	}
+	s.publishBroadcastEvent("post_reaction_updated", map[string]interface{}{
+		"post_id":        post.ID,
+		"likes_count":    post.LikesCount,
+		"comments_count": post.CommentsCount,
+		"updated_at":     time.Now().UTC().Format(time.RFC3339Nano),
+	})
 
 	return c.JSON(post)
 }

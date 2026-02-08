@@ -3,6 +3,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 	"vibeshift/internal/models"
 	"vibeshift/internal/notifications"
@@ -37,6 +38,42 @@ func (s *Server) CreateConversation(c *fiber.Ctx) error {
 	if len(req.ParticipantIDs) == 0 {
 		return models.RespondWithError(c, fiber.StatusBadRequest,
 			models.NewValidationError("At least one participant is required"))
+	}
+
+	// For direct messages, reuse existing 1:1 conversation when present.
+	if !req.IsGroup && len(req.ParticipantIDs) == 1 && req.ParticipantIDs[0] != userID && s.db != nil {
+		otherUserID := req.ParticipantIDs[0]
+		var existing models.Conversation
+		findErr := s.db.WithContext(ctx).
+			Model(&models.Conversation{}).
+			Joins(
+				"JOIN conversation_participants cp_self ON cp_self.conversation_id = conversations.id AND cp_self.user_id = ?",
+				userID,
+			).
+			Joins(
+				"JOIN conversation_participants cp_other ON cp_other.conversation_id = conversations.id AND cp_other.user_id = ?",
+				otherUserID,
+			).
+			Where("conversations.is_group = ?", false).
+			Where(
+				"NOT EXISTS (SELECT 1 FROM conversation_participants cp_extra WHERE cp_extra.conversation_id = conversations.id AND cp_extra.user_id NOT IN (?, ?))",
+				userID,
+				otherUserID,
+			).
+			Order("conversations.updated_at DESC").
+			First(&existing).Error
+		switch {
+		case findErr == nil:
+			existingConv, err := s.chatRepo.GetConversation(ctx, existing.ID)
+			if err != nil {
+				return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+			}
+			return c.Status(fiber.StatusCreated).JSON(existingConv)
+		case errors.Is(findErr, gorm.ErrRecordNotFound):
+			// Create a new DM below.
+		default:
+			return models.RespondWithError(c, fiber.StatusInternalServerError, findErr)
+		}
 	}
 
 	conv := &models.Conversation{
@@ -79,44 +116,15 @@ func (s *Server) GetConversations(c *fiber.Ctx) error {
 	ctx := c.Context()
 	userID := c.Locals("userID").(uint)
 
-	// Get all group conversations
-	var allGroupConversations []*models.Conversation
-	err := s.db.WithContext(ctx).
-		Where("is_group = ?", true).
-		Preload("Participants").
-		Preload("Messages", func(db *gorm.DB) *gorm.DB {
-			return db.Order("created_at DESC").Limit(1)
-		}).
-		Preload("Messages.Sender").
-		Order("name ASC").
-		Find(&allGroupConversations).Error
-	if err != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
-	}
-
-	// Auto-add user to any group conversations they're not in
-	for _, conv := range allGroupConversations {
-		isParticipant := false
-		for _, p := range conv.Participants {
-			if p.ID == userID {
-				isParticipant = true
-				break
-			}
-		}
-		// If user is not a participant, add them (ignore errors if already exists)
-		if !isParticipant {
-			// Use OnConflict to avoid duplicate key errors
-			s.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&models.ConversationParticipant{
-				ConversationID: conv.ID,
-				UserID:         userID,
-			})
-		}
-	}
-
-	// Get user's conversations (now includes all group conversations)
 	conversations, err := s.chatRepo.GetUserConversations(ctx, userID)
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	for _, conv := range conversations {
+		if conv.IsGroup {
+			conv.Participants = s.filterOnlineParticipants(conv.Participants)
+		}
 	}
 
 	return c.JSON(conversations)
@@ -146,15 +154,13 @@ func (s *Server) GetConversation(c *fiber.Ctx) error {
 		}
 	}
 
-	// Auto-add user to group conversations if not already a participant
-	if !isParticipant && conv.IsGroup {
-		_ = s.chatRepo.AddParticipant(ctx, uint(convID), userID)
-		isParticipant = true // Trust that add succeeded
-	}
-
 	if !isParticipant {
 		return models.RespondWithError(c, fiber.StatusForbidden,
 			models.NewUnauthorizedError("You are not a participant in this conversation"))
+	}
+
+	if conv.IsGroup {
+		conv.Participants = s.filterOnlineParticipants(conv.Participants)
 	}
 
 	return c.JSON(conv)
@@ -203,12 +209,6 @@ func (s *Server) SendMessage(c *fiber.Ctx) error {
 		}
 	}
 
-	// Auto-add user to group conversations if not already a participant
-	if !isParticipant && conv.IsGroup {
-		_ = s.chatRepo.AddParticipant(ctx, uint(convID), userID)
-		isParticipant = true // Trust that add succeeded
-	}
-
 	if !isParticipant {
 		return models.RespondWithError(c, fiber.StatusForbidden,
 			models.NewUnauthorizedError("You are not a participant in this conversation"))
@@ -235,6 +235,10 @@ func (s *Server) SendMessage(c *fiber.Ctx) error {
 	if sender, err := s.userRepo.GetByID(ctx, userID); err == nil {
 		message.Sender = sender
 	}
+	senderUsername := ""
+	if message.Sender != nil {
+		senderUsername = message.Sender.Username
+	}
 
 	// Broadcast message to all WebSocket-connected participants in real-time via ChatHub
 	if s.chatHub != nil {
@@ -242,24 +246,39 @@ func (s *Server) SendMessage(c *fiber.Ctx) error {
 			Type:           "message",
 			ConversationID: uint(convID),
 			UserID:         userID,
-			Username:       message.Sender.Username,
+			Username:       senderUsername,
 			Payload:        message,
 		})
 	}
 
-	// Also notify participants over the general notifications websocket so message lists
-	// and unread counters update even when users are not inside the chat page.
-	for _, participant := range conv.Participants {
-		if participant.ID == userID {
-			continue
-		}
-		s.publishUserEvent(participant.ID, "message_received", map[string]interface{}{
-			"conversation_id": conv.ID,
-			"message_id":      message.ID,
-			"from_user":       userSummaryPtr(message.Sender),
-			"preview":         message.Content,
-			"created_at":      time.Now().UTC().Format(time.RFC3339Nano),
+	// For public chatrooms, broadcast room-level realtime updates to all connected users
+	// so room tabs/counters can react even when the room isn't currently open.
+	if conv.IsGroup && s.chatHub != nil {
+		s.chatHub.BroadcastToAllUsers(notifications.ChatMessage{
+			Type:           "room_message",
+			ConversationID: uint(convID),
+			UserID:         userID,
+			Username:       senderUsername,
+			Payload:        message,
 		})
+	}
+
+	// Notify only for direct messages; chatroom/group traffic should not trigger
+	// global bell/toast notifications.
+	if !conv.IsGroup {
+		for _, participant := range conv.Participants {
+			if participant.ID == userID {
+				continue
+			}
+			s.publishUserEvent(participant.ID, "message_received", map[string]interface{}{
+				"conversation_id": conv.ID,
+				"message_id":      message.ID,
+				"is_group":        conv.IsGroup,
+				"from_user":       userSummaryPtr(message.Sender),
+				"preview":         message.Content,
+				"created_at":      time.Now().UTC().Format(time.RFC3339Nano),
+			})
+		}
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(message)
@@ -290,12 +309,6 @@ func (s *Server) GetMessages(c *fiber.Ctx) error {
 			isParticipant = true
 			break
 		}
-	}
-
-	// Auto-add user to group conversations if not already a participant
-	if !isParticipant && conv.IsGroup {
-		_ = s.chatRepo.AddParticipant(ctx, uint(convID), userID)
-		isParticipant = true // Trust that add succeeded
 	}
 
 	if !isParticipant {
@@ -360,6 +373,45 @@ func (s *Server) AddParticipant(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
+// LeaveConversation handles DELETE /api/conversations/:id
+// Removes the current user from a conversation so it no longer appears in their list.
+func (s *Server) LeaveConversation(c *fiber.Ctx) error {
+	ctx := c.Context()
+	userID := c.Locals("userID").(uint)
+	convID, err := c.ParamsInt("id")
+	if err != nil || convID < 0 {
+		return models.RespondWithError(c, fiber.StatusBadRequest,
+			models.NewValidationError("Invalid conversation ID"))
+	}
+
+	conv, err := s.chatRepo.GetConversation(ctx, uint(convID))
+	if err != nil {
+		return models.RespondWithError(c, fiber.StatusNotFound, err)
+	}
+
+	isParticipant := false
+	for _, participant := range conv.Participants {
+		if participant.ID == userID {
+			isParticipant = true
+			break
+		}
+	}
+	if !isParticipant {
+		return models.RespondWithError(c, fiber.StatusForbidden,
+			models.NewUnauthorizedError("You are not a participant in this conversation"))
+	}
+
+	if err := s.chatRepo.RemoveParticipant(ctx, uint(convID), userID); err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	if conv.IsGroup {
+		s.broadcastChatroomPresenceSnapshot(ctx, uint(convID), userID, "", "left_room")
+	}
+
+	return c.JSON(fiber.Map{"message": "Conversation removed"})
+}
+
 // GetAllChatrooms handles GET /api/chatrooms - returns ALL public chatrooms
 func (s *Server) GetAllChatrooms(c *fiber.Ctx) error {
 	ctx := c.Context()
@@ -368,39 +420,6 @@ func (s *Server) GetAllChatrooms(c *fiber.Ctx) error {
 	// Get all group conversations (public chatrooms)
 	var chatrooms []*models.Conversation
 	err := s.db.WithContext(ctx).
-		Where("is_group = ?", true).
-		Preload("Participants").
-		Preload("Messages", func(db *gorm.DB) *gorm.DB {
-			return db.Order("created_at DESC").Limit(1)
-		}).
-		Preload("Messages.Sender").
-		Order("name ASC").
-		Find(&chatrooms).Error
-	if err != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
-	}
-
-	// Auto-add user to any group conversations they're not in
-	for _, conv := range chatrooms {
-		isParticipant := false
-		for _, p := range conv.Participants {
-			if p.ID == userID {
-				isParticipant = true
-				break
-			}
-		}
-		// If user is not a participant, add them (ignore errors if already exists)
-		if !isParticipant {
-			// Use OnConflict to avoid duplicate key errors
-			s.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&models.ConversationParticipant{
-				ConversationID: conv.ID,
-				UserID:         userID,
-			})
-		}
-	}
-
-	// Re-query to get updated Participants list after auto-adding
-	err = s.db.WithContext(ctx).
 		Where("is_group = ?", true).
 		Preload("Participants").
 		Preload("Messages", func(db *gorm.DB) *gorm.DB {
@@ -492,6 +511,8 @@ func (s *Server) JoinChatroom(c *fiber.Ctx) error {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
 
+	s.broadcastChatroomPresenceSnapshot(ctx, uint(roomID), userID, "", "joined_room")
+
 	return c.JSON(fiber.Map{"message": "Joined chatroom successfully"})
 }
 
@@ -536,5 +557,25 @@ func (s *Server) RemoveParticipant(c *fiber.Ctx) error {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
 
+	s.broadcastChatroomPresenceSnapshot(ctx, uint(roomID), userID, user.Username, "removed_participant")
+
 	return c.JSON(fiber.Map{"message": "Participant removed successfully"})
+}
+
+func (s *Server) filterOnlineParticipants(participants []models.User) []models.User {
+	if len(participants) == 0 {
+		return participants
+	}
+
+	if s.chatHub == nil {
+		return []models.User{}
+	}
+
+	online := make([]models.User, 0, len(participants))
+	for _, participant := range participants {
+		if s.chatHub.IsUserOnline(participant.ID) {
+			online = append(online, participant)
+		}
+	}
+	return online
 }

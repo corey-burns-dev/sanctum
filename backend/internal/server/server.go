@@ -219,6 +219,7 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	conversations.Get("/:id/messages", s.GetMessages)
 	conversations.Post("/:id/messages", middleware.RateLimit(s.redis, 15, time.Minute, "send_chat"), s.SendMessage)
 	conversations.Post("/:id/participants", s.AddParticipant)
+	conversations.Delete("/:id", s.LeaveConversation)
 	// Generic /:id route must be last
 	conversations.Get("/:id", s.GetConversation)
 

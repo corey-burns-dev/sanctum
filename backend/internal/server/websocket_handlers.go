@@ -95,30 +95,6 @@ func (s *Server) WebSocketChatHandler() fiber.Handler {
 						if s.isUserParticipant(ctx, userID, convID) {
 							s.chatHub.JoinConversation(userID, convID)
 
-							// Publish presence
-							if s.notifier != nil {
-								if perr := s.notifier.PublishPresence(ctx, convID, userID, username, "online"); perr != nil {
-									log.Printf("publish presence (online) error: %v", perr)
-								}
-							}
-
-							// Get updated participants list and broadcast to all users in conversation
-							if conv, err := s.chatRepo.GetConversation(ctx, convID); err == nil {
-								participantUpdate := notifications.ChatMessage{
-									Type:           "participant_joined",
-									ConversationID: convID,
-									UserID:         userID,
-									Username:       username,
-									Payload: map[string]interface{}{
-										"conversation_id": convID,
-										"user_id":         userID,
-										"username":        username,
-										"participants":    conv.Participants,
-									},
-								}
-								s.chatHub.BroadcastToConversation(convID, participantUpdate)
-							}
-
 							// Send confirmation to user
 							response := notifications.ChatMessage{
 								Type:           "joined",
@@ -136,35 +112,7 @@ func (s *Server) WebSocketChatHandler() fiber.Handler {
 				if convIDFloat, ok := incomingMsg["conversation_id"].(float64); ok {
 					convID := uint(convIDFloat)
 					if s.chatHub != nil {
-						// Get current participants before leaving
-						var currentParticipants []models.User
-						if conv, err := s.chatRepo.GetConversation(ctx, convID); err == nil {
-							currentParticipants = conv.Participants
-						}
-
 						s.chatHub.LeaveConversation(userID, convID)
-
-						// Publish presence
-						if s.notifier != nil {
-							if perr := s.notifier.PublishPresence(ctx, convID, userID, username, "offline"); perr != nil {
-								log.Printf("publish presence (offline) error: %v", perr)
-							}
-						}
-
-						// Broadcast participant_left to all users still in conversation
-						participantUpdate := notifications.ChatMessage{
-							Type:           "participant_left",
-							ConversationID: convID,
-							UserID:         userID,
-							Username:       username,
-							Payload: map[string]interface{}{
-								"conversation_id": convID,
-								"user_id":         userID,
-								"username":        username,
-								"participants":    currentParticipants,
-							},
-						}
-						s.chatHub.BroadcastToConversation(convID, participantUpdate)
 					}
 				}
 
@@ -246,6 +194,16 @@ func (s *Server) WebSocketChatHandler() fiber.Handler {
 								log.Printf("publish chat message error: %v", perr)
 							}
 						}
+
+						if s.chatHub != nil && s.isGroupConversation(ctx, convID) {
+							s.chatHub.BroadcastToAllUsers(notifications.ChatMessage{
+								Type:           "room_message",
+								ConversationID: convID,
+								UserID:         userID,
+								Username:       username,
+								Payload:        message,
+							})
+						}
 					}
 				}
 
@@ -296,6 +254,21 @@ func (s *Server) WebSocketChatHandler() fiber.Handler {
 
 		// Read pump runs in the main handler goroutine (blocking)
 		client.ReadPump()
+
+		// Broadcast offline presence for any rooms the user was in
+		if s.chatHub != nil && !s.chatHub.IsUserOnline(userID) {
+			// User's last connection dropped — broadcast offline status to their rooms
+			var roomIDs []uint
+			s.db.WithContext(ctx).
+				Table("conversation_participants AS cp").
+				Joins("JOIN conversations c ON c.id = cp.conversation_id").
+				Where("cp.user_id = ? AND c.is_group = ?", userID, true).
+				Pluck("cp.conversation_id", &roomIDs)
+			for _, roomID := range roomIDs {
+				s.chatHub.LeaveConversation(userID, roomID)
+				s.broadcastChatroomPresenceSnapshot(ctx, roomID, userID, username, "offline")
+			}
+		}
 	})
 }
 
@@ -358,4 +331,58 @@ func (s *Server) isUserParticipant(ctx context.Context, userID, conversationID u
 		}
 	}
 	return false
+}
+
+func (s *Server) isGroupConversation(ctx context.Context, conversationID uint) bool {
+	var conversation models.Conversation
+	if err := s.db.WithContext(ctx).
+		Select("id", "is_group").
+		First(&conversation, conversationID).Error; err != nil {
+		return false
+	}
+	return conversation.IsGroup
+}
+
+// removeUserFromAllGroupChatrooms is intentionally removed.
+// Chatroom membership is now persistent — users stay in rooms across sessions.
+
+func (s *Server) broadcastChatroomPresenceSnapshot(
+	ctx context.Context,
+	conversationID uint,
+	userID uint,
+	username string,
+	action string,
+) {
+	if s.chatHub == nil {
+		return
+	}
+
+	conv, err := s.chatRepo.GetConversation(ctx, conversationID)
+	if err != nil || !conv.IsGroup {
+		return
+	}
+
+	// Compute which participants are currently online via the ChatHub
+	onlineIDs := make([]uint, 0)
+	for _, p := range conv.Participants {
+		if s.chatHub.IsUserOnline(p.ID) {
+			onlineIDs = append(onlineIDs, p.ID)
+		}
+	}
+
+	s.chatHub.BroadcastToAllUsers(notifications.ChatMessage{
+		Type:           "chatroom_presence",
+		ConversationID: conversationID,
+		UserID:         userID,
+		Username:       username,
+		Payload: map[string]interface{}{
+			"conversation_id": conversationID,
+			"user_id":         userID,
+			"username":        username,
+			"action":          action,
+			"participants":    conv.Participants,
+			"member_count":    len(conv.Participants),
+			"online_user_ids": onlineIDs,
+		},
+	})
 }

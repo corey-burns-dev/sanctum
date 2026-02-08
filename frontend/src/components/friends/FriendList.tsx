@@ -33,7 +33,7 @@ export function FriendList() {
             { participant_ids: [friendId] },
             {
                 onSuccess: (conv) => {
-                    navigate(`/chat/${conv.id}`)
+                    navigate(`/messages/${conv.id}`)
                 },
             }
         )

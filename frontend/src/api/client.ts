@@ -315,6 +315,12 @@ class ApiClient {
         })
     }
 
+    async leaveConversation(id: number): Promise<{ message: string }> {
+        return this.request(`/conversations/${id}`, {
+            method: 'DELETE',
+        })
+    }
+
     async markConversationAsRead(id: number): Promise<{ message: string }> {
         return this.request(`/conversations/${id}/read`, {
             method: 'POST',

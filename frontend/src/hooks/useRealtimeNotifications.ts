@@ -1,12 +1,16 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { create } from 'zustand'
+import { apiClient } from '@/api/client'
 import { usePresenceStore } from '@/hooks/usePresence'
 
 type RealtimeEventType =
     | 'post_created'
     | 'post_reaction_updated'
+    | 'comment_created'
+    | 'comment_updated'
+    | 'comment_deleted'
     | 'message_received'
     | 'friend_request_received'
     | 'friend_request_sent'
@@ -21,6 +25,31 @@ type RealtimeEventType =
 interface RealtimeEvent {
     type?: RealtimeEventType
     payload?: Record<string, unknown>
+}
+
+interface InfinitePostsData {
+    pages: Array<
+        Array<{
+            id: number
+            likes_count?: number
+            comments_count?: number
+        }>
+    >
+    pageParams: unknown[]
+}
+
+interface RealtimeComment {
+    id: number
+    post_id: number
+    content: string
+    user_id: number
+    created_at: string
+    updated_at: string
+    user?: {
+        id?: number
+        username?: string
+        avatar?: string
+    }
 }
 
 export interface AppNotification {
@@ -74,6 +103,15 @@ export function useRealtimeNotifications(enabled = true) {
     const setOffline = usePresenceStore((state) => state.setOffline)
     const setInitialOnlineUsers = usePresenceStore((state) => state.setInitialOnlineUsers)
 
+    const openDirectMessage = useCallback(async (userID: number) => {
+        try {
+            const conv = await apiClient.createConversation({ participant_ids: [userID] })
+            window.location.href = `/messages/${conv.id}`
+        } catch {
+            // Silently ignore failures; user can still navigate manually.
+        }
+    }, [])
+
     useEffect(() => {
         if (!enabled) return
 
@@ -103,18 +141,150 @@ export function useRealtimeNotifications(enabled = true) {
                 const payload = data.payload ?? {}
                 switch (data.type) {
                     case 'post_created':
-                    case 'post_reaction_updated':
                         void queryClient.invalidateQueries({ queryKey: ['posts'] })
                         break
+                    case 'post_reaction_updated': {
+                        const postID = asNumber(payload.post_id)
+                        const likesCount = asNumber(payload.likes_count)
+                        const commentsCount = asNumber(payload.comments_count)
+                        if (!postID || likesCount === null) break
+
+                        queryClient.setQueryData<
+                            { likes_count?: number; comments_count?: number } | undefined
+                        >(['posts', 'detail', postID], (oldPost) => {
+                            if (!oldPost) return oldPost
+                            return {
+                                ...oldPost,
+                                likes_count: likesCount,
+                                comments_count:
+                                    commentsCount ?? (oldPost.comments_count as number | undefined),
+                            }
+                        })
+
+                        const infiniteQueries = queryClient
+                            .getQueryCache()
+                            .findAll({ queryKey: ['posts', 'infinite'] })
+                        for (const query of infiniteQueries) {
+                            queryClient.setQueryData<InfinitePostsData | undefined>(
+                                query.queryKey,
+                                (oldData) => {
+                                    if (!oldData) return oldData
+                                    return {
+                                        ...oldData,
+                                        pages: oldData.pages.map((page) =>
+                                            page.map((post) =>
+                                                post.id === postID
+                                                    ? {
+                                                          ...post,
+                                                          likes_count: likesCount,
+                                                          comments_count:
+                                                              commentsCount ??
+                                                              (post.comments_count as
+                                                                  | number
+                                                                  | undefined),
+                                                      }
+                                                    : post
+                                            )
+                                        ),
+                                    }
+                                }
+                            )
+                        }
+                        break
+                    }
+                    case 'comment_created':
+                    case 'comment_updated':
+                    case 'comment_deleted': {
+                        const postID = asNumber(payload.post_id)
+                        if (!postID) break
+
+                        const commentsCount = asNumber(payload.comments_count)
+                        const commentID = asNumber(payload.comment_id)
+                        const comment = (payload.comment as RealtimeComment | undefined) ?? null
+
+                        queryClient.setQueryData<
+                            { likes_count?: number; comments_count?: number } | undefined
+                        >(['posts', 'detail', postID], (oldPost) => {
+                            if (!oldPost || commentsCount === null) return oldPost
+                            return {
+                                ...oldPost,
+                                comments_count: commentsCount,
+                            }
+                        })
+
+                        const infiniteQueries = queryClient
+                            .getQueryCache()
+                            .findAll({ queryKey: ['posts', 'infinite'] })
+                        for (const query of infiniteQueries) {
+                            queryClient.setQueryData<InfinitePostsData | undefined>(
+                                query.queryKey,
+                                (oldData) => {
+                                    if (!oldData || commentsCount === null) return oldData
+                                    return {
+                                        ...oldData,
+                                        pages: oldData.pages.map((page) =>
+                                            page.map((post) =>
+                                                post.id === postID
+                                                    ? {
+                                                          ...post,
+                                                          comments_count: commentsCount,
+                                                      }
+                                                    : post
+                                            )
+                                        ),
+                                    }
+                                }
+                            )
+                        }
+
+                        queryClient.setQueryData<RealtimeComment[] | undefined>(
+                            ['comments', 'list', postID],
+                            (oldComments) => {
+                                if (!oldComments) return oldComments
+                                if (data.type === 'comment_created' && comment) {
+                                    if (oldComments.some((c) => c.id === comment.id)) {
+                                        return oldComments
+                                    }
+                                    return [comment, ...oldComments]
+                                }
+                                if (data.type === 'comment_updated' && comment) {
+                                    return oldComments.map((c) =>
+                                        c.id === comment.id ? { ...c, ...comment } : c
+                                    )
+                                }
+                                if (data.type === 'comment_deleted') {
+                                    const targetID = commentID ?? comment?.id
+                                    if (!targetID) return oldComments
+                                    return oldComments.filter((c) => c.id !== targetID)
+                                }
+                                return oldComments
+                            }
+                        )
+                        break
+                    }
                     case 'message_received': {
+                        const isGroupMessage = payload.is_group === true
+                        if (isGroupMessage) {
+                            break
+                        }
                         void queryClient.invalidateQueries({ queryKey: ['chat', 'conversations'] })
+                        const path = window.location.pathname
+                        const inMessagingView =
+                            path === '/messages' ||
+                            path.startsWith('/messages/') ||
+                            path === '/chat' ||
+                            path.startsWith('/chat/')
+
+                        if (inMessagingView) {
+                            break
+                        }
+
                         const username = asString(
                             (payload.from_user as Record<string, unknown>)?.username
                         )
                         const preview = asString(payload.preview)
                         if (username) {
                             const desc = preview ? `"${preview}"` : 'New message'
-                            toast.message(`${username} sent a message`, { description: desc })
                             addNotification({
                                 title: `${username} sent a message`,
                                 description: desc,
@@ -170,10 +340,27 @@ export function useRealtimeNotifications(enabled = true) {
 
                         if (status === 'online') {
                             setOnline(friendID)
-                            toast.message(`${username} is online`)
+                            toast.message(`${username} is online`, {
+                                description: 'Tap to open chat',
+                                duration: 7000,
+                                className: 'border border-emerald-500/40',
+                                onClick: () => {
+                                    void openDirectMessage(friendID)
+                                },
+                                action: {
+                                    label: 'Message',
+                                    onClick: () => {
+                                        void openDirectMessage(friendID)
+                                    },
+                                },
+                            })
                         } else if (status === 'offline') {
                             setOffline(friendID)
-                            toast.message(`${username} went offline`)
+                            toast.message(`${username} went offline`, {
+                                description: 'They are currently offline',
+                                duration: 7000,
+                                className: 'border border-slate-500/40',
+                            })
                         }
                         break
                     }
@@ -183,9 +370,8 @@ export function useRealtimeNotifications(enabled = true) {
                                   .map((id) => asNumber(id))
                                   .filter((id): id is number => id !== null)
                             : []
-                        if (userIDs.length > 0) {
-                            setInitialOnlineUsers(userIDs)
-                        }
+                        // Always apply snapshot, even when empty, so stale online badges clear.
+                        setInitialOnlineUsers(userIDs)
                         break
                     }
                 }
@@ -211,5 +397,13 @@ export function useRealtimeNotifications(enabled = true) {
             }
             ws?.close()
         }
-    }, [enabled, queryClient, addNotification, setOnline, setOffline, setInitialOnlineUsers])
+    }, [
+        enabled,
+        queryClient,
+        addNotification,
+        setOnline,
+        setOffline,
+        setInitialOnlineUsers,
+        openDirectMessage,
+    ])
 }

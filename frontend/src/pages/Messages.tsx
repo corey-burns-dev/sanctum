@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { MessageCircle, Send, Users } from 'lucide-react'
+import { MessageCircle, Send, Trash2, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { Conversation, Message, User } from '@/api/types'
@@ -7,7 +7,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { useConversations, useMessages, useSendMessage } from '@/hooks/useChat'
+import {
+    useConversations,
+    useLeaveConversation,
+    useMessages,
+    useSendMessage,
+} from '@/hooks/useChat'
 import { useChatWebSocket } from '@/hooks/useChatWebSocket'
 import { usePresenceStore } from '@/hooks/usePresence'
 import { getCurrentUser } from '@/hooks/useUsers'
@@ -19,6 +24,8 @@ export default function Messages() {
     const [messageTab, setMessageTab] = useState<'all' | 'unread'>('all')
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const typingTimeoutRef = useRef<number | null>(null)
+    const hasHydratedMessagesRef = useRef(false)
+    const lastChimedMessageIdRef = useRef<number | null>(null)
 
     const onlineUserIds = usePresenceStore((state) => state.onlineUserIds)
     const setOnline = usePresenceStore((state) => state.setOnline)
@@ -32,11 +39,20 @@ export default function Messages() {
         error: convError,
     } = useConversations()
 
-    // Filter and memoize conversations to avoid infinite loops
-    const dmConversations = useMemo(
-        () => allConversations.filter((c: Conversation) => !c.is_group),
-        [allConversations]
-    )
+    // Filter and memoize conversations; collapse duplicate DMs by other participant.
+    const dmConversations = useMemo(() => {
+        const directConversations = allConversations.filter((c: Conversation) => !c.is_group)
+        const deduped: Conversation[] = []
+        const seenKeys = new Set<string>()
+        for (const conv of directConversations) {
+            const other = conv.participants?.find((p) => p.id !== currentUser?.id)
+            const key = other ? String(other.id) : `conv:${conv.id}`
+            if (seenKeys.has(key)) continue
+            seenKeys.add(key)
+            deduped.push(conv)
+        }
+        return deduped
+    }, [allConversations, currentUser?.id])
 
     const conversations = useMemo(
         () =>
@@ -55,6 +71,18 @@ export default function Messages() {
         () => conversations.find((c: Conversation) => c.id === selectedConversationId),
         [conversations, selectedConversationId]
     )
+    const canAccessSelectedConversation = Boolean(selectedConversationId && selectedConversation)
+    const selectedConversationOtherUserId = useMemo(
+        () => selectedConversation?.participants?.find((p) => p.id !== currentUser?.id)?.id,
+        [selectedConversation, currentUser?.id]
+    )
+    const isSelectedConversationOtherUserOnline = useMemo(
+        () =>
+            selectedConversationOtherUserId
+                ? onlineUserIds.has(selectedConversationOtherUserId)
+                : false,
+        [onlineUserIds, selectedConversationOtherUserId]
+    )
 
     // Auto-select first conversation if None is in URL
     useEffect(() => {
@@ -63,8 +91,24 @@ export default function Messages() {
         }
     }, [conversations, selectedConversationId, navigate])
 
-    const { data: messages = [], isLoading } = useMessages(selectedConversationId || 0)
+    useEffect(() => {
+        if (!selectedConversationId) return
+        if (convLoading) return
+        if (selectedConversation) return
+
+        const fallbackId = conversations[0]?.id
+        if (fallbackId) {
+            navigate(`/messages/${fallbackId}`, { replace: true })
+            return
+        }
+        navigate('/messages', { replace: true })
+    }, [selectedConversationId, selectedConversation, convLoading, conversations, navigate])
+
+    const { data: messages = [], isLoading } = useMessages(selectedConversationId || 0, undefined, {
+        enabled: canAccessSelectedConversation,
+    })
     const sendMessage = useSendMessage(selectedConversationId || 0)
+    const leaveConversation = useLeaveConversation()
     const queryClient = useQueryClient()
 
     // Participants state
@@ -78,6 +122,60 @@ export default function Messages() {
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
         }
     }, [messages])
+
+    const playIncomingMessageChime = useCallback(() => {
+        const AudioContextClass = window.AudioContext
+        if (!AudioContextClass) return
+        const audioContext = new AudioContextClass()
+        const startAt = audioContext.currentTime + 0.01
+        const tones = [659.25, 880]
+
+        tones.forEach((frequency, index) => {
+            const osc = audioContext.createOscillator()
+            const gain = audioContext.createGain()
+            const noteStart = startAt + index * 0.085
+            const noteEnd = noteStart + 0.12
+
+            osc.type = 'sine'
+            osc.frequency.setValueAtTime(frequency, noteStart)
+
+            gain.gain.setValueAtTime(0.0001, noteStart)
+            gain.gain.exponentialRampToValueAtTime(0.08, noteStart + 0.015)
+            gain.gain.exponentialRampToValueAtTime(0.0001, noteEnd)
+
+            osc.connect(gain)
+            gain.connect(audioContext.destination)
+            osc.start(noteStart)
+            osc.stop(noteEnd)
+        })
+
+        window.setTimeout(() => {
+            void audioContext.close()
+        }, 700)
+    }, [])
+
+    useEffect(() => {
+        if (!selectedConversationId || messages.length === 0) return
+
+        const lastMessage = messages[messages.length - 1]
+        const alreadyChimed = lastChimedMessageIdRef.current === lastMessage.id
+
+        if (!hasHydratedMessagesRef.current) {
+            hasHydratedMessagesRef.current = true
+            lastChimedMessageIdRef.current = lastMessage.id
+            return
+        }
+
+        if (!alreadyChimed && lastMessage.sender_id !== currentUser?.id) {
+            playIncomingMessageChime()
+            lastChimedMessageIdRef.current = lastMessage.id
+        }
+    }, [messages, selectedConversationId, currentUser?.id, playIncomingMessageChime])
+
+    useEffect(() => {
+        hasHydratedMessagesRef.current = false
+        lastChimedMessageIdRef.current = null
+    }, [selectedConversationId])
 
     // Initialize participants from conversations data
     useEffect(() => {
@@ -103,8 +201,9 @@ export default function Messages() {
 
     // WebSocket for real-time updates
     const chatWs = useChatWebSocket({
-        conversationId: selectedConversationId || 0,
-        enabled: !!selectedConversationId,
+        conversationId: canAccessSelectedConversation ? (selectedConversationId ?? 0) : 0,
+        enabled: true,
+        autoJoinConversation: canAccessSelectedConversation,
         onMessage: (msg) => {
             if (selectedConversationId && msg.conversation_id === selectedConversationId) {
                 queryClient.setQueryData<Message[]>(
@@ -211,7 +310,7 @@ export default function Messages() {
     )
 
     return (
-        <div className="flex-1 bg-background flex flex-col overflow-hidden">
+        <div className="h-full min-h-0 flex-1 bg-background flex flex-col overflow-hidden">
             {convError && (
                 <div className="bg-destructive/15 border-b border-destructive p-4">
                     <p className="text-sm text-destructive">
@@ -220,7 +319,7 @@ export default function Messages() {
                 </div>
             )}
 
-            <div className="flex-1 flex overflow-hidden">
+            <div className="h-full min-h-0 flex-1 flex overflow-hidden">
                 {/* Left Sidebar - Conversations (250px fixed) */}
                 <div className="w-[250px] border-r bg-card flex flex-col overflow-hidden">
                     <div className="p-4 border-b shrink-0 h-[60px] flex items-center">
@@ -305,11 +404,42 @@ export default function Messages() {
                                                         <p className="font-medium truncate text-sm">
                                                             {name}
                                                         </p>
-                                                        {unread > 0 && (
-                                                            <span className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full">
-                                                                {unread}
-                                                            </span>
-                                                        )}
+                                                        <div className="flex items-center gap-2">
+                                                            {unread > 0 && (
+                                                                <span className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full">
+                                                                    {unread}
+                                                                </span>
+                                                            )}
+                                                            <button
+                                                                type="button"
+                                                                className="text-muted-foreground hover:text-destructive"
+                                                                title="Remove conversation"
+                                                                onClick={(event) => {
+                                                                    event.preventDefault()
+                                                                    event.stopPropagation()
+                                                                    leaveConversation.mutate(
+                                                                        conv.id,
+                                                                        {
+                                                                            onSuccess: () => {
+                                                                                if (
+                                                                                    selectedConversationId ===
+                                                                                    conv.id
+                                                                                ) {
+                                                                                    navigate(
+                                                                                        '/messages',
+                                                                                        {
+                                                                                            replace: true,
+                                                                                        }
+                                                                                    )
+                                                                                }
+                                                                            },
+                                                                        }
+                                                                    )
+                                                                }}
+                                                            >
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                     {conv.last_message && (
                                                         <p className="text-xs opacity-75 truncate">
@@ -354,14 +484,10 @@ export default function Messages() {
                                         </h3>
                                         <div className="flex items-center gap-1.5">
                                             <div
-                                                className={`w-2 h-2 rounded-full ${participants[selectedConversation.participants?.find((p) => p.id !== currentUser?.id)?.id || 0]?.online ? 'bg-green-500' : 'bg-gray-400'}`}
+                                                className={`w-2 h-2 rounded-full ${isSelectedConversationOtherUserOnline ? 'bg-green-500' : 'bg-gray-400'}`}
                                             />
                                             <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-                                                {participants[
-                                                    selectedConversation.participants?.find(
-                                                        (p) => p.id !== currentUser?.id
-                                                    )?.id || 0
-                                                ]?.online
+                                                {isSelectedConversationOtherUserOnline
                                                     ? 'Online'
                                                     : 'Offline'}
                                             </p>
@@ -392,10 +518,7 @@ export default function Messages() {
                                     const isOwnMessage = msg.sender_id === currentUser?.id
                                     const sender = msg.sender
                                     return (
-                                        <div
-                                            key={msg.id}
-                                            className={`flex items-start gap-3 ${isOwnMessage ? 'flex-row-reverse' : ''}`}
-                                        >
+                                        <div key={msg.id} className="flex items-start gap-3">
                                             <Avatar className="w-8 h-8 shrink-0 border">
                                                 <AvatarImage
                                                     src={
@@ -407,15 +530,13 @@ export default function Messages() {
                                                     {sender?.username?.[0]?.toUpperCase() || 'U'}
                                                 </AvatarFallback>
                                             </Avatar>
-                                            <div
-                                                className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'} max-w-[70%]`}
-                                            >
+                                            <div className="flex max-w-[70%] flex-col items-start">
                                                 <div className="flex items-center gap-2 mb-1">
-                                                    {!isOwnMessage && (
-                                                        <span className="font-semibold text-xs">
-                                                            {sender?.username}
-                                                        </span>
-                                                    )}
+                                                    <span className="font-semibold text-xs">
+                                                        {isOwnMessage
+                                                            ? 'You'
+                                                            : sender?.username || 'User'}
+                                                    </span>
                                                     <span className="text-[10px] text-muted-foreground">
                                                         {formatTimestamp(msg.created_at)}
                                                     </span>
@@ -423,7 +544,7 @@ export default function Messages() {
                                                 <div
                                                     className={`rounded-2xl px-4 py-2 text-sm ${
                                                         isOwnMessage
-                                                            ? 'bg-primary text-primary-foreground rounded-tr-none'
+                                                            ? 'bg-primary text-primary-foreground rounded-tl-none'
                                                             : 'bg-secondary text-foreground rounded-tl-none'
                                                     }`}
                                                 >

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { apiClient } from '@/api/client'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -16,6 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { getAuthToken, getCurrentUser } from '@/hooks'
+import { useGameRoomSession } from '@/hooks/useGameRoomSession'
 
 type GameState = {
     board: string[][]
@@ -41,6 +43,7 @@ type ActiveGameRoom = {
 
 const CONFETTI_COLORS = ['#facc15', '#fb7185', '#38bdf8', '#34d399', '#c084fc', '#f97316']
 const VICTORY_BLAST_DURATION_MS = 4200
+const DEFEAT_COLORS = ['#64748b', '#334155', '#0f172a', '#1e293b', '#475569', '#111827']
 const CONFETTI_PIECES = Array.from({ length: 30 }, (_, index) => ({
     id: index,
     left: (index * 13) % 100,
@@ -48,6 +51,14 @@ const CONFETTI_PIECES = Array.from({ length: 30 }, (_, index) => ({
     duration: 2.4 + (index % 5) * 0.25,
     rotate: (index * 37) % 360,
     color: CONFETTI_COLORS[index % CONFETTI_COLORS.length],
+}))
+const DEFEAT_PIECES = Array.from({ length: 30 }, (_, index) => ({
+    id: index,
+    left: (index * 11) % 100,
+    delay: (index % 8) * 0.12,
+    duration: 2.3 + (index % 6) * 0.2,
+    rotate: (index * 17) % 360,
+    color: DEFEAT_COLORS[index % DEFEAT_COLORS.length],
 }))
 
 export default function ConnectFour() {
@@ -61,39 +72,23 @@ export default function ConnectFour() {
     const [messages, setMessages] = useState<ChatMessage[]>([])
     const [chatInput, setChatInput] = useState('')
     const [hoverColumn, setHoverColumn] = useState<number | null>(null)
-    const [isSocketReady, setIsSocketReady] = useState(false)
     const [showVictoryBlast, setShowVictoryBlast] = useState(false)
+    const [showDefeatBlast, setShowDefeatBlast] = useState(false)
     const [showRematchDialog, setShowRematchDialog] = useState(false)
     const [isStartingRematch, setIsStartingRematch] = useState(false)
 
-    const ws = useRef<WebSocket | null>(null)
     const chatScrollRef = useRef<HTMLDivElement>(null)
-    const shouldAutoJoinRef = useRef(false)
-    const hasJoined = useRef(false)
-    const [_, setConnectionError] = useState(false)
-    const connectionErrorRef = useRef(false)
-    const allowLeaveOnUnmountRef = useRef(false)
-    const isParticipantRef = useRef(false)
     const didShowEndGameUiRef = useRef(false)
     const victoryTimeoutRef = useRef<number | null>(null)
+    const defeatTimeoutRef = useRef<number | null>(null)
     const rematchDialogTimeoutRef = useRef<number | null>(null)
+    const didShowGameStartedToastRef = useRef(false)
 
     const { data: room, isError } = useQuery({
         queryKey: ['gameRoom', id],
         queryFn: () => apiClient.getGameRoom(Number(id)),
         enabled: !!id,
     })
-
-    const sendWsAction = (payload: Record<string, unknown>) => {
-        if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
-            toast.error('Connecting...', {
-                description: 'Game socket is not ready yet. Please try again in a second.',
-            })
-            return false
-        }
-        ws.current.send(JSON.stringify(payload))
-        return true
-    }
 
     const playVictoryJingle = useCallback(() => {
         const AudioContextClass = window.AudioContext
@@ -141,6 +136,18 @@ export default function ConnectFour() {
         }, VICTORY_BLAST_DURATION_MS)
     }, [playVictoryJingle])
 
+    const triggerDefeatBlast = useCallback(() => {
+        setShowDefeatBlast(true)
+
+        if (defeatTimeoutRef.current !== null) {
+            window.clearTimeout(defeatTimeoutRef.current)
+        }
+
+        defeatTimeoutRef.current = window.setTimeout(() => {
+            setShowDefeatBlast(false)
+        }, VICTORY_BLAST_DURATION_MS)
+    }, [])
+
     useEffect(() => {
         if (isError) {
             toast.error('Game not found')
@@ -168,190 +175,98 @@ export default function ConnectFour() {
         }
     }, [room])
 
+    const roomId = id ? Number(id) : null
+
     useEffect(() => {
-        if (!id || !room || !currentUser) {
-            isParticipantRef.current = false
+        if (!roomId || Number.isNaN(roomId)) {
+            didShowGameStartedToastRef.current = false
             return
         }
+        didShowGameStartedToastRef.current = false
+    }, [roomId])
 
-        const roomId = Number(id)
-        if (Number.isNaN(roomId)) {
-            isParticipantRef.current = false
-            return
-        }
+    const handleGameSocketAction = useCallback(
+        (action: Record<string, unknown>) => {
+            const actionType = typeof action.type === 'string' ? action.type : ''
+            const payload =
+                action.payload && typeof action.payload === 'object'
+                    ? (action.payload as Record<string, unknown>)
+                    : {}
 
-        isParticipantRef.current =
-            room.creator_id === currentUser.id || room.opponent_id === currentUser.id
-    }, [id, room, currentUser])
-
-    useEffect(() => {
-        if (
-            room &&
-            currentUser &&
-            room.status === 'pending' &&
-            room.creator_id !== currentUser.id &&
-            !hasJoined.current
-        ) {
-            shouldAutoJoinRef.current = true
-            // If socket is already open, join immediately
-            if (ws.current?.readyState === WebSocket.OPEN) {
-                hasJoined.current = true
-                ws.current.send(
-                    JSON.stringify({
-                        type: 'join_room',
-                        room_id: Number(id),
-                    })
-                )
-                shouldAutoJoinRef.current = false
-            }
-        } else {
-            shouldAutoJoinRef.current = false
-        }
-    }, [room, currentUser, id])
-
-    useEffect(() => {
-        const timer = window.setTimeout(() => {
-            allowLeaveOnUnmountRef.current = true
-        }, 0)
-
-        return () => window.clearTimeout(timer)
-    }, [])
-
-    useEffect(() => {
-        if (!id || !token) return
-        setConnectionError(false)
-        setIsSocketReady(false)
-        connectionErrorRef.current = false
-        hasJoined.current = false
-
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-        const host = window.location.hostname
-        const port = import.meta.env.VITE_API_PORT || '8375'
-        const wsUrl = `${protocol}//${host}:${port}/api/ws/game?room_id=${id}&token=${token}`
-
-        try {
-            ws.current = new WebSocket(wsUrl)
-        } catch (e) {
-            console.error('Failed to create WebSocket:', e)
-            setConnectionError(true)
-            connectionErrorRef.current = true
-            return
-        }
-
-        ws.current.onopen = () => {
-            setConnectionError(false)
-            setIsSocketReady(true)
-            connectionErrorRef.current = false
-            if (shouldAutoJoinRef.current && !hasJoined.current) {
-                hasJoined.current = true
-                ws.current?.send(
-                    JSON.stringify({
-                        type: 'join_room',
-                        room_id: Number(id),
-                    })
-                )
-                shouldAutoJoinRef.current = false
-            }
-        }
-
-        ws.current.onmessage = (event) => {
-            try {
-                const action = JSON.parse(event.data)
-                switch (action.type) {
-                    case 'game_state':
-                        setGameState(action.payload)
-                        break
-                    case 'game_started':
-                        setGameState((prev) =>
-                            prev
-                                ? {
-                                      ...prev,
-                                      status: action.payload.status,
-                                      next_turn: action.payload.next_turn,
-                                  }
-                                : null
-                        )
-                        void queryClient.invalidateQueries({ queryKey: ['gameRoom', id] })
+            switch (actionType) {
+                case 'game_state':
+                    setGameState(payload as unknown as GameState)
+                    break
+                case 'game_started':
+                    setGameState((prev) =>
+                        prev
+                            ? {
+                                  ...prev,
+                                  status:
+                                      typeof payload.status === 'string'
+                                          ? (payload.status as GameState['status'])
+                                          : prev.status,
+                                  next_turn:
+                                      typeof payload.next_turn === 'number'
+                                          ? payload.next_turn
+                                          : prev.next_turn,
+                              }
+                            : null
+                    )
+                    void queryClient.invalidateQueries({ queryKey: ['gameRoom', id] })
+                    if (!didShowGameStartedToastRef.current) {
+                        didShowGameStartedToastRef.current = true
                         toast.success('Connect 4 Started!', {
                             description: 'Your opponent has joined.',
                         })
-                        break
-                    case 'chat':
-                        setMessages((prev) => [
-                            ...prev,
-                            {
-                                user_id: action.user_id,
-                                username: action.payload.username || 'Opponent',
-                                text: action.payload.text,
-                            },
-                        ])
-                        break
-                    case 'error':
-                        toast.error('Game Error', {
-                            description:
-                                action.payload.message === 'You are the creator'
-                                    ? 'Open the room from a different account to join as opponent.'
-                                    : action.payload.message,
-                        })
-                        break
+                    }
+                    break
+                case 'chat': {
+                    const userId = typeof action.user_id === 'number' ? action.user_id : 0
+                    const username =
+                        typeof payload.username === 'string' ? payload.username : 'Opponent'
+                    const text = typeof payload.text === 'string' ? payload.text : ''
+                    if (!text) return
+                    setMessages((prev) => [
+                        ...prev,
+                        {
+                            user_id: userId,
+                            username,
+                            text,
+                        },
+                    ])
+                    break
                 }
-            } catch (e) {
-                console.error('Failed to parse message:', e)
+                case 'error': {
+                    const message =
+                        typeof payload.message === 'string' ? payload.message : 'Unknown error'
+                    toast.error('Game Error', {
+                        description:
+                            message === 'You are the creator'
+                                ? 'Open the room from a different account to join as opponent.'
+                                : message,
+                    })
+                    break
+                }
             }
-        }
+        },
+        [id, queryClient]
+    )
 
-        ws.current.onerror = () => {
-            if (!connectionErrorRef.current) {
-                setConnectionError(true)
-                setIsSocketReady(false)
-                connectionErrorRef.current = true
-            }
-        }
-
-        ws.current.onclose = () => {
-            // Connection closed
-            setIsSocketReady(false)
-        }
-
-        return () => {
-            setIsSocketReady(false)
-            ws.current?.close()
-        }
-    }, [id, token, queryClient])
-
-    useEffect(() => {
-        if (!id || !token) return
-
-        const roomId = Number(id)
-        if (Number.isNaN(roomId)) return
-
-        const leaveWithKeepalive = () => {
-            if (!isParticipantRef.current) return
-            void fetch(`/api/games/rooms/${roomId}/leave`, {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                keepalive: true,
-            })
-        }
-
-        const handleBeforeUnload = () => {
-            leaveWithKeepalive()
-        }
-
-        window.addEventListener('beforeunload', handleBeforeUnload)
-
-        return () => {
-            window.removeEventListener('beforeunload', handleBeforeUnload)
-            if (!allowLeaveOnUnmountRef.current || !isParticipantRef.current) return
-            void apiClient.leaveGameRoom(roomId).catch((error: unknown) => {
-                if (error instanceof Error && error.message.includes('403')) return
-                console.error('Failed to leave room cleanly:', error)
-            })
-        }
-    }, [id, token])
+    const gameSession = useGameRoomSession({
+        roomId: roomId && !Number.isNaN(roomId) ? roomId : null,
+        token,
+        room: room
+            ? {
+                  creator_id: room.creator_id,
+                  opponent_id: room.opponent_id,
+                  status: room.status,
+              }
+            : null,
+        currentUserId: currentUser?.id,
+        onAction: handleGameSocketAction,
+    })
+    const isSocketReady = gameSession.isSocketReady
 
     // biome-ignore lint/correctness/useExhaustiveDependencies: scroll when new messages arrive
     useEffect(() => {
@@ -377,6 +292,14 @@ export default function ConnectFour() {
                 rematchDialogTimeoutRef.current = window.setTimeout(() => {
                     setShowRematchDialog(true)
                 }, VICTORY_BLAST_DURATION_MS)
+            } else if (!gameState.is_draw) {
+                triggerDefeatBlast()
+                if (rematchDialogTimeoutRef.current !== null) {
+                    window.clearTimeout(rematchDialogTimeoutRef.current)
+                }
+                rematchDialogTimeoutRef.current = window.setTimeout(() => {
+                    setShowRematchDialog(true)
+                }, VICTORY_BLAST_DURATION_MS)
             } else {
                 setShowRematchDialog(true)
             }
@@ -386,12 +309,15 @@ export default function ConnectFour() {
         if (gameState.status === 'active' || gameState.status === 'pending') {
             didShowEndGameUiRef.current = false
         }
-    }, [gameState, currentUser?.id, triggerVictoryBlast])
+    }, [gameState, currentUser?.id, triggerVictoryBlast, triggerDefeatBlast])
 
     useEffect(() => {
         return () => {
             if (victoryTimeoutRef.current !== null) {
                 window.clearTimeout(victoryTimeoutRef.current)
+            }
+            if (defeatTimeoutRef.current !== null) {
+                window.clearTimeout(defeatTimeoutRef.current)
             }
             if (rematchDialogTimeoutRef.current !== null) {
                 window.clearTimeout(rematchDialogTimeoutRef.current)
@@ -404,32 +330,20 @@ export default function ConnectFour() {
             return
         if (gameState.board[0][col] !== '') return
 
-        sendWsAction({
+        gameSession.sendAction({
             type: 'make_move',
-            room_id: Number(id),
             payload: { column: col },
         })
     }
 
     const joinGame = () => {
-        if (!isSocketReady) {
-            shouldAutoJoinRef.current = true
-            toast.message('Connecting...', {
-                description: 'Joining the match as soon as the game socket is ready.',
-            })
-            return
-        }
-        sendWsAction({
-            type: 'join_room',
-            room_id: Number(id),
-        })
+        gameSession.joinRoom()
     }
 
     const sendChat = () => {
         if (!chatInput.trim()) return
-        const sent = sendWsAction({
+        const sent = gameSession.sendAction({
             type: 'chat',
-            room_id: Number(id),
             payload: { text: chatInput.trim(), username: currentUser?.username },
         })
         if (!sent) return
@@ -487,16 +401,13 @@ export default function ConnectFour() {
     const playerOneName = room.creator.username
     const playerTwoName =
         room.opponent?.username || (gameState.status === 'pending' ? 'WAITING...' : 'BOT')
+    const playerOneAvatar = room.creator.avatar || `https://i.pravatar.cc/80?u=${playerOneName}`
+    const playerTwoAvatar = room.opponent?.avatar
+        ? room.opponent.avatar
+        : room.opponent?.username
+          ? `https://i.pravatar.cc/80?u=${room.opponent.username}`
+          : ''
     const didIWin = !gameState.is_draw && gameState.winner_id === currentUser?.id
-
-    const getStatusText = () => {
-        if (gameState.status === 'pending') return 'Waiting for opponent...'
-        if (gameState.status === 'finished') {
-            if (gameState.is_draw) return 'Game Draw!'
-            return gameState.winner_id === currentUser?.id ? '🎉 You Won!' : '💀 You Lost!'
-        }
-        return isMyTurn ? 'Your Turn' : "Opponent's Turn"
-    }
 
     return (
         <div className="h-full overflow-hidden bg-background text-foreground">
@@ -531,50 +442,113 @@ export default function ConnectFour() {
                     </div>
                 </div>
             )}
+            {showDefeatBlast && (
+                <div className="pointer-events-none fixed inset-0 z-40 overflow-hidden">
+                    <style>
+                        {`@keyframes defeat-drop { 0% { transform: translateY(-20vh) rotate(0deg); opacity: 0.85; } 100% { transform: translateY(120vh) rotate(360deg); opacity: 0.08; } }`}
+                    </style>
+                    <div className="absolute inset-0 bg-linear-to-b from-slate-950/80 via-slate-900/60 to-black/70" />
+                    {DEFEAT_PIECES.map((piece) => (
+                        <span
+                            key={piece.id}
+                            className="absolute top-[-20%] h-5 w-2 rounded-full"
+                            style={{
+                                left: `${piece.left}%`,
+                                backgroundColor: piece.color,
+                                transform: `rotate(${piece.rotate}deg)`,
+                                animation: `defeat-drop ${piece.duration}s linear ${piece.delay}s infinite`,
+                            }}
+                        />
+                    ))}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="relative flex h-72 w-72 items-center justify-center rounded-full border border-slate-500/40 bg-black/55 backdrop-blur-md">
+                            <div className="absolute h-72 w-72 animate-ping rounded-full bg-slate-600/20" />
+                            <div className="flex flex-col items-center gap-3">
+                                <PartyPopper className="h-28 w-28 rotate-180 text-slate-400 drop-shadow-[0_0_18px_rgba(100,116,139,0.6)]" />
+                                <p className="text-4xl font-black uppercase tracking-tight text-slate-100">
+                                    You Lost
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="mx-auto grid h-full w-full max-w-[1600px] gap-3 px-3 py-2 lg:grid-cols-12 lg:gap-4">
                 {/* Game Area */}
                 <div className="min-h-0 overflow-hidden lg:col-span-9">
                     <Card className="flex h-full flex-col border-2 border-blue-500/20 bg-blue-900/10 shadow-xl">
                         <CardHeader className="border-b border-blue-500/10 bg-blue-500/5 px-3 py-1.5">
-                            <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
-                                <CardTitle className="flex shrink-0 items-center gap-2 text-lg font-black text-blue-500 italic uppercase">
-                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-sm text-white">
-                                        4
+                            <div className="grid w-full grid-cols-1 items-center gap-2 md:grid-cols-[1fr_auto_1fr]">
+                                <div className="flex items-center gap-2 md:justify-self-start">
+                                    <CardTitle className="flex shrink-0 items-center gap-2 text-lg font-black text-blue-500 italic uppercase">
+                                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-sm text-white">
+                                            4
+                                        </div>
+                                        Connect Four
+                                    </CardTitle>
+                                    <span className="inline-flex shrink-0 items-center rounded-md border border-blue-400/30 bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-blue-500">
+                                        Match #{id}
+                                    </span>
+                                </div>
+                                <div className="flex min-w-0 items-center justify-center gap-2 overflow-x-auto whitespace-nowrap md:justify-self-center">
+                                    <div className="flex shrink-0 items-center gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-2 py-1">
+                                        <Avatar className="h-7 w-7 border border-red-500/30">
+                                            <AvatarImage src={playerOneAvatar} />
+                                            <AvatarFallback className="text-[10px] font-black">
+                                                {playerOneName.slice(0, 1).toUpperCase()}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div>
+                                            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-red-500">
+                                                Player 1
+                                            </p>
+                                            <p className="text-xs font-black">{playerOneName}</p>
+                                        </div>
                                     </div>
-                                    Connect Four
-                                </CardTitle>
-                                <span className="inline-flex shrink-0 items-center rounded-md border border-blue-400/30 bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-blue-500">
-                                    Match #{id}
-                                </span>
-                                <div className="flex min-w-0 items-center justify-center gap-2 overflow-x-auto whitespace-nowrap">
-                                    <div className="shrink-0 rounded-lg border border-red-500/40 bg-red-500/10 px-2 py-1">
-                                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-red-500">
-                                            Player 1
-                                        </p>
-                                        <p className="text-xs font-black">{playerOneName}</p>
-                                    </div>
-                                    <div className="shrink-0 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-2 py-1">
-                                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-yellow-500">
-                                            Player 2
-                                        </p>
-                                        <p className="text-xs font-black">{playerTwoName}</p>
+                                    <div className="flex shrink-0 items-center gap-2 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-2 py-1">
+                                        <Avatar className="h-7 w-7 border border-yellow-500/30">
+                                            <AvatarImage src={playerTwoAvatar} />
+                                            <AvatarFallback className="text-[10px] font-black">
+                                                {playerTwoName.slice(0, 1).toUpperCase()}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div>
+                                            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-yellow-500">
+                                                Player 2
+                                            </p>
+                                            <p className="text-xs font-black">{playerTwoName}</p>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="flex justify-end">
+                                <div className="flex md:justify-end md:justify-self-end">
                                     <div
                                         className={`shrink-0 rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tight ${
                                             isMyTurn
                                                 ? 'bg-blue-500 text-white animate-pulse'
-                                                : 'bg-muted text-muted-foreground'
+                                                : 'bg-slate-700 text-slate-100'
                                         }`}
                                     >
-                                        {getStatusText()}
+                                        {isMyTurn ? 'Your Turn' : "Opponent's Turn"}
                                     </div>
                                 </div>
                             </div>
                         </CardHeader>
                         <CardContent className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden px-3 py-2">
+                            {gameState.status === 'active' && (
+                                <div
+                                    className={`mb-2 flex w-full max-w-150 items-center justify-center rounded-xl border px-3 py-2 text-center text-xl font-black uppercase tracking-wide ${
+                                        isMyTurn
+                                            ? 'border-emerald-300/60 bg-emerald-500/20 text-emerald-100 shadow-[0_0_24px_rgba(16,185,129,0.35)]'
+                                            : 'border-amber-300/60 bg-amber-500/20 text-amber-100 shadow-[0_0_24px_rgba(245,158,11,0.35)]'
+                                    }`}
+                                >
+                                    {isMyTurn
+                                        ? 'Your Turn - Drop A Piece'
+                                        : "Opponent's Turn - Stand By"}
+                                </div>
+                            )}
+
                             {/* Column Selection indicators */}
                             <div className="mb-2 grid w-full max-w-150 grid-cols-7 gap-2 px-2">
                                 {[...Array(7)].map((_, i) => {

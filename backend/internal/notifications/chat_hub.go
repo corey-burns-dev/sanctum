@@ -138,6 +138,15 @@ func (h *ChatHub) UnregisterUser(client *Client) {
 	h.BroadcastGlobalStatus(client.UserID, "offline")
 }
 
+// IsUserOnline returns true when the user has at least one active chat websocket client.
+func (h *ChatHub) IsUserOnline(userID uint) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	clients, ok := h.userConns[userID]
+	return ok && len(clients) > 0
+}
+
 // JoinConversation subscribes a user to a conversation's messages
 func (h *ChatHub) JoinConversation(userID, conversationID uint) {
 	h.mu.Lock()
@@ -232,6 +241,24 @@ func (h *ChatHub) BroadcastToConversation(conversationID uint, message ChatMessa
 	}
 
 	log.Printf("ChatHub: Broadcast to conversation %d (%d users)", conversationID, len(users))
+}
+
+// BroadcastToAllUsers sends a message to every connected websocket client.
+func (h *ChatHub) BroadcastToAllUsers(message ChatMessage) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	messageJSON, err := json.Marshal(message)
+	if err != nil {
+		log.Printf("ChatHub: Failed to marshal global message: %v", err)
+		return
+	}
+
+	for _, clients := range h.userConns {
+		for client := range clients {
+			client.TrySend(messageJSON)
+		}
+	}
 }
 
 // GetActiveUsers returns the list of userIDs currently viewing a conversation

@@ -1,4 +1,4 @@
-import { MessageCircle, User as UserIcon, UserMinus, UserPlus, Video } from 'lucide-react'
+import { Gamepad2, MessageCircle, User as UserIcon, UserMinus, UserPlus, Video } from 'lucide-react'
 import type { User } from '@/api/types'
 import { UserContextMenu } from '@/components/UserContextMenu'
 import {
@@ -22,6 +22,7 @@ export function UserMenu({ user, children }: UserMenuProps) {
         handleViewProfile,
         handleMessage,
         handleVideoChat,
+        handleJoinConnect4,
         handleAddFriend,
         handleRemoveFriend,
         canAddFriend,
@@ -80,6 +81,16 @@ export function UserMenu({ user, children }: UserMenuProps) {
                     >
                         <Video className="mr-2 h-4 w-4" />
                         <span>Video Chat</span>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                        onClick={(event) => {
+                            event.stopPropagation()
+                            void handleJoinConnect4()
+                        }}
+                    >
+                        <Gamepad2 className="mr-2 h-4 w-4" />
+                        <span>Join Connect 4</span>
                     </DropdownMenuItem>
 
                     <DropdownMenuSeparator />

@@ -16,69 +16,40 @@ export const ParticipantsList = memo(function ParticipantsList({
     participants,
     onlineUserIds,
 }: ParticipantsListProps) {
-    const sortedParticipants = Object.values(participants).sort((a, b) => {
-        // Online users first
-        const aOnline = a.online || onlineUserIds.has(a.id)
-        const bOnline = b.online || onlineUserIds.has(b.id)
-        if (aOnline && !bOnline) return -1
-        if (!aOnline && bOnline) return 1
-        // Then alphabetical
-        return (a.username || '').localeCompare(b.username || '')
-    })
-
-    const onlineParticipants = sortedParticipants.filter((p) => p.online || onlineUserIds.has(p.id))
-    const offlineParticipants = sortedParticipants.filter(
-        (p) => !(p.online || onlineUserIds.has(p.id))
-    )
+    const onlineParticipants = Object.values(participants)
+        .filter((p) => p.online || onlineUserIds.has(p.id))
+        .sort((a, b) => {
+            // Alphabetical
+            return (a.username || '').localeCompare(b.username || '')
+        })
 
     return (
-        <div className="space-y-4">
-            {/* Online Users */}
-            <div className="space-y-2">
-                <h4 className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest px-2">
-                    Online — {onlineParticipants.length}
-                </h4>
-                {onlineParticipants.length > 0 ? (
-                    <div className="space-y-1">
-                        {onlineParticipants.map((user) => (
-                            <div
-                                key={user.id}
-                                className="flex items-center gap-2 text-[11px] px-2 py-1.5 rounded-md hover:bg-muted/50 transition-colors"
-                            >
-                                <div className="relative">
-                                    <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
-                                    {user.typing && (
-                                        <div className="absolute -inset-1 bg-primary/20 rounded-full animate-ping" />
-                                    )}
-                                </div>
-                                <span className="truncate font-medium">
-                                    {user.username || `User ${user.id}`}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <p className="text-[9px] text-muted-foreground italic px-2">No one is online</p>
-                )}
-            </div>
-
-            {/* Offline Users */}
-            <div className="space-y-2">
-                <h4 className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest px-2">
-                    Offline — {offlineParticipants.length}
-                </h4>
+        <div className="space-y-2">
+            <h4 className="px-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
+                Online Members - {onlineParticipants.length}
+            </h4>
+            {onlineParticipants.length > 0 ? (
                 <div className="space-y-1">
-                    {offlineParticipants.map((user) => (
+                    {onlineParticipants.map((user) => (
                         <div
                             key={user.id}
-                            className="flex items-center gap-2 text-[11px] px-2 py-1.5 rounded-md opacity-60 grayscale hover:grayscale-0 hover:opacity-100 transition-all"
+                            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] transition-colors hover:bg-muted/50"
                         >
-                            <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
-                            <span className="truncate">{user.username || `User ${user.id}`}</span>
+                            <div className="relative">
+                                <div className="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+                                {user.typing && (
+                                    <div className="absolute -inset-1 animate-ping rounded-full bg-primary/20" />
+                                )}
+                            </div>
+                            <span className="truncate font-medium">
+                                {user.username || `User ${user.id}`}
+                            </span>
                         </div>
                     ))}
                 </div>
-            </div>
+            ) : (
+                <p className="px-2 text-[10px] italic text-muted-foreground">No one joined yet.</p>
+            )}
         </div>
     )
 })

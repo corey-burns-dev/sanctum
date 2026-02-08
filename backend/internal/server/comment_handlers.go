@@ -3,6 +3,7 @@ package server
 
 import (
 	"fmt"
+	"time"
 	"vibeshift/internal/models"
 
 	"github.com/gofiber/fiber/v2"
@@ -50,6 +51,17 @@ func (s *Server) CreateComment(c *fiber.Ctx) error {
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
+
+	commentsCount := 0
+	if post, postErr := s.postRepo.GetByID(ctx, postID, userID); postErr == nil {
+		commentsCount = post.CommentsCount
+	}
+	s.publishBroadcastEvent("comment_created", map[string]interface{}{
+		"post_id":        postID,
+		"comment":        created,
+		"comments_count": commentsCount,
+		"updated_at":     time.Now().UTC().Format(time.RFC3339Nano),
+	})
 
 	return c.Status(fiber.StatusCreated).JSON(created)
 }
@@ -115,6 +127,17 @@ func (s *Server) UpdateComment(c *fiber.Ctx) error {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
 
+	commentsCount := 0
+	if post, postErr := s.postRepo.GetByID(ctx, comment.PostID, userID); postErr == nil {
+		commentsCount = post.CommentsCount
+	}
+	s.publishBroadcastEvent("comment_updated", map[string]interface{}{
+		"post_id":        comment.PostID,
+		"comment":        updated,
+		"comments_count": commentsCount,
+		"updated_at":     time.Now().UTC().Format(time.RFC3339Nano),
+	})
+
 	return c.JSON(updated)
 }
 
@@ -147,6 +170,17 @@ func (s *Server) DeleteComment(c *fiber.Ctx) error {
 	if err := s.commentRepo.Delete(ctx, commentID); err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
+
+	commentsCount := 0
+	if post, postErr := s.postRepo.GetByID(ctx, comment.PostID, userID); postErr == nil {
+		commentsCount = post.CommentsCount
+	}
+	s.publishBroadcastEvent("comment_deleted", map[string]interface{}{
+		"post_id":        comment.PostID,
+		"comment_id":     commentID,
+		"comments_count": commentsCount,
+		"updated_at":     time.Now().UTC().Format(time.RFC3339Nano),
+	})
 
 	return c.SendStatus(fiber.StatusOK)
 }

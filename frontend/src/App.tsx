@@ -358,8 +358,10 @@ function MainLayout({ children }: { children: ReactNode }) {
     useRealtimeNotifications(isAuthenticated)
     const location = useLocation()
     const isChatRoute = location.pathname === '/chat' || location.pathname.startsWith('/chat/')
+    const isMessagesRoute =
+        location.pathname === '/messages' || location.pathname.startsWith('/messages/')
     const isGameRoomRoute = /^\/games\/connect4\/[^/]+$/.test(location.pathname)
-    const isViewportLockedRoute = isChatRoute || isGameRoomRoute
+    const isViewportLockedRoute = isChatRoute || isMessagesRoute || isGameRoomRoute
 
     return (
         <div

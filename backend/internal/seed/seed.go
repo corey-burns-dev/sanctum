@@ -119,11 +119,8 @@ func Seed(db *gorm.DB, opts Options) error {
 	}
 	log.Printf("✓ %d posts created", len(posts))
 
-	// Join users to conversations
-	if err := joinParticipants(db, users, conversations); err != nil {
-		return fmt.Errorf("failed to join participants: %w", err)
-	}
-	log.Printf("✓ Users joined to chat rooms")
+	// Chatroom membership is user-driven — seed users should NOT auto-join rooms
+	_ = conversations // rooms exist, users join manually via the UI
 
 	log.Println("🎉 Database seeding completed successfully!")
 	return nil
@@ -301,50 +298,4 @@ func createOrGetConversations(db *gorm.DB) ([]models.Conversation, error) {
 		conversations = append(conversations, conv)
 	}
 	return conversations, nil
-}
-
-func joinParticipants(db *gorm.DB, users []models.User, conversations []models.Conversation) error {
-	//nolint:gosec // Weak random for seeding
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-
-	// Batch create participants for speed
-	batchSize := 100
-	participants := make([]models.ConversationParticipant, 0, batchSize)
-
-	for _, conv := range conversations {
-		// Randomly pick participants
-		numParticipants := r.Intn(len(users) / 2) // Join up to half the users to each channel
-		if numParticipants < 5 {
-			numParticipants = 5
-		}
-		if numParticipants > len(users) {
-			numParticipants = len(users)
-		}
-
-		perm := r.Perm(len(users))
-		for i := 0; i < numParticipants; i++ {
-			userID := users[perm[i]].ID
-			participant := models.ConversationParticipant{
-				ConversationID: conv.ID,
-				UserID:         userID,
-				JoinedAt:       time.Now().Add(-time.Hour * time.Duration(r.Intn(100))),
-				LastReadAt:     time.Now(),
-			}
-			participants = append(participants, participant)
-
-			if len(participants) >= batchSize {
-				if err := db.Create(&participants).Error; err != nil {
-					log.Printf("Batch join error: %v", err)
-				}
-				participants = participants[:0]
-			}
-		}
-	}
-	// Flush remaining
-	if len(participants) > 0 {
-		if err := db.Create(&participants).Error; err != nil {
-			log.Printf("Final batch join error: %v", err)
-		}
-	}
-	return nil
 }
