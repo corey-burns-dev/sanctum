@@ -1,9 +1,9 @@
 package server
 
 import (
+	"sanctum/internal/models"
 	"testing"
 	"time"
-	"sanctum/internal/models"
 
 	"github.com/stretchr/testify/assert"
 )

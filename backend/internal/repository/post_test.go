@@ -3,8 +3,8 @@ package repository
 import (
 	"context"
 	"regexp"
-	"testing"
 	"sanctum/internal/models"
+	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"

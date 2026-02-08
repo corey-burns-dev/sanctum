@@ -2,8 +2,8 @@ package notifications
 
 import (
 	"regexp"
-	"testing"
 	"sanctum/internal/models"
+	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/gofiber/websocket/v2"

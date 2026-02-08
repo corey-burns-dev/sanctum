@@ -4,9 +4,9 @@ package server
 import (
 	"encoding/json"
 	"errors"
-	"time"
 	"sanctum/internal/models"
 	"sanctum/internal/notifications"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"

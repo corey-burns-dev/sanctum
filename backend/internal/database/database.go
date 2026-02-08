@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"time"
 	"sanctum/internal/config"
 	"sanctum/internal/middleware"
 	"sanctum/internal/models"
+	"time"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

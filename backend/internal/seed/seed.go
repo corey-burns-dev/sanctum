@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"sanctum/internal/models"
 	"strings"
 	"time"
-	"sanctum/internal/models"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"

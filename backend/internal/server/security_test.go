@@ -2,8 +2,8 @@ package server
 
 import (
 	"net/http/httptest"
-	"testing"
 	"sanctum/internal/middleware"
+	"testing"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/helmet"

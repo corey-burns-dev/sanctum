@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"log"
-	"strconv"
-	"time"
 	"sanctum/internal/models"
 	"sanctum/internal/notifications"
+	"strconv"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"

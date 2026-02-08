@@ -3,8 +3,8 @@ package server
 
 import (
 	"errors"
-	"time"
 	"sanctum/internal/models"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
