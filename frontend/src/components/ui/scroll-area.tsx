@@ -1,46 +1,32 @@
 'use client'
 
-import * as ScrollAreaPrimitive from '@radix-ui/react-scroll-area'
-import * as React from 'react'
+import type * as React from 'react'
 
 import { cn } from '@/lib/utils'
 
-const ScrollArea = React.forwardRef<
-    React.ElementRef<typeof ScrollAreaPrimitive.Root>,
-    React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root>
->(({ className, children, ...props }, ref) => (
-    <ScrollAreaPrimitive.Root
-        ref={ref}
-        className={cn('relative overflow-hidden', className)}
-        {...props}
-    >
-        <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit]">
-            {children}
-        </ScrollAreaPrimitive.Viewport>
-        <ScrollBar />
-        <ScrollAreaPrimitive.Corner />
-    </ScrollAreaPrimitive.Root>
-))
-ScrollArea.displayName = ScrollAreaPrimitive.Root.displayName
+// CSS-based scroll area — replaces Radix ScrollArea which has an infinite
+// re-render loop with React 19 (setState inside ref callback).
+// Scrollbar styling is handled via CSS in globals.css.
 
-const ScrollBar = React.forwardRef<
-    React.ElementRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>,
-    React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>
->(({ className, orientation = 'vertical', ...props }, ref) => (
-    <ScrollAreaPrimitive.ScrollAreaScrollbar
-        ref={ref}
-        orientation={orientation}
-        className={cn(
-            'flex touch-none select-none transition-colors',
-            orientation === 'vertical' && 'h-full w-2.5 border-l border-l-transparent p-px',
-            orientation === 'horizontal' && 'h-2.5 flex-col border-t border-t-transparent p-px',
-            className
-        )}
-        {...props}
-    >
-        <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-border" />
-    </ScrollAreaPrimitive.ScrollAreaScrollbar>
-))
-ScrollBar.displayName = ScrollAreaPrimitive.ScrollAreaScrollbar.displayName
+function ScrollArea({ className, children, ...props }: React.ComponentProps<'div'>) {
+    return (
+        <div
+            data-slot="scroll-area"
+            className={cn('relative overflow-y-auto scroll-area-styled', className)}
+            {...props}
+        >
+            {children}
+        </div>
+    )
+}
+
+interface ScrollBarProps extends React.ComponentProps<'div'> {
+    orientation?: 'vertical' | 'horizontal'
+}
+
+// Retained for API compatibility — CSS handles scrollbar styling now
+function ScrollBar({ orientation: _orientation = 'vertical', ...props }: ScrollBarProps) {
+    return <div data-slot="scroll-area-scrollbar" hidden {...props} />
+}
 
 export { ScrollArea, ScrollBar }

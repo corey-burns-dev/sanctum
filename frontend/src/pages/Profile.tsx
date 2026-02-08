@@ -1,7 +1,3 @@
-import { useQueries } from '@tanstack/react-query'
-import { Calendar, Edit, Heart, MessageCircle, ShieldCheck, UserRound } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { apiClient } from '@/api/client'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -13,6 +9,11 @@ import { useLogout } from '@/hooks/useAuth'
 import { useFriends } from '@/hooks/useFriends'
 import { usePosts } from '@/hooks/usePosts'
 import { useAllUsers, useMyProfile, useUpdateMyProfile } from '@/hooks/useUsers'
+import { getAvatarUrl } from '@/lib/chat-utils'
+import { useQueries } from '@tanstack/react-query'
+import { Calendar, Edit, Heart, MessageCircle, ShieldCheck, UserRound } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 export default function Profile() {
     const [isEditing, setIsEditing] = useState(false)
@@ -26,7 +27,10 @@ export default function Profile() {
     const { data: user, isLoading, error } = useMyProfile()
     const updateProfile = useUpdateMyProfile()
 
-    const { data: allPosts = [], isLoading: postsLoading } = usePosts({ limit: 120, offset: 0 })
+    const { data: allPosts = [], isLoading: postsLoading } = usePosts({
+        limit: 120,
+        offset: 0,
+    })
     const { data: friends = [] } = useFriends()
     const { data: users = [] } = useAllUsers()
 
@@ -144,12 +148,7 @@ export default function Profile() {
                         <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
                             <div className="flex items-start gap-4">
                                 <Avatar className="h-20 w-20 border border-border/60">
-                                    <AvatarImage
-                                        src={
-                                            user.avatar ||
-                                            `https://i.pravatar.cc/150?u=${user.username}`
-                                        }
-                                    />
+                                    <AvatarImage src={user.avatar || getAvatarUrl(user.username)} />
                                     <AvatarFallback className="text-xl">
                                         {user.username[0]?.toUpperCase()}
                                     </AvatarFallback>
@@ -189,7 +188,7 @@ export default function Profile() {
                                 </div>
                             </div>
 
-                            <div className="w-full md:w-[360px]">
+                            <div className="w-full md:w-90">
                                 {isEditing ? (
                                     <Textarea
                                         value={editedProfile.bio}

@@ -1,3 +1,31 @@
+import type { Conversation, Message, User } from '@/api/types'
+import { MessageList } from '@/components/chat/MessageList'
+import { ParticipantsList } from '@/components/chat/ParticipantsList'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { useAudio } from '@/hooks/useAudio'
+import {
+    useAllChatrooms,
+    useConversation,
+    useConversations,
+    useJoinChatroom,
+    useJoinedChatrooms,
+    useLeaveConversation,
+    useMessages,
+    useSendMessage,
+} from '@/hooks/useChat'
+import { useChatWebSocket } from '@/hooks/useChatWebSocket'
+import { usePresenceStore } from '@/hooks/usePresence'
+import { getCurrentUser } from '@/hooks/useUsers'
+import {
+    deduplicateDMConversations,
+    getDirectMessageAvatar,
+    getDirectMessageName,
+    getInitials,
+} from '@/lib/chat-utils'
+import { cn } from '@/lib/utils'
 import { useQueryClient } from '@tanstack/react-query'
 import {
     Hash,
@@ -12,27 +40,6 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import type { Conversation, Message, User } from '@/api/types'
-import { MessageList } from '@/components/chat/MessageList'
-import { ParticipantsList } from '@/components/chat/ParticipantsList'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import {
-    useAllChatrooms,
-    useConversation,
-    useConversations,
-    useJoinChatroom,
-    useJoinedChatrooms,
-    useLeaveConversation,
-    useMessages,
-    useSendMessage,
-} from '@/hooks/useChat'
-import { useChatWebSocket } from '@/hooks/useChatWebSocket'
-import { usePresenceStore } from '@/hooks/usePresence'
-import { getCurrentUser } from '@/hooks/useUsers'
-import { cn } from '@/lib/utils'
 
 export default function Chat() {
     const { id: urlChatId } = useParams<{ id: string }>()
@@ -64,19 +71,10 @@ export default function Chat() {
 
     const conversations = allChatrooms as Conversation[]
     const activeRooms = useMemo(() => joinedChatrooms as Conversation[], [joinedChatrooms])
-    const dmConversations = useMemo(() => {
-        const directConversations = (allConversations as Conversation[]).filter((c) => !c.is_group)
-        const deduped: Conversation[] = []
-        const seenKeys = new Set<string>()
-        for (const conv of directConversations) {
-            const other = conv.participants?.find((p) => p.id !== currentUser?.id)
-            const key = other ? String(other.id) : `conv:${conv.id}`
-            if (seenKeys.has(key)) continue
-            seenKeys.add(key)
-            deduped.push(conv)
-        }
-        return deduped
-    }, [allConversations, currentUser?.id])
+    const dmConversations = useMemo(
+        () => deduplicateDMConversations(allConversations as Conversation[], currentUser?.id),
+        [allConversations, currentUser?.id]
+    )
 
     const selectedChatId = useMemo(
         () => (urlChatId ? Number.parseInt(urlChatId, 10) : null),
@@ -283,60 +281,7 @@ export default function Chat() {
         setParticipants(map)
     }, [selectedChatId, currentConversation, currentUser, userIsJoined, onlineUserIds])
 
-    const playDirectMessageSound = useCallback(() => {
-        const AudioContextClass = window.AudioContext
-        if (!AudioContextClass) return
-        const audioContext = new AudioContextClass()
-        const startAt = audioContext.currentTime + 0.01
-        const tones = [659.25, 880]
-
-        tones.forEach((frequency, index) => {
-            const osc = audioContext.createOscillator()
-            const gain = audioContext.createGain()
-            const noteStart = startAt + index * 0.08
-            const noteEnd = noteStart + 0.12
-
-            osc.type = 'sine'
-            osc.frequency.setValueAtTime(frequency, noteStart)
-            gain.gain.setValueAtTime(0.0001, noteStart)
-            gain.gain.exponentialRampToValueAtTime(0.07, noteStart + 0.015)
-            gain.gain.exponentialRampToValueAtTime(0.0001, noteEnd)
-
-            osc.connect(gain)
-            gain.connect(audioContext.destination)
-            osc.start(noteStart)
-            osc.stop(noteEnd)
-        })
-
-        window.setTimeout(() => {
-            void audioContext.close()
-        }, 700)
-    }, [])
-
-    const playRoomAlertSound = useCallback(() => {
-        const AudioContextClass = window.AudioContext
-        if (!AudioContextClass) return
-        const audioContext = new AudioContextClass()
-        const osc = audioContext.createOscillator()
-        const gain = audioContext.createGain()
-        const startAt = audioContext.currentTime + 0.01
-        const endAt = startAt + 0.14
-
-        osc.type = 'triangle'
-        osc.frequency.setValueAtTime(523.25, startAt)
-        gain.gain.setValueAtTime(0.0001, startAt)
-        gain.gain.exponentialRampToValueAtTime(0.055, startAt + 0.02)
-        gain.gain.exponentialRampToValueAtTime(0.0001, endAt)
-
-        osc.connect(gain)
-        gain.connect(audioContext.destination)
-        osc.start(startAt)
-        osc.stop(endAt)
-
-        window.setTimeout(() => {
-            void audioContext.close()
-        }, 500)
-    }, [])
+    const { playDirectMessageSound, playRoomAlertSound } = useAudio()
 
     const onMessage = useCallback(
         (msg: Message) => {
@@ -662,23 +607,13 @@ export default function Chat() {
         [navigate]
     )
 
-    const getDirectMessageName = useCallback(
-        (conversation: Conversation) => {
-            if (conversation.name) return conversation.name
-            const otherUser = conversation.participants?.find((p) => p.id !== currentUser?.id)
-            return otherUser?.username || 'Unknown User'
-        },
+    const getDmName = useCallback(
+        (conversation: Conversation) => getDirectMessageName(conversation, currentUser?.id),
         [currentUser?.id]
     )
 
-    const getDirectMessageAvatar = useCallback(
-        (conversation: Conversation) => {
-            const otherUser = conversation.participants?.find((p) => p.id !== currentUser?.id)
-            return (
-                otherUser?.avatar ||
-                `https://i.pravatar.cc/80?u=${otherUser?.username || conversation.id}`
-            )
-        },
+    const getDmAvatar = useCallback(
+        (conversation: Conversation) => getDirectMessageAvatar(conversation, currentUser?.id),
         [currentUser?.id]
     )
 
@@ -887,20 +822,16 @@ export default function Chat() {
                                                 >
                                                     <Avatar className="h-8 w-8 border">
                                                         <AvatarImage
-                                                            src={getDirectMessageAvatar(
-                                                                conversation
-                                                            )}
+                                                            src={getDmAvatar(conversation)}
                                                         />
                                                         <AvatarFallback className="text-[10px]">
-                                                            {getDirectMessageName(conversation)
-                                                                .slice(0, 2)
-                                                                .toUpperCase()}
+                                                            {getInitials(getDmName(conversation))}
                                                         </AvatarFallback>
                                                     </Avatar>
                                                     <div className="min-w-0 flex-1">
                                                         <div className="flex items-center gap-2">
                                                             <p className="truncate text-[12px] font-semibold">
-                                                                {getDirectMessageName(conversation)}
+                                                                {getDmName(conversation)}
                                                             </p>
                                                             <span
                                                                 className={cn(
@@ -946,7 +877,7 @@ export default function Chat() {
                                         {isCurrentConversationGroup
                                             ? currentConversation.name ||
                                               `Room ${currentConversation.id}`
-                                            : getDirectMessageName(currentConversation)}
+                                            : getDmName(currentConversation)}
                                     </h3>
                                     <p className="text-[11px] text-muted-foreground">
                                         {isCurrentConversationGroup

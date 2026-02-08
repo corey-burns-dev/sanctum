@@ -1,4 +1,5 @@
 // usePresence - Real-time online status tracking using zustand
+import { getWsBaseUrl } from '@/lib/chat-utils'
 import { useEffect, useRef } from 'react'
 import { create } from 'zustand'
 
@@ -62,10 +63,7 @@ export function usePresenceListener() {
                 wsRef.current.close()
             }
 
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-            const host = window.location.hostname
-            const port = import.meta.env.VITE_API_PORT || '8375'
-            const wsUrl = `${protocol}//${host}:${port}/api/ws/chat?token=${token}`
+            const wsUrl = `${getWsBaseUrl()}/api/ws/chat?token=${token}`
 
             const ws = new WebSocket(wsUrl)
             wsRef.current = ws

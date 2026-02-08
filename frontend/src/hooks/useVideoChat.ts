@@ -1,5 +1,6 @@
 // WebRTC video chat hook — manages camera/mic, peer connections, and signaling via WebSocket
 
+import { getWsBaseUrl } from '@/lib/chat-utils'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 interface PeerInfo {
@@ -302,10 +303,7 @@ export function useVideoChat({ roomId, enabled = true }: UseVideoChatOptions) {
         }
 
         // Open signaling WebSocket
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-        const host = window.location.hostname
-        const port = import.meta.env.VITE_API_PORT || '8375'
-        const wsUrl = `${protocol}//${host}:${port}/api/ws/videochat?token=${token}&room=${encodeURIComponent(roomId)}`
+        const wsUrl = `${getWsBaseUrl()}/api/ws/videochat?token=${token}&room=${encodeURIComponent(roomId)}`
         const ws = new WebSocket(wsUrl)
         wsRef.current = ws
 

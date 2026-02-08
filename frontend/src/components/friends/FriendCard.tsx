@@ -1,9 +1,10 @@
-import { Loader2 } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import type { User } from '@/api/types'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { getAvatarUrl, getInitials } from '@/lib/chat-utils'
+import { Loader2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 export type FriendAction = 'add' | 'cancel' | 'accept' | 'reject' | 'remove'
 
@@ -28,9 +29,9 @@ export function FriendCard({ user, actionType, onAction, isLoading = false }: Fr
                     ) : (
                         <div className="w-full h-full flex items-center justify-center bg-muted/50">
                             <Avatar className="w-32 h-32 text-4xl">
-                                <AvatarImage src={`https://i.pravatar.cc/300?u=${user.username}`} />
+                                <AvatarImage src={getAvatarUrl(user.username, 300)} />
                                 <AvatarFallback className="bg-primary/10 text-primary text-4xl font-bold">
-                                    {user.username.slice(0, 2).toUpperCase()}
+                                    {getInitials(user.username)}
                                 </AvatarFallback>
                             </Avatar>
                         </div>

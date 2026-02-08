@@ -1,8 +1,9 @@
 // WebSocket hook for real-time chat
 
+import type { Message, User } from '@/api/types'
+import { getWsBaseUrl } from '@/lib/chat-utils'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Message, User } from '@/api/types'
 
 interface ChatWebSocketMessage {
     type:
@@ -49,11 +50,13 @@ interface UseChatWebSocketOptions {
     }) => void
 }
 
+const EMPTY_ROOM_IDS: number[] = []
+
 export function useChatWebSocket({
     conversationId,
     enabled = true,
     autoJoinConversation = true,
-    joinedRoomIds = [],
+    joinedRoomIds = EMPTY_ROOM_IDS,
     onMessage,
     onRoomMessage,
     onTyping,
@@ -133,10 +136,7 @@ export function useChatWebSocket({
         }
 
         // Create WebSocket connection
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-        const host = window.location.hostname
-        const port = import.meta.env.VITE_API_PORT || '8375'
-        const wsUrl = `${protocol}//${host}:${port}/api/ws/chat?token=${token}`
+        const wsUrl = `${getWsBaseUrl()}/api/ws/chat?token=${token}`
         const ws = new WebSocket(wsUrl)
 
         wsRef.current = ws
@@ -398,17 +398,24 @@ export function useChatWebSocket({
         }
 
         // Update ref to match desired (joined confirmations come via 'joined' messages)
+        let changed = false
         for (const roomId of desired) {
+            if (!current.has(roomId)) changed = true
             current.add(roomId)
         }
-        setJoinedSet(new Set(current))
+        if (changed) {
+            setJoinedSet(new Set(current))
+        }
     }, [joinedRoomIds, conversationId, isConnected, autoJoinConversation])
 
     // Connect on mount (persistent — does not depend on conversationId)
+    // Deferred via setTimeout to avoid "closed before established" in React 19 StrictMode dev.
     useEffect(() => {
-        connect()
+        const timer = window.setTimeout(connect, 0)
 
         return () => {
+            window.clearTimeout(timer)
+
             if (wsRef.current) {
                 wsRef.current.close()
                 wsRef.current = null

@@ -22,8 +22,10 @@ type Options struct {
 
 var (
 	conversationNames = []string{
-		"General", "Movies", "Music", "Television", "Games",
-		"Fitness", "Hobbies", "Social", "Sports", "Technology",
+		"General", "Movies", "Music", "Television", "Gaming",
+		"Fitness", "Hobbies", "Sports", "Technology",
+		"Anime", "Books", "Food", "Travel", "Programming", "Linux", "Frontend", "Backend", "DevOps", "Cloud", "AI", "Startups", "Homelab", "Art", "History", "Philosophy", "Science",
+		"Pets", "Parenting", "Relationships", "Social", "Finance", "Investing", "Crypto",
 	}
 
 	firstNames = []string{

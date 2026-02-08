@@ -1,6 +1,7 @@
+import { apiClient } from '@/api/client'
+import { getWsBaseUrl } from '@/lib/chat-utils'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { apiClient } from '@/api/client'
 
 type RoomSession = {
     creator_id: number
@@ -158,10 +159,7 @@ export function useGameRoomSession({
         didSetConnectionErrorRef.current = false
         hasJoinedRef.current = false
 
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-        const host = window.location.hostname
-        const port = import.meta.env.VITE_API_PORT || '8375'
-        const wsUrl = `${protocol}//${host}:${port}/api/ws/game?room_id=${roomId}&token=${token}`
+        const wsUrl = `${getWsBaseUrl()}/api/ws/game?room_id=${roomId}&token=${token}`
 
         try {
             wsRef.current = new WebSocket(wsUrl)

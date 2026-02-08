@@ -173,15 +173,7 @@ function RoutesWithPrefetch() {
                     }
                 />
                 <Route
-                    path="/messages"
-                    element={
-                        <ProtectedRoute>
-                            <Messages />
-                        </ProtectedRoute>
-                    }
-                />
-                <Route
-                    path="/messages/:id"
+                    path="/messages/:id?"
                     element={
                         <ProtectedRoute>
                             <Messages />
@@ -367,9 +359,7 @@ function MainLayout({ children }: { children: ReactNode }) {
         <div
             className={cn(
                 'relative flex w-full text-foreground',
-                isAuthenticated && isViewportLockedRoute
-                    ? 'h-[100dvh] overflow-hidden'
-                    : 'min-h-screen'
+                isAuthenticated && isViewportLockedRoute ? 'h-dvh overflow-hidden' : 'min-h-screen'
             )}
         >
             {isAuthenticated && <MobileHeader />}

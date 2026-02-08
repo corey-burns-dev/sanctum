@@ -1,7 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
-import { formatDistanceToNow } from 'date-fns'
-import { Loader2, Send } from 'lucide-react'
-import { memo, useCallback, useState } from 'react'
 import { apiClient } from '@/api/client'
 import { UserMenu } from '@/components/UserMenu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -9,6 +5,11 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { useCreateComment, useDeleteComment, usePostComments } from '@/hooks/useComments'
 import { getCurrentUser } from '@/hooks/useUsers'
+import { getAvatarUrl } from '@/lib/chat-utils'
+import { useQueryClient } from '@tanstack/react-query'
+import { formatDistanceToNow } from 'date-fns'
+import { Loader2, Send } from 'lucide-react'
+import { memo, useCallback, useState } from 'react'
 
 export const PostComments = memo(function PostComments({ postId }: { postId: number }) {
     const [newComment, setNewComment] = useState('')
@@ -85,7 +86,7 @@ export const PostComments = memo(function PostComments({ postId }: { postId: num
                                     <AvatarImage
                                         src={
                                             comment.user.avatar ||
-                                            `https://i.pravatar.cc/150?u=${comment.user.username}`
+                                            getAvatarUrl(comment.user.username)
                                         }
                                     />
                                     <AvatarFallback className="text-xs">
@@ -170,10 +171,7 @@ export const PostComments = memo(function PostComments({ postId }: { postId: num
                 <div className="flex gap-3">
                     <Avatar className="w-8 h-8 shrink-0">
                         <AvatarImage
-                            src={
-                                currentUser.avatar ||
-                                `https://i.pravatar.cc/150?u=${currentUser.username}`
-                            }
+                            src={currentUser.avatar || getAvatarUrl(currentUser.username)}
                         />
                         <AvatarFallback className="text-xs">
                             {currentUser.username?.[0]?.toUpperCase()}

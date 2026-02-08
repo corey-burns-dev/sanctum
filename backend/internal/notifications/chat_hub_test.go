@@ -65,3 +65,59 @@ func TestChatHub_BroadcastToConversation(t *testing.T) {
 	assert.Equal(t, "message", received.Type)
 	assert.Equal(t, uint(101), received.ConversationID)
 }
+
+func TestChatHub_MultiDeviceSupport(t *testing.T) {
+	hub := NewChatHub()
+	userID := uint(42)
+
+	client1 := &Client{UserID: userID, Send: make(chan []byte, 10)}
+	client2 := &Client{UserID: userID, Send: make(chan []byte, 10)}
+
+	hub.RegisterUser(client1)
+	hub.RegisterUser(client2)
+
+	hub.mu.RLock()
+	assert.Len(t, hub.userConns[userID], 2)
+	hub.mu.RUnlock()
+
+	hub.JoinConversation(userID, 202)
+
+	msg := ChatMessage{Type: "message", ConversationID: 202, Payload: "Multi-device test"}
+	hub.BroadcastToConversation(202, msg)
+
+	// Both clients should receive the message
+	select {
+	case <-client1.Send:
+	default:
+		t.Error("client1 did not receive message")
+	}
+
+	select {
+	case <-client2.Send:
+	default:
+		t.Error("client2 did not receive message")
+	}
+}
+
+func TestChatHub_UnregisterCleanup(t *testing.T) {
+	hub := NewChatHub()
+	userID := uint(7)
+	convID := uint(303)
+
+	client := &Client{UserID: userID, Send: make(chan []byte, 10)}
+	hub.RegisterUser(client)
+	hub.JoinConversation(userID, convID)
+
+	hub.mu.RLock()
+	assert.Contains(t, hub.conversations[convID], userID)
+	assert.Contains(t, hub.userActiveConvs[userID], convID)
+	hub.mu.RUnlock()
+
+	hub.UnregisterUser(client)
+
+	hub.mu.RLock()
+	assert.NotContains(t, hub.userConns, userID)
+	assert.NotContains(t, hub.conversations, convID)
+	assert.NotContains(t, hub.userActiveConvs, userID)
+	hub.mu.RUnlock()
+}

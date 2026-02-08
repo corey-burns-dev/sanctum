@@ -1,9 +1,10 @@
+import { apiClient } from '@/api/client'
+import { usePresenceStore } from '@/hooks/usePresence'
+import { getWsBaseUrl } from '@/lib/chat-utils'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { create } from 'zustand'
-import { apiClient } from '@/api/client'
-import { usePresenceStore } from '@/hooks/usePresence'
 
 type RealtimeEventType =
     | 'post_created'
@@ -105,7 +106,9 @@ export function useRealtimeNotifications(enabled = true) {
 
     const openDirectMessage = useCallback(async (userID: number) => {
         try {
-            const conv = await apiClient.createConversation({ participant_ids: [userID] })
+            const conv = await apiClient.createConversation({
+                participant_ids: [userID],
+            })
             window.location.href = `/messages/${conv.id}`
         } catch {
             // Silently ignore failures; user can still navigate manually.
@@ -118,13 +121,11 @@ export function useRealtimeNotifications(enabled = true) {
         const token = localStorage.getItem('token')
         if (!token) return
 
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-        const host = window.location.hostname
-        const port = import.meta.env.VITE_API_PORT || '8375'
-        const wsUrl = `${protocol}//${host}:${port}/api/ws?token=${token}`
+        const wsUrl = `${getWsBaseUrl()}/api/ws?token=${token}`
 
         let closedByEffect = false
         let ws: WebSocket | null = null
+        let connectTimer: number | null = null
 
         const connect = () => {
             if (closedByEffect) return
@@ -267,7 +268,9 @@ export function useRealtimeNotifications(enabled = true) {
                         if (isGroupMessage) {
                             break
                         }
-                        void queryClient.invalidateQueries({ queryKey: ['chat', 'conversations'] })
+                        void queryClient.invalidateQueries({
+                            queryKey: ['chat', 'conversations'],
+                        })
                         const path = window.location.pathname
                         const inMessagingView =
                             path === '/messages' ||
@@ -387,10 +390,16 @@ export function useRealtimeNotifications(enabled = true) {
             }
         }
 
-        connect()
+        // Small delay avoids the "closed before established" warning from
+        // React 19 StrictMode's double-invocation of effects in dev.
+        connectTimer = window.setTimeout(connect, 0)
 
         return () => {
             closedByEffect = true
+            if (connectTimer !== null) {
+                window.clearTimeout(connectTimer)
+                connectTimer = null
+            }
             if (reconnectTimeoutRef.current !== null) {
                 window.clearTimeout(reconnectTimeoutRef.current)
                 reconnectTimeoutRef.current = null

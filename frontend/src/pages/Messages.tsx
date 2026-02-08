@@ -1,7 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
-import { MessageCircle, Send, Trash2, Users } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
 import type { Conversation, Message, User } from '@/api/types'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -16,6 +12,10 @@ import {
 import { useChatWebSocket } from '@/hooks/useChatWebSocket'
 import { usePresenceStore } from '@/hooks/usePresence'
 import { getCurrentUser } from '@/hooks/useUsers'
+import { useQueryClient } from '@tanstack/react-query'
+import { MessageCircle, Send, Trash2, Users } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 
 export default function Messages() {
     const { id: urlConvId } = useParams<{ id: string }>()
@@ -175,7 +175,7 @@ export default function Messages() {
     useEffect(() => {
         hasHydratedMessagesRef.current = false
         lastChimedMessageIdRef.current = null
-    }, [selectedConversationId])
+    }, [])
 
     // Initialize participants from conversations data
     useEffect(() => {
@@ -321,8 +321,8 @@ export default function Messages() {
 
             <div className="h-full min-h-0 flex-1 flex overflow-hidden">
                 {/* Left Sidebar - Conversations (250px fixed) */}
-                <div className="w-[250px] border-r bg-card flex flex-col overflow-hidden">
-                    <div className="p-4 border-b shrink-0 h-[60px] flex items-center">
+                <div className="w-62.5 border-r bg-card flex flex-col overflow-hidden">
+                    <div className="p-4 border-b shrink-0 h-15 flex items-center">
                         <h2 className="font-semibold text-sm flex items-center gap-2">
                             <MessageCircle className="w-4 h-4" />
                             Direct Messages
@@ -464,7 +464,7 @@ export default function Messages() {
 
                 {/* Center - Chat Window */}
                 <div className="flex-1 flex flex-col overflow-hidden bg-background">
-                    <div className="border-b px-6 h-[60px] flex items-center justify-between shrink-0 bg-card/30 backdrop-blur-sm">
+                    <div className="border-b px-6 h-15 flex items-center justify-between shrink-0 bg-card/30 backdrop-blur-sm">
                         <div className="flex items-center gap-3">
                             {selectedConversation && (
                                 <>
@@ -599,8 +599,8 @@ export default function Messages() {
                 </div>
 
                 {/* Right Sidebar - Contact Info (200px fixed) */}
-                <div className="w-[200px] border-l bg-card hidden lg:flex flex-col overflow-hidden">
-                    <div className="p-4 border-b shrink-0 h-[60px] flex items-center">
+                <div className="w-50 border-l bg-card hidden lg:flex flex-col overflow-hidden">
+                    <div className="p-4 border-b shrink-0 h-15 flex items-center">
                         <h2 className="font-semibold text-sm flex items-center gap-2">
                             <Users className="w-4 h-4" />
                             Details

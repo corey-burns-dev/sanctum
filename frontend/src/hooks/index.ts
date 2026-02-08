@@ -1,5 +1,6 @@
 // Export all hooks from a single entry point
 
+export * from './useAudio'
 export * from './useAuth'
 export * from './useChat'
 export * from './useChatWebSocket'

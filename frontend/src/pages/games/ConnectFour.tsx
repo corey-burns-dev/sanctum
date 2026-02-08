@@ -1,8 +1,3 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, PartyPopper, Send } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { toast } from 'sonner'
 import { apiClient } from '@/api/client'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -18,6 +13,12 @@ import {
 import { Input } from '@/components/ui/input'
 import { getAuthToken, getCurrentUser } from '@/hooks'
 import { useGameRoomSession } from '@/hooks/useGameRoomSession'
+import { getAvatarUrl } from '@/lib/chat-utils'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { ChevronDown, PartyPopper, Send } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
 
 type GameState = {
     board: string[][]
@@ -401,11 +402,11 @@ export default function ConnectFour() {
     const playerOneName = room.creator.username
     const playerTwoName =
         room.opponent?.username || (gameState.status === 'pending' ? 'WAITING...' : 'BOT')
-    const playerOneAvatar = room.creator.avatar || `https://i.pravatar.cc/80?u=${playerOneName}`
+    const playerOneAvatar = room.creator.avatar || getAvatarUrl(playerOneName, 80)
     const playerTwoAvatar = room.opponent?.avatar
         ? room.opponent.avatar
         : room.opponent?.username
-          ? `https://i.pravatar.cc/80?u=${room.opponent.username}`
+          ? getAvatarUrl(room.opponent.username, 80)
           : ''
     const didIWin = !gameState.is_draw && gameState.winner_id === currentUser?.id
 
@@ -474,7 +475,7 @@ export default function ConnectFour() {
                 </div>
             )}
 
-            <div className="mx-auto grid h-full w-full max-w-[1600px] gap-3 px-3 py-2 lg:grid-cols-12 lg:gap-4">
+            <div className="mx-auto grid h-full w-full max-w-400 gap-3 px-3 py-2 lg:grid-cols-12 lg:gap-4">
                 {/* Game Area */}
                 <div className="min-h-0 overflow-hidden lg:col-span-9">
                     <Card className="flex h-full flex-col border-2 border-blue-500/20 bg-blue-900/10 shadow-xl">

@@ -1,6 +1,5 @@
-import { LogOut, Settings, User } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { ModeToggle } from '@/components/mode-toggle'
+import { topRouteNav, topServiceNav } from '@/components/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,15 +11,16 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { getCurrentUser, useIsAuthenticated, useLogout } from '@/hooks'
+import { getInitials } from '@/lib/chat-utils'
+import { LogOut, Settings, User } from 'lucide-react'
+import { Link } from 'react-router-dom'
+
+const navLinks = [...topRouteNav, ...topServiceNav]
 
 export function Navbar() {
     const isAuthenticated = useIsAuthenticated()
     const currentUser = getCurrentUser()
     const logout = useLogout()
-
-    const getInitials = (username: string) => {
-        return username.slice(0, 2).toUpperCase()
-    }
 
     return (
         <nav className="border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
@@ -30,48 +30,15 @@ export function Navbar() {
                         Sanctum
                     </Link>
                     <div className="hidden md:flex gap-6">
-                        <Link
-                            to="/posts"
-                            className="text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            Posts
-                        </Link>
-                        <Link
-                            to="/chat"
-                            className="text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            Chat
-                        </Link>
-                        <Link
-                            to="/profile"
-                            className="text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            Profile
-                        </Link>
-                        <Link
-                            to="/friends"
-                            className="text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            Friends
-                        </Link>
-                        <Link
-                            to="/messages"
-                            className="text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            Messages
-                        </Link>
-                        <Link
-                            to="/users"
-                            className="text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            Users
-                        </Link>
-                        <Link
-                            to="/games"
-                            className="text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            Games
-                        </Link>
+                        {navLinks.map((link) => (
+                            <Link
+                                key={link.path}
+                                to={link.path}
+                                className="text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                                {link.label}
+                            </Link>
+                        ))}
                     </div>
                 </div>
                 <div className="flex items-center gap-4">

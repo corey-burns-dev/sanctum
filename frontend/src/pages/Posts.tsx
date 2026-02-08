@@ -1,11 +1,11 @@
 // API
 
+import { apiClient } from '@/api/client'
 import { useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
 import { Heart, Image, Loader2, MessageCircle, Send, Smile, Video } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { apiClient } from '@/api/client'
 // Types
 import type { Post } from '@/api/types'
 import { PostCaption } from '@/components/posts/PostCaption'
@@ -18,35 +18,9 @@ import { Textarea } from '@/components/ui/textarea'
 // Hooks
 import { useCreatePost, useInfinitePosts, useLikePost } from '@/hooks/usePosts'
 import { getCurrentUser, useIsAuthenticated } from '@/hooks/useUsers'
+import { getAvatarUrl } from '@/lib/chat-utils'
+import { handleAuthOrFKError } from '@/lib/handleAuthOrFKError'
 import { cn } from '@/lib/utils'
-
-function handleAuthOrFKError(error: unknown) {
-    let msg: string
-    if (
-        typeof error === 'object' &&
-        error &&
-        'message' in error &&
-        typeof (error as { message?: unknown }).message === 'string'
-    ) {
-        msg = (error as { message: string }).message
-    } else {
-        msg = String(error)
-    }
-    if (
-        msg.includes('401') ||
-        msg.includes('403') ||
-        msg.toLowerCase().includes('unauthorized') ||
-        msg.toLowerCase().includes('forbidden') ||
-        msg.includes('foreign key constraint')
-    ) {
-        localStorage.removeItem('token')
-        localStorage.removeItem('user')
-        alert('Your session is invalid or your user no longer exists. Please log in again.')
-        window.location.href = '/login'
-        return true
-    }
-    return false
-}
 
 export default function Posts() {
     const [newPostTitle, setNewPostTitle] = useState('')
@@ -186,7 +160,7 @@ export default function Posts() {
                                     <AvatarImage
                                         src={
                                             currentUser?.avatar ||
-                                            `https://i.pravatar.cc/150?u=${currentUser?.username}`
+                                            getAvatarUrl(currentUser?.username ?? 'user')
                                         }
                                     />
                                     <AvatarFallback>
@@ -332,7 +306,7 @@ export default function Posts() {
                                                     <AvatarImage
                                                         src={
                                                             post.user.avatar ||
-                                                            `https://i.pravatar.cc/150?u=${post.user.username}`
+                                                            getAvatarUrl(post.user.username)
                                                         }
                                                     />
                                                     <AvatarFallback>

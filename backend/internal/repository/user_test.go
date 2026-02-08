@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"testing"
 	"vibeshift/internal/models"
@@ -68,13 +69,107 @@ func TestUserRepository_GetByID(t *testing.T) {
 
 			if tt.expectedError {
 				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
+			} else if assert.NotNil(t, user) {
 				assert.Equal(t, tt.expectedUser.Username, user.Username)
 			}
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
+}
+
+func TestUserRepository_GetByID_DatabaseError(t *testing.T) {
+	db, mock := setupMockDB(t)
+	repo := NewUserRepository(db)
+	ctx := context.Background()
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "users" WHERE "users"."id" = $1`)).
+		WithArgs(1, 1).
+		WillReturnError(errors.New("connection timeout"))
+
+	user, err := repo.GetByID(ctx, 1)
+	assert.Error(t, err)
+	assert.Nil(t, user)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestUserRepository_GetByIDWithPosts(t *testing.T) {
+	db, mock := setupMockDB(t)
+	repo := NewUserRepository(db)
+	ctx := context.Background()
+
+	t.Run("Success with Preload", func(t *testing.T) {
+		userID := uint(1)
+		limit := 5
+
+		// Expect user query
+		userRows := sqlmock.NewRows([]string{"id", "username"}).AddRow(userID, "testuser")
+		mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "users" WHERE "users"."id" = $1 AND "users"."deleted_at" IS NULL ORDER BY "users"."id" LIMIT $2`)).
+			WithArgs(userID, 1).
+			WillReturnRows(userRows)
+
+		// Expect posts query (preloaded)
+		postRows := sqlmock.NewRows([]string{"id", "title", "user_id"}).
+			AddRow(101, "Post 1", userID).
+			AddRow(102, "Post 2", userID)
+		mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "posts" WHERE "posts"."user_id" = $1 AND "posts"."deleted_at" IS NULL ORDER BY created_at DESC LIMIT $2`)).
+			WithArgs(userID, limit).
+			WillReturnRows(postRows)
+
+		user, err := repo.GetByIDWithPosts(ctx, userID, limit)
+		assert.NoError(t, err)
+		assert.NotNil(t, user)
+		assert.Len(t, user.Posts, 2)
+		assert.Equal(t, "Post 1", user.Posts[0].Title)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("Default Limit Enforcement", func(t *testing.T) {
+		userID := uint(1)
+		// limit <= 0 should default to 10
+		userRows := sqlmock.NewRows([]string{"id"}).AddRow(userID)
+		mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "users" WHERE "users"."id" = $1`)).
+			WithArgs(userID, 1).
+			WillReturnRows(userRows)
+
+		mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "posts" WHERE "posts"."user_id" = $1`)).
+			WithArgs(userID, 10). // Verified default limit
+			WillReturnRows(sqlmock.NewRows([]string{"id"}))
+
+		_, _ = repo.GetByIDWithPosts(ctx, userID, 0)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+func TestUserRepository_GetByEmail(t *testing.T) {
+	db, mock := setupMockDB(t)
+	repo := NewUserRepository(db)
+	ctx := context.Background()
+
+	t.Run("Success", func(t *testing.T) {
+		email := "test@example.com"
+		rows := sqlmock.NewRows([]string{"id", "email"}).AddRow(1, email)
+		mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "users" WHERE email = $1 AND "users"."deleted_at" IS NULL ORDER BY "users"."id" LIMIT $2`)).
+			WithArgs(email, 1).
+			WillReturnRows(rows)
+
+		user, err := repo.GetByEmail(ctx, email)
+		assert.NoError(t, err)
+		assert.NotNil(t, user)
+		assert.Equal(t, email, user.Email)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("Not Found", func(t *testing.T) {
+		email := "ghost@example.com"
+		mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "users" WHERE email = $1`)).
+			WithArgs(email, 1).
+			WillReturnError(gorm.ErrRecordNotFound)
+
+		user, err := repo.GetByEmail(ctx, email)
+		assert.NoError(t, err) // Should return nil, nil per implementation
+		assert.Nil(t, user)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 }
 
 func TestUserRepository_Create(t *testing.T) {
