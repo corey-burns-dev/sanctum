@@ -1,3 +1,17 @@
+import { useQueryClient } from '@tanstack/react-query'
+import {
+    Hash,
+    MessageCircle,
+    PanelLeftClose,
+    PanelLeftOpen,
+    PanelRightClose,
+    PanelRightOpen,
+    Send,
+    Users,
+    X,
+} from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import type { Conversation, Message, User } from '@/api/types'
 import { MessageList } from '@/components/chat/MessageList'
 import { ParticipantsList } from '@/components/chat/ParticipantsList'
@@ -19,20 +33,6 @@ import { useChatWebSocket } from '@/hooks/useChatWebSocket'
 import { usePresenceStore } from '@/hooks/usePresence'
 import { getCurrentUser } from '@/hooks/useUsers'
 import { cn } from '@/lib/utils'
-import { useQueryClient } from '@tanstack/react-query'
-import {
-    Hash,
-    MessageCircle,
-    PanelLeftClose,
-    PanelLeftOpen,
-    PanelRightClose,
-    PanelRightOpen,
-    Send,
-    Users,
-    X,
-} from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
 
 export default function Chat() {
     const { id: urlChatId } = useParams<{ id: string }>()
