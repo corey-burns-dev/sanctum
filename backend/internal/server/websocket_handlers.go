@@ -279,11 +279,7 @@ func (s *Server) validateChatToken(tokenString string) (uint, string, error) {
 			return nil, fiber.NewError(fiber.StatusUnauthorized, "Invalid signing method")
 		}
 		return []byte(s.config.JWTSecret), nil
-	},
-		jwt.WithIssuer("sanctum-api"),
-		jwt.WithAudience("sanctum-client"),
-		jwt.WithValidMethods([]string{"HS256"}),
-	)
+	})
 
 	if err != nil || !token.Valid {
 		return 0, "", err
@@ -292,6 +288,14 @@ func (s *Server) validateChatToken(tokenString string) (uint, string, error) {
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
 		return 0, "", fiber.NewError(fiber.StatusUnauthorized, "Invalid claims")
+	}
+
+	// Validate issuer and audience manually to support legacy tokens
+	if issuer, issuerOk := claims["iss"].(string); !issuerOk || (issuer != "sanctum-api" && issuer != "vibeshift-api") {
+		return 0, "", fiber.NewError(fiber.StatusUnauthorized, "Invalid token issuer")
+	}
+	if audience, audienceOk := claims["aud"].(string); !audienceOk || (audience != "sanctum-client" && audience != "vibeshift-client") {
+		return 0, "", fiber.NewError(fiber.StatusUnauthorized, "Invalid token audience")
 	}
 
 	sub, ok := claims["sub"].(string)

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to check latest versions of Docker images used in vibeshift
+# Script to check latest versions of Docker images used in sanctum
 # Usage: bash scripts/check-versions.sh
 
 set -e

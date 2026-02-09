@@ -1,4 +1,5 @@
 import { Bell, LogOut, Search, User } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { ModeToggle } from '@/components/mode-toggle'
 import {
@@ -21,11 +22,20 @@ import { getCurrentUser, useIsAuthenticated, useLogout } from '@/hooks'
 import { useNotificationStore } from '@/hooks/useRealtimeNotifications'
 import { cn } from '@/lib/utils'
 
-function NavPill({ item, active }: { item: NavItem; active: boolean }) {
+function NavPill({
+    item,
+    active,
+    showLabel,
+}: {
+    item: NavItem
+    active: boolean
+    showLabel: boolean
+}) {
     return (
         <Link
             key={item.path}
             to={item.path}
+            title={item.label}
             className={cn(
                 'inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition-colors',
                 active
@@ -34,13 +44,23 @@ function NavPill({ item, active }: { item: NavItem; active: boolean }) {
             )}
         >
             <item.icon className="h-3.5 w-3.5" />
-            <span>{item.label}</span>
+            {showLabel && <span className="truncate">{item.label}</span>}
         </Link>
     )
 }
 
 export function TopBar() {
     const location = useLocation()
+    const [iconsOnly, setIconsOnly] = useState(false)
+    useEffect(() => {
+        function update() {
+            if (typeof window === 'undefined') return
+            setIconsOnly(window.innerWidth >= 3840)
+        }
+        update()
+        window.addEventListener('resize', update)
+        return () => window.removeEventListener('resize', update)
+    }, [])
     const isAuthenticated = useIsAuthenticated()
     const currentUser = getCurrentUser()
     const logout = useLogout()
@@ -80,6 +100,7 @@ export function TopBar() {
                                 key={item.path}
                                 item={item}
                                 active={isRouteActive(location.pathname, item.path)}
+                                showLabel={!iconsOnly}
                             />
                         ))}
                     </div>

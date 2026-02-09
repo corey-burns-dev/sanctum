@@ -36,9 +36,21 @@ type videoChatPeer struct {
 }
 
 // safeWrite sends a message to the peer with mutex protection
-func (p *videoChatPeer) safeWrite(msgType int, data []byte) error {
+func (p *videoChatPeer) safeWrite(msgType int, data []byte) (err error) {
+	// Fast-fail when peer or connection is nil to avoid nil pointer deref
+	if p == nil || p.Conn == nil {
+		return fmt.Errorf("websocket connection is nil")
+	}
+
 	p.writeMu.Lock()
 	defer p.writeMu.Unlock()
+
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic writing to conn: %v", r)
+		}
+	}()
+
 	return p.Conn.WriteMessage(msgType, data)
 }
 

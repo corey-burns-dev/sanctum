@@ -35,6 +35,7 @@ export const mobileNav: NavItem[] = [
     { icon: Home, label: 'Home', path: '/' },
     { icon: MessageCircle, label: 'Messages', path: '/messages' },
     { icon: Gamepad2, label: 'Games', path: '/games' },
+    { icon: MessageSquare, label: 'Chatrooms', path: '/chat' },
 ]
 
 const routeTitles: Array<{ path: string; title: string }> = [

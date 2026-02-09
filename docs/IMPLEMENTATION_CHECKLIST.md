@@ -58,7 +58,7 @@
   - Implement token blacklist cleanup job
 
 - [ ] **Enforce WebSocket Connection Limits**
-  - Limit users to 5 concurrent WebSocket connections
+  - Limit users to 10 concurrent WebSocket connections
   - Track connections per user in Redis
   - Add connection cleanup on disconnect
   - Implement server-side heartbeat (ping/pong every 30s)
@@ -256,6 +256,7 @@
 ## 📝 Implementation Notes
 
 **For AI Agents:**
+
 - Each checkbox represents a discrete task
 - Tasks include specific endpoints, models, and technical details
 - Prioritize Tier 1 (🔴) before Tier 2 (🟡)
@@ -265,6 +266,7 @@
 - Update OpenAPI spec with new endpoints
 
 **Current Strengths:**
+
 - ✅ Structured logging with slog
 - ✅ Redis Pub/Sub for WebSocket scaling
 - ✅ Basic rate limiting
@@ -272,6 +274,7 @@
 - ✅ Integration test suite
 
 **Immediate Next Steps:**
+
 1. Implement Service layer refactor
 2. Add database read/write separation
 3. Integrate job queue for async processing

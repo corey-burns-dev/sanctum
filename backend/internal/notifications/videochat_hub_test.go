@@ -11,7 +11,7 @@ func TestVideoChatHub_JoinLeave(t *testing.T) {
 	hub := NewVideoChatHub()
 	roomID := "room1"
 	userID := uint(1)
-	conn := &websocket.Conn{}
+	var conn *websocket.Conn
 
 	hub.Join(roomID, userID, "user1", conn)
 	hub.mu.RLock()
@@ -30,11 +30,11 @@ func TestVideoChatHub_Limits(t *testing.T) {
 	roomID := "fullroom"
 
 	for i := uint(1); i <= MaxPeersPerRoom; i++ {
-		hub.Join(roomID, i, "user", &websocket.Conn{})
+		hub.Join(roomID, i, "user", nil)
 	}
 
 	// Next join should fail (log will show it, but we can check count)
-	hub.Join(roomID, MaxPeersPerRoom+1, "user", &websocket.Conn{})
+	hub.Join(roomID, MaxPeersPerRoom+1, "user", nil)
 
 	hub.mu.RLock()
 	assert.Len(t, hub.rooms[roomID], MaxPeersPerRoom)

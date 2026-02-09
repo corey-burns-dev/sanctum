@@ -19,6 +19,8 @@ export function BottomBar() {
                             <Link
                                 key={item.path}
                                 to={item.path}
+                                title={item.label}
+                                aria-label={item.label}
                                 className={cn(
                                     'flex flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-semibold transition-colors',
                                     active
@@ -26,14 +28,15 @@ export function BottomBar() {
                                         : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
                                 )}
                             >
-                                <item.icon className="h-4 w-4" />
-                                <span className="leading-none">{item.label}</span>
+                                <item.icon className="h-5 w-5" />
                             </Link>
                         )
                     })}
 
                     <Link
                         to="/profile"
+                        title="Profile"
+                        aria-label="Profile"
                         className={cn(
                             'flex flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-semibold transition-colors',
                             isRouteActive(location.pathname, '/profile')
@@ -47,7 +50,6 @@ export function BottomBar() {
                                 {currentUser?.username?.[0]?.toUpperCase() || 'U'}
                             </AvatarFallback>
                         </Avatar>
-                        <span className="leading-none">Profile</span>
                     </Link>
                 </div>
             </div>

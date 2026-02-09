@@ -287,8 +287,16 @@ test-e2e:
 
 # Database seeding
 seed:
-	@echo "$(BLUE)Seeding database with test data...$(NC)"
+	@echo "$(BLUE)Seeding database with default parameters...$(NC)"
 	cd backend && $(GO) run cmd/seed/main.go
+
+seed-all:
+	@echo "$(BLUE)Applying MegaPopulated seeder preset...$(NC)"
+	cd backend && $(GO) run cmd/seed/main.go -preset MegaPopulated
+
+seed-clean:
+	@echo "$(BLUE)Cleaning and seeding database...$(NC)"
+	cd backend && $(GO) run cmd/seed/main.go -clean=true
 	@echo "$(GREEN)✓ Database seeded successfully!$(NC)"
 	@echo "$(YELLOW)📧 Test users password: password123$(NC)"
 

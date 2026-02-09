@@ -103,7 +103,7 @@ export default function PostDetail() {
                                 <img
                                     src={post.image_url}
                                     alt={`Post by ${post.user?.username}`}
-                                    className="w-full max-h-[520px] object-cover"
+                                    className="w-full max-h-130 object-cover"
                                     loading="lazy"
                                 />
                             </div>

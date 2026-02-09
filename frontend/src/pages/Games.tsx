@@ -226,7 +226,7 @@ export default function Games() {
                     <div>
                         <h1 className="text-4xl font-black italic uppercase tracking-tighter text-foreground mb-2 flex items-center gap-3">
                             <Gamepad2 className="w-10 h-10 text-primary" />
-                            Vibe Arcade
+                            Arcade
                         </h1>
                         <p className="text-muted-foreground font-medium">
                             Global Multiplayer & Competitive Leaderboards
@@ -435,7 +435,7 @@ export default function Games() {
                                     </div>
                                     <div className="flex justify-between items-center bg-white/10 p-3 rounded-xl">
                                         <span className="text-xs font-bold uppercase opacity-80">
-                                            VibePoints
+                                            Points
                                         </span>
                                         <span className="font-black italic text-xl">1,250</span>
                                     </div>

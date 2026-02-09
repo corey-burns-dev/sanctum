@@ -24,6 +24,7 @@ const Friends = lazy(() => import('@/pages/Friends'))
 const Messages = lazy(() => import('@/pages/Messages'))
 const Chat = lazy(() => import('@/pages/Chat'))
 const UsersPage = lazy(() => import('@/pages/Users'))
+const UserProfilePage = lazy(() => import('@/pages/UserProfile'))
 const Games = lazy(() => import('@/pages/Games'))
 const ConnectFour = lazy(() => import('@/pages/games/ConnectFour'))
 const Chess = lazy(() => import('@/pages/games/Chess'))
@@ -201,6 +202,14 @@ function RoutesWithPrefetch() {
                     element={
                         <ProtectedRoute>
                             <UsersPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/users/:id"
+                    element={
+                        <ProtectedRoute>
+                            <UserProfilePage />
                         </ProtectedRoute>
                     }
                 />

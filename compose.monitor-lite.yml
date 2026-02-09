@@ -21,7 +21,7 @@ services:
       - "3001:3001"
     restart: unless-stopped
     networks:
-      - vibeshift_default
+      - sanctum_default
 
 volumes:
   uptime_kuma_data:

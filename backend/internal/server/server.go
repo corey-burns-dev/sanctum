@@ -375,11 +375,11 @@ func (s *Server) AuthRequired() fiber.Handler {
 		}
 
 		// Validate issuer and audience
-		if issuer, issuerOk := claims["iss"].(string); !issuerOk || issuer != "sanctum-api" {
+		if issuer, issuerOk := claims["iss"].(string); !issuerOk || (issuer != "sanctum-api" && issuer != "vibeshift-api") {
 			return models.RespondWithError(c, fiber.StatusUnauthorized,
 				models.NewUnauthorizedError("Invalid token issuer"))
 		}
-		if audience, audienceOk := claims["aud"].(string); !audienceOk || audience != "sanctum-client" {
+		if audience, audienceOk := claims["aud"].(string); !audienceOk || (audience != "sanctum-client" && audience != "vibeshift-client") {
 			return models.RespondWithError(c, fiber.StatusUnauthorized,
 				models.NewUnauthorizedError("Invalid token audience"))
 		}

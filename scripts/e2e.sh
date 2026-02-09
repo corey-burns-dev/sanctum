@@ -2,7 +2,7 @@
 set -e
 
 # Comprehensive E2E test for Tic-Tac-Toe game
-API_BASE="http://localhost:8082/api"
+API_BASE="http://localhost:${GO_PORT:-8375}/api"
 TS=$(date +%s)
 USER1_NAME="e2e_p1_${TS}"
 USER2_NAME="e2e_p2_${TS}"
