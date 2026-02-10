@@ -349,227 +349,6 @@ paths:
       summary: Reject sanctum request
       tags:
       - sanctums-admin
-  /api/streams:
-    get:
-      parameters:
-      - description: Filter by category
-        in: query
-        name: category
-        type: string
-      - default: 20
-        description: Limit results
-        in: query
-        name: limit
-        type: integer
-      - default: 0
-        description: Offset for pagination
-        in: query
-        name: offset
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Get live streams
-      tags:
-      - Streams
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Stream data
-        in: body
-        name: stream
-        required: true
-        schema:
-          $ref: '#/definitions/server.CreateStreamRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/models.Stream'
-      summary: Create a new stream
-      tags:
-      - Streams
-  /api/streams/{id}:
-    delete:
-      parameters:
-      - description: Stream ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      responses:
-        "204":
-          description: No Content
-      summary: Delete a stream
-      tags:
-      - Streams
-    get:
-      parameters:
-      - description: Stream ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.Stream'
-      summary: Get stream by ID
-      tags:
-      - Streams
-    put:
-      consumes:
-      - application/json
-      parameters:
-      - description: Stream ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: Stream data
-        in: body
-        name: stream
-        required: true
-        schema:
-          $ref: '#/definitions/server.UpdateStreamRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.Stream'
-      summary: Update a stream
-      tags:
-      - Streams
-  /api/streams/{id}/end:
-    post:
-      parameters:
-      - description: Stream ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.Stream'
-      summary: End streaming
-      tags:
-      - Streams
-  /api/streams/{id}/go-live:
-    post:
-      parameters:
-      - description: Stream ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.Stream'
-      summary: Start streaming (go live)
-      tags:
-      - Streams
-  /api/streams/{id}/messages:
-    get:
-      parameters:
-      - description: Stream ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - default: 50
-        description: Limit results
-        in: query
-        name: limit
-        type: integer
-      - default: 0
-        description: Offset for pagination
-        in: query
-        name: offset
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/models.StreamMessage'
-            type: array
-      summary: Get stream chat messages
-      tags:
-      - Streams
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Stream ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: Message content
-        in: body
-        name: message
-        required: true
-        schema:
-          additionalProperties:
-            type: string
-          type: object
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/models.StreamMessage'
-      summary: Send stream chat message
-      tags:
-      - Streams
-  /api/streams/categories:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              type: string
-            type: array
-      summary: Get stream categories
-      tags:
-      - Streams
-  /api/streams/me:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/models.Stream'
-            type: array
-      summary: Get my streams
-      tags:
-      - Streams
   /auth/login:
     post:
       consumes:
@@ -758,6 +537,227 @@ paths:
       summary: Get my sanctum requests
       tags:
       - sanctums
+  /streams:
+    get:
+      parameters:
+      - description: Filter by category
+        in: query
+        name: category
+        type: string
+      - default: 20
+        description: Limit results
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get live streams
+      tags:
+      - Streams
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Stream data
+        in: body
+        name: stream
+        required: true
+        schema:
+          $ref: '#/definitions/server.CreateStreamRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Stream'
+      summary: Create a new stream
+      tags:
+      - Streams
+  /streams/{id}:
+    delete:
+      parameters:
+      - description: Stream ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+      summary: Delete a stream
+      tags:
+      - Streams
+    get:
+      parameters:
+      - description: Stream ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Stream'
+      summary: Get stream by ID
+      tags:
+      - Streams
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Stream ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Stream data
+        in: body
+        name: stream
+        required: true
+        schema:
+          $ref: '#/definitions/server.UpdateStreamRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Stream'
+      summary: Update a stream
+      tags:
+      - Streams
+  /streams/{id}/end:
+    post:
+      parameters:
+      - description: Stream ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Stream'
+      summary: End streaming
+      tags:
+      - Streams
+  /streams/{id}/go-live:
+    post:
+      parameters:
+      - description: Stream ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Stream'
+      summary: Start streaming (go live)
+      tags:
+      - Streams
+  /streams/{id}/messages:
+    get:
+      parameters:
+      - description: Stream ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: 50
+        description: Limit results
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.StreamMessage'
+            type: array
+      summary: Get stream chat messages
+      tags:
+      - Streams
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Stream ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Message content
+        in: body
+        name: message
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.StreamMessage'
+      summary: Send stream chat message
+      tags:
+      - Streams
+  /streams/categories:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              type: string
+            type: array
+      summary: Get stream categories
+      tags:
+      - Streams
+  /streams/me:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Stream'
+            type: array
+      summary: Get my streams
+      tags:
+      - Streams
 schemes:
 - http
 - https
