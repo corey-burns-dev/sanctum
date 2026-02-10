@@ -67,7 +67,7 @@
 
 ### Code Architecture
 
-- [ ] **Introduce Service Layer**
+- [ ] **Introduce Service Layer** — In progress (scaffolded `/internal/service` package)
   - Create `/internal/service` package
   - Extract business logic from handlers to service layer
   - Pattern: Handler → Service → Repository
