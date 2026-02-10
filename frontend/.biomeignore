@@ -1,0 +1,8 @@
+
+# Ignore build artifacts and deps
+
+/dist
+dist/**
+dist/*
+node_modules
+.DS_Store

@@ -29,6 +29,10 @@ backend/config.yml
 /build
 /bin
 
+# Distribution artifacts
+dist/
+frontend/dist/
+
 # Go modules (don't ignore go.sum/go.mod)
 
 # OS

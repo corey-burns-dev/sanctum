@@ -1,6 +1,13 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.3.14/schema.json",
 	"files": {
+		"experimentalScannerIgnores": [
+			"frontend/dist/**",
+			"**/dist/**",
+			"**/.astro/**",
+			"**/.next/**",
+			"**/build/**"
+		],
 		"ignoreUnknown": false,
 		"includes": ["**/*.{js,jsx,ts,tsx,json,jsonc,mjs,cjs}"]
 	},

@@ -220,7 +220,9 @@ fmt-frontend:
 
 lint-frontend:
 	@echo "$(BLUE)Linting frontend code with Biome...$(NC)"
-	cd frontend && $(BUN) --bun biome check .
+	# In CI, clean build artifacts to ensure linting is deterministic.
+	# Locally we avoid removing `dist` so developers' build output isn't destroyed.
+	cd frontend && if [ -n "$(CI)" ]; then rm -rf dist; fi && $(BUN) --bun biome check .
 	@echo "$(GREEN)✓ Frontend linting passed$(NC)"
 
 # Frontend dependencies
