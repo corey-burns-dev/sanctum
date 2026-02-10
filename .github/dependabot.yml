@@ -1,9 +1,5 @@
-# Dependabot configuration for automated dependency updates
-# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
-
 version: 2
 updates:
-  # Go backend dependencies
   - package-ecosystem: 'gomod'
     directory: '/backend'
     schedule:
@@ -13,19 +9,16 @@ updates:
       timezone: 'America/New_York'
     commit-message:
       prefix: 'deps(go)'
-    labels:
-      - 'dependencies'
-      - 'go'
+    labels: ['dependencies', 'go']
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
     groups:
       go-minor:
-        patterns:
-          - '*'
-        update-types:
-          - 'minor'
-          - 'patch'
+        patterns: ['*']
+        update-types: ['minor', 'patch']
 
-  # Frontend npm/bun dependencies
   - package-ecosystem: 'npm'
     directory: '/frontend'
     schedule:
@@ -35,37 +28,44 @@ updates:
       timezone: 'America/New_York'
     commit-message:
       prefix: 'deps(frontend)'
-    labels:
-      - 'dependencies'
-      - 'frontend'
+    labels: ['dependencies', 'frontend']
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
     groups:
       npm-minor:
-        patterns:
-          - '*'
-        update-types:
-          - 'minor'
-          - 'patch'
+        patterns: ['*']
+        update-types: ['minor', 'patch']
 
-  # Docker base images
   - package-ecosystem: 'docker'
     directory: '/'
     schedule:
       interval: 'weekly'
       day: 'monday'
+      time: '09:00'
+      timezone: 'America/New_York'
     commit-message:
       prefix: 'deps(docker)'
-    labels:
-      - 'dependencies'
-      - 'docker'
+    labels: ['dependencies', 'docker']
+    open-pull-requests-limit: 5
+    groups:
+      docker-minor:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
 
-  # GitHub Actions
   - package-ecosystem: 'github-actions'
     directory: '/'
     schedule:
       interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'America/New_York'
     commit-message:
       prefix: 'ci'
-    labels:
-      - 'ci'
-      - 'dependencies'
+    labels: ['ci', 'dependencies']
+    open-pull-requests-limit: 5
+    groups:
+      actions-minor:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
