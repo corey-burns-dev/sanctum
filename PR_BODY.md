@@ -8,9 +8,15 @@
 - [ ] Docs / CI / Chore
 
 ## Changes
+**Summary (AI-generated):**
+- Stabilizes CI and developer tooling: fixes the CI workflow and makes frontend linting CI-safe.
+- Updates and bumps backend and frontend dependencies to current versions, and runs tests to validate compatibility.
+- Removes incomplete service-layer scaffolding and cleans up implementation docs.
+- Fixes a health-check bug and related README/architecture notes.
+- Large frontend changes (UI components, hooks, and pages) and refactors across ~117 files.
 
-**Summary (auto-generated):**
-- Commits:
+**Commits (selection):**
+- chore(scripts): add PR body generator and PR upsert script
 - chore: ignore dist and make frontend lint CI-safe
 - chore: update implementation checklist and biome.json
 - chore(makefile): run backend dependency updates inside container to avoid host/container Go version drift
@@ -25,6 +31,7 @@
  .github/workflows/ci.yml                           |    6 +-
  .gitignore                                         |    6 +
  Makefile                                           |    9 +-
+ PR_BODY.md                                         |  156 ++
  README.md                                          |    2 +-
  backend/go.mod                                     |   17 +-
  backend/go.sum                                     |   34 +-
@@ -135,7 +142,9 @@
  frontend/vite.config.ts                            |  124 +-
  frontend/vitest.config.ts                          |    2 +-
  issues_and_agent_prompts.md                        |  382 ++++
- 114 files changed, 13069 insertions(+), 12051 deletions(-)
+ scripts/gen_pr_body.sh                             |   82 +
+ scripts/pr_upsert.sh                               |   22 +
+ 117 files changed, 13329 insertions(+), 12051 deletions(-)
 ```
 
 ## How to Test
