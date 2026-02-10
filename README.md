@@ -124,7 +124,7 @@ sanctum/
 
 ### Backend
 
-- **Framework:** Go with net/http
+- **Framework:** Go with [Fiber](https://gofiber.io)
 - **Databases:** PostgreSQL (persistence), Redis (caching)
 - **Features:** Graceful shutdown, health checks, CORS support
 

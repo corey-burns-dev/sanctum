@@ -296,14 +296,16 @@ func (s *Server) HealthCheck(c *fiber.Ctx) error {
 	}
 
 	status := fiber.StatusOK
+	overallStatus := "healthy"
 	if dbStatus == "unhealthy" || redisStatus == "unhealthy" {
 		status = fiber.StatusServiceUnavailable
+		overallStatus = "unhealthy"
 	}
 
 	return c.Status(status).JSON(fiber.Map{
 		"message": "Vibecheck",
 		"version": "1.0.0",
-		"status":  "healthy",
+		"status":  overallStatus,
 		"checks": fiber.Map{
 			"database": dbStatus,
 			"redis":    redisStatus,
