@@ -325,8 +325,9 @@ deps-update: deps-tidy
 
 deps-update-backend:
 	@echo "$(BLUE)Updating Go dependencies...$(NC)"
-	cd backend && $(GO) get -u ./...
-	cd backend && $(GO) mod tidy
+	@echo "$(BLUE)Updating Go dependencies inside container...$(NC)"
+	$(DOCKER_COMPOSE) $(COMPOSE_FILES) exec -T app go get -u ./...
+	$(DOCKER_COMPOSE) $(COMPOSE_FILES) exec -T app go mod tidy
 	@echo "$(GREEN)✓ Go dependencies updated$(NC)"
 
 deps-update-frontend:
