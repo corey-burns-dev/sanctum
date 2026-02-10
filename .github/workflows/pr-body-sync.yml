@@ -1,6 +1,11 @@
 name: PR Body Sync
 
 on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
   push:
     branches-ignore:
       - main
@@ -29,6 +34,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            echo "has_pr=true" >> "$GITHUB_OUTPUT"
+            echo "pr_number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+            echo "base_ref=${{ github.event.pull_request.base.ref }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           BRANCH="${GITHUB_REF_NAME}"
           HEAD_REF="${GITHUB_REPOSITORY_OWNER}:${BRANCH}"
