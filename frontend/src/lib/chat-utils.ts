@@ -81,10 +81,18 @@ export function deduplicateDMConversations(
   return deduped
 }
 
-/** Build the WebSocket base URL from the current page location */
+/** Build the WebSocket base URL from the current page location or VITE_API_URL */
 export function getWsBaseUrl(): string {
+  // If VITE_API_URL is an absolute URL, derive WS from it
+  const apiUrl = import.meta.env.VITE_API_URL
+  if (apiUrl && apiUrl.startsWith('http')) {
+    const url = new URL(apiUrl)
+    const protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${protocol}//${url.host}`
+  }
+
+  // Fallback to same-origin
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const host = window.location.hostname
-  const port = import.meta.env.VITE_API_PORT || '8375'
-  return `${protocol}//${host}:${port}`
+  const host = window.location.host // includes port if present
+  return `${protocol}//${host}`
 }

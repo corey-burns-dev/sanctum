@@ -1,26 +1,38 @@
 {
-  "compilerOptions": {
-    "target": "ESNext",
-    "useDefineForClassFields": true,
-    "lib": ["DOM", "ESNext"],
-    "jsx": "react-jsx",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "paths": {
-      "@/*": ["./src/*"],
-      "@/components": ["./src/components"],
-      "@/lib": ["./src/lib"],
-      "@/hooks": ["./src/hooks"],
-      "@/components/ui": ["./src/components/ui"],
-      "@/pages": ["./src/pages"]
-    }
-  },
-  "include": ["src"]
+	"compilerOptions": {
+		"baseUrl": ".",
+		"target": "ESNext",
+		"useDefineForClassFields": true,
+		"lib": ["DOM", "ESNext"],
+		"jsx": "react-jsx",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"isolatedModules": true,
+		"noEmit": true,
+		"paths": {
+			"@/*": ["./src/*"],
+			"@/components": ["./src/components"],
+			"@/lib": ["./src/lib"],
+			"@/hooks": ["./src/hooks"],
+			"@/components/ui": ["./src/components/ui"],
+			"@/pages": ["./src/pages"]
+		}
+	},
+	"include": ["src"],
+	"exclude": [
+		"node_modules",
+		"dist",
+		"**/*.spec.ts",
+		"**/*.test.*",
+		"**/*.spec.*",
+		"playwright-report",
+		"playwright-report/**",
+		"tests",
+		"tests/**"
+	]
 }

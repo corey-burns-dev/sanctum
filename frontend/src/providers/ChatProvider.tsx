@@ -1,6 +1,7 @@
 import type { Message, User } from "@/api/types";
 import { useIsAuthenticated } from "@/hooks/useUsers";
 import { getWsBaseUrl } from "@/lib/chat-utils";
+import { createTicketedWS, getNextBackoff } from "@/lib/ws-utils";
 import { useQueryClient } from "@tanstack/react-query";
 import {
 	createContext,
@@ -324,15 +325,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
 		[],
 	);
 
-	const connect = useCallback(() => {
+	const connect = useCallback(async () => {
 		if (!isAuthenticated) return;
 		if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return;
-
-		const token = localStorage.getItem("token");
-		if (!token) {
-			console.error("No auth token found");
-			return;
-		}
 
 		// Get current user info from localStorage
 		const userStr = localStorage.getItem("user");
@@ -349,216 +344,218 @@ export function ChatProvider({ children }: ChatProviderProps) {
 		}
 
 		// Create WebSocket connection
-		const wsUrl = `${getWsBaseUrl()}/api/ws/chat?token=${token}`;
-		const ws = new WebSocket(wsUrl);
+		try {
+			const ws = await createTicketedWS({
+				path: "/api/ws/chat",
+				onOpen: () => {
+					if (ws !== wsRef.current) return;
 
-		wsRef.current = ws;
+					setIsConnected(true);
+					reconnectAttemptsRef.current = 0;
+					// allow reconnects; mark that reconnection should be attempted
+					shouldReconnectRef.current = true;
 
-		ws.onopen = () => {
-			if (ws !== wsRef.current) return;
-
-			setIsConnected(true);
-			reconnectAttemptsRef.current = 0;
-			// allow reconnects; mark that reconnection should be attempted
-			shouldReconnectRef.current = true;
-
-			// Re-join all rooms that were previously joined
-			const roomsToJoin = new Set(joinedRoomsRef.current);
-			for (const roomId of roomsToJoin) {
-				ws.send(JSON.stringify({ type: "join", conversation_id: roomId }));
-			}
-		};
-
-		ws.onmessage = (event) => {
-			if (ws !== wsRef.current) return;
-
-			try {
-				const data: ChatWebSocketMessage = JSON.parse(event.data);
-
-				if (data.error) {
-					console.error("WS Server Error:", data.error);
-					if (data.error === "invalid token") {
-						localStorage.removeItem("token");
-						localStorage.removeItem("user");
-						window.location.href = "/login";
-						return;
+					// Re-join all rooms that were previously joined
+					const roomsToJoin = new Set(joinedRoomsRef.current);
+					for (const roomId of roomsToJoin) {
+						ws.send(JSON.stringify({ type: "join", conversation_id: roomId }));
 					}
-				}
+				},
+				onMessage: (event) => {
+					if (ws !== wsRef.current) return;
 
-				switch (data.type) {
-					case "connected":
-						break;
+					try {
+						const data: ChatWebSocketMessage = JSON.parse(event.data);
 
-					case "joined": {
-						const joinedId = data.conversation_id;
-						if (joinedId) {
-							joinedRoomsRef.current.add(joinedId);
-							setJoinedRooms(new Set(joinedRoomsRef.current));
-						}
-						break;
-					}
-
-					case "message":
-					case "room_message": {
-						// Support payload either under `payload` or flat top-level keys
-						const payload = data.payload || data;
-						const convId = payload.conversation_id || data.conversation_id;
-						const message = payload as Message;
-						if (!convId || !message || !message.id) break;
-
-						// Dedupe by conversation + message.id using short TTL map
-						const key = `${convId}:${message.id}`;
-						const now = Date.now();
-						const recent = recentMessageMapRef.current;
-						// cleanup old entries when map grows
-						if (recent.size > 2000) {
-							for (const [k, ts] of recent) {
-								if (now - ts > 1000 * 60 * 5) recent.delete(k);
+						if (data.error) {
+							console.error("WS Server Error:", data.error);
+							if (data.error === "invalid token" || data.error === "Invalid or expired WebSocket ticket") {
+								// We might need to refresh token or re-login if ticket/token fails
+								// But createTicketedWS handles ticket issuance.
+								return;
 							}
 						}
-						if (recent.has(key)) break;
-						recent.set(key, now);
 
-						// Update TanStack Query cache (avoid duplicates)
-						queryClient.setQueryData<Message[]>(
-							["chat", "messages", convId],
-							(old) => {
-								if (!old) return [message];
-								if (old.some((m) => m.id === message.id)) return old;
-								return [...old, message];
-							},
+						switch (data.type) {
+							case "connected":
+								break;
+
+							case "joined": {
+								const joinedId = data.conversation_id;
+								if (joinedId) {
+									joinedRoomsRef.current.add(joinedId);
+									setJoinedRooms(new Set(joinedRoomsRef.current));
+								}
+								break;
+							}
+
+							case "message":
+							case "room_message": {
+								// Support payload either under `payload` or flat top-level keys
+								const payload = data.payload || data;
+								const convId = payload.conversation_id || data.conversation_id;
+								const message = payload as Message;
+								if (!convId || !message || !message.id) break;
+
+								// Dedupe by conversation + message.id using short TTL map
+								const key = `${convId}:${message.id}`;
+								const now = Date.now();
+								const recent = recentMessageMapRef.current;
+								// cleanup old entries when map grows
+								if (recent.size > 2000) {
+									for (const [k, ts] of recent) {
+										if (now - ts > 1000 * 60 * 5) recent.delete(k);
+									}
+								}
+								if (recent.has(key)) break;
+								recent.set(key, now);
+
+								// Update TanStack Query cache (avoid duplicates)
+								queryClient.setQueryData<Message[]>(
+									["chat", "messages", convId],
+									(old) => {
+										if (!old) return [message];
+										if (old.some((m) => m.id === message.id)) return old;
+										return [...old, message];
+									},
+								);
+
+								// Ensure conversation list reflects new last_message / ordering
+								queryClient.invalidateQueries({
+									queryKey: ["chat", "conversations"],
+								});
+
+								// Notify all subscribers
+								for (const cb of messageHandlersRef.current) {
+									try {
+										cb(message, convId);
+									} catch (e) {
+										console.error("message handler failed", e);
+									}
+								}
+								break;
+							}
+
+							case "typing": {
+								const payload = data.payload || data;
+								const convId = payload.conversation_id || data.conversation_id;
+								const userId = payload.user_id || payload.userId || data.user_id;
+								const username = payload.username || data.username;
+								const isTyping = payload.is_typing ?? payload.isTyping;
+								if (!convId) break;
+								for (const cb of typingHandlersRef.current) {
+									try {
+										cb(convId, userId, username, !!isTyping);
+									} catch (e) {
+										console.error("typing handler failed", e);
+									}
+								}
+								break;
+							}
+
+							case "presence":
+							case "user_status": {
+								const payload = data.payload || data;
+								const userId = payload.user_id || payload.userId || data.user_id;
+								const username = payload.username || data.username;
+								const status = payload.status;
+								for (const cb of presenceHandlersRef.current) {
+									try {
+										cb(userId, username, status);
+									} catch (e) {
+										console.error("presence handler failed", e);
+									}
+								}
+								break;
+							}
+
+							case "connected_users": {
+								const payload = data.payload || data;
+								const ids = payload.user_ids || payload.userIds || payload.userIds;
+								if (Array.isArray(ids)) {
+									for (const cb of connectedUsersHandlersRef.current) {
+										try {
+											cb(ids);
+										} catch (e) {
+											console.error("connected_users handler failed", e);
+										}
+									}
+								}
+								break;
+							}
+
+							case "participant_joined":
+							case "participant_left": {
+								const payload = data.payload || data;
+								const convId = payload.conversation_id || data.conversation_id;
+								const participants = payload.participants;
+								if (convId && Array.isArray(participants)) {
+									for (const cb of participantsUpdateHandlersRef.current) {
+										try {
+											cb(convId, participants);
+										} catch (e) {
+											console.error("participantsUpdate handler failed", e);
+										}
+									}
+								}
+								break;
+							}
+
+							case "chatroom_presence": {
+								const payload = data.payload || data;
+								for (const cb of chatroomPresenceHandlersRef.current) {
+									try {
+										cb(payload);
+									} catch (e) {
+										console.error("chatroomPresence handler failed", e);
+									}
+								}
+								break;
+							}
+
+							case "read":
+								// Invalidate messages to refresh read status
+								if (data.conversation_id) {
+									queryClient.invalidateQueries({
+										queryKey: ["chat", "messages", data.conversation_id],
+									});
+								}
+								break;
+						}
+					} catch (error) {
+						console.error("Failed to parse WebSocket message:", error);
+					}
+				},
+				onError: (error) => {
+					if (ws !== wsRef.current) return;
+					console.error("WebSocket error:", error);
+				},
+				onClose: () => {
+					if (ws !== wsRef.current) return;
+
+					wsRef.current = null;
+					setIsConnected(false);
+
+					// Only reconnect if still authenticated and not explicitly disabled
+					if (isAuthenticated && shouldReconnectRef.current) {
+						const delay = getNextBackoff(reconnectAttemptsRef.current++);
+						console.log(
+							`WebSocket disconnected. Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current})`,
 						);
-
-						// Ensure conversation list reflects new last_message / ordering
-						queryClient.invalidateQueries({
-							queryKey: ["chat", "conversations"],
-						});
-
-						// Notify all subscribers
-						for (const cb of messageHandlersRef.current) {
-							try {
-								cb(message, convId);
-							} catch (e) {
-								console.error("message handler failed", e);
-							}
-						}
-						break;
+						reconnectTimeoutRef.current = window.setTimeout(() => {
+							connect();
+						}, delay);
 					}
+				},
+			});
 
-					case "typing": {
-						const payload = data.payload || data;
-						const convId = payload.conversation_id || data.conversation_id;
-						const userId = payload.user_id || payload.userId || data.user_id;
-						const username = payload.username || data.username;
-						const isTyping = payload.is_typing ?? payload.isTyping;
-						if (!convId) break;
-						for (const cb of typingHandlersRef.current) {
-							try {
-								cb(convId, userId, username, !!isTyping);
-							} catch (e) {
-								console.error("typing handler failed", e);
-							}
-						}
-						break;
-					}
-
-					case "presence":
-					case "user_status": {
-						const payload = data.payload || data;
-						const userId = payload.user_id || payload.userId || data.user_id;
-						const username = payload.username || data.username;
-						const status = payload.status;
-						for (const cb of presenceHandlersRef.current) {
-							try {
-								cb(userId, username, status);
-							} catch (e) {
-								console.error("presence handler failed", e);
-							}
-						}
-						break;
-					}
-
-					case "connected_users": {
-						const payload = data.payload || data;
-						const ids = payload.user_ids || payload.userIds || payload.userIds;
-						if (Array.isArray(ids)) {
-							for (const cb of connectedUsersHandlersRef.current) {
-								try {
-									cb(ids);
-								} catch (e) {
-									console.error("connected_users handler failed", e);
-								}
-							}
-						}
-						break;
-					}
-
-					case "participant_joined":
-					case "participant_left": {
-						const payload = data.payload || data;
-						const convId = payload.conversation_id || data.conversation_id;
-						const participants = payload.participants;
-						if (convId && Array.isArray(participants)) {
-							for (const cb of participantsUpdateHandlersRef.current) {
-								try {
-									cb(convId, participants);
-								} catch (e) {
-									console.error("participantsUpdate handler failed", e);
-								}
-							}
-						}
-						break;
-					}
-
-					case "chatroom_presence": {
-						const payload = data.payload || data;
-						for (const cb of chatroomPresenceHandlersRef.current) {
-							try {
-								cb(payload);
-							} catch (e) {
-								console.error("chatroomPresence handler failed", e);
-							}
-						}
-						break;
-					}
-
-					case "read":
-						// Invalidate messages to refresh read status
-						if (data.conversation_id) {
-							queryClient.invalidateQueries({
-								queryKey: ["chat", "messages", data.conversation_id],
-							});
-						}
-						break;
-				}
-			} catch (error) {
-				console.error("Failed to parse WebSocket message:", error);
-			}
-		};
-
-		ws.onerror = (error) => {
-			if (ws !== wsRef.current) return;
-			console.error("WebSocket error:", error);
-		};
-
-		ws.onclose = () => {
-			if (ws !== wsRef.current) return;
-
-			wsRef.current = null;
-			setIsConnected(false);
-
-			// Only reconnect if still authenticated and not explicitly disabled
+			wsRef.current = ws;
+		} catch (err) {
 			if (isAuthenticated && shouldReconnectRef.current) {
-				reconnectAttemptsRef.current++;
-				const delay = Math.min(1000 * 2 ** reconnectAttemptsRef.current, 30000);
-				console.log(
-					`WebSocket disconnected. Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current})`,
-				);
-				reconnectTimeoutRef.current = window.setTimeout(() => {
-					connect();
-				}, delay);
+				const delay = getNextBackoff(reconnectAttemptsRef.current++);
+				reconnectTimeoutRef.current = window.setTimeout(connect, delay);
 			}
-		};
+		}
 	}, [isAuthenticated, queryClient]);
 
 	// Connect on mount / auth change

@@ -74,18 +74,31 @@ fi
 
 # Test WebSocket connection
 echo "✓ Testing WebSocket connection to /api/ws/chat..."
-echo "  WebSocket URL: ws://localhost:8375/api/ws/chat?token=$TOKEN"
 
-# Use websocat if available, otherwise just report URL
-if command -v websocat &> /dev/null; then
-  # Test WebSocket with 3 second timeout
-  echo "  Attempting connection (3s timeout)..." 
-  timeout 3 websocat "ws://localhost:8375/api/ws/chat?token=$TOKEN" <<EOF || true
+# First, get a WS ticket
+echo "  Getting WebSocket ticket..."
+TICKET_RESPONSE=$(curl -s -X POST "$API_BASE/ws/ticket" \
+  -H "Authorization: Bearer $TOKEN")
+TICKET=$(echo "$TICKET_RESPONSE" | grep -o '"ticket":"[^"]*"' | cut -d'"' -f4)
+
+if [ -z "$TICKET" ]; then
+  echo "  ❌ Failed to get WebSocket ticket"
+  echo "  Response: $TICKET_RESPONSE"
+else
+  echo "  Ticket: ${TICKET:0:10}..."
+  echo "  WebSocket URL: ws://localhost:8375/api/ws/chat?ticket=$TICKET"
+
+  # Use websocat if available, otherwise just report URL
+  if command -v websocat &> /dev/null; then
+    # Test WebSocket with 3 second timeout
+    echo "  Attempting connection (3s timeout)..." 
+    timeout 3 websocat "ws://localhost:8375/api/ws/chat?ticket=$TICKET" <<EOF || true
 {"type":"join","conversation_id":$CONV_ID}
 EOF
-  echo "  WebSocket test completed"
-else
-  echo "  (websocat not available - URL looks correct)"
+    echo "  WebSocket test completed"
+  else
+    echo "  (websocat not available - URL looks correct)"
+  fi
 fi
 
 echo ""

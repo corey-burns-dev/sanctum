@@ -240,10 +240,6 @@
 
 ---
 
-Implementing the "Request and Approve" community model is a great way to maintain the specific focus of Sanctum. Below is a structured checklist for these features, followed by a design for your admin dashboard.
-
-### **Feature Implementation Checklist**
-
 ### **Admin Dashboard Design**
 
 An admin page is essential for a "moderated" growth strategy. Since you are using React and `shadcn` components, you can build a view at `/admin` with the following sections:

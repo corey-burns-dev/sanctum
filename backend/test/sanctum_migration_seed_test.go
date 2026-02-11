@@ -38,8 +38,8 @@ func getEnvOrDefault(key, fallback string) string {
 
 func readPGEnv() pgEnv {
 	env := pgEnv{
-		host: getEnvOrDefault("DB_HOST", "postgres_test"),
-		port: getEnvOrDefault("DB_PORT", "5432"),
+		host: getEnvOrDefault("DB_HOST", "localhost"),
+		port: getEnvOrDefault("DB_PORT", "5433"),
 		user: getEnvOrDefault("DB_USER", "sanctum_user"),
 		pass: getEnvOrDefault("DB_PASSWORD", "sanctum_password"),
 	}

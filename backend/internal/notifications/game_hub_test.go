@@ -32,19 +32,20 @@ func TestGameHub_RegisterUnregister(t *testing.T) {
 	userID := uint(1)
 	roomID := uint(101)
 	conn := &websocket.Conn{}
+	client := &Client{UserID: userID, Conn: conn}
 
-	hub.Register(userID, roomID, conn)
+	hub.RegisterClient(roomID, client)
 	hub.mu.RLock()
-	assert.Equal(t, conn, hub.rooms[roomID][userID])
+	assert.Equal(t, client, hub.rooms[roomID][userID])
 	assert.Contains(t, hub.userRooms[userID], roomID)
 	hub.mu.RUnlock()
 
 	// Unregister checks DB for creator cleanup
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "game_rooms" WHERE "game_rooms"."id" = $1`)).
+	mock.ExpectQuery(`^SELECT \* FROM "game_rooms" WHERE "game_rooms"\."id" = \$1.*`).
 		WithArgs(roomID, 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(roomID))
 
-	hub.Unregister(userID, roomID, conn)
+	hub.UnregisterClient(client)
 	hub.mu.RLock()
 	assert.Empty(t, hub.rooms[roomID])
 	assert.Empty(t, hub.userRooms[userID])
@@ -65,7 +66,7 @@ func TestGameHub_HandleJoin(t *testing.T) {
 		Status:    models.GamePending,
 	}
 
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "game_rooms" WHERE "game_rooms"."id" = $1`)).
+	mock.ExpectQuery(`^SELECT \* FROM "game_rooms" WHERE "game_rooms"\."id" = \$1.*`).
 		WithArgs(roomID, 1). // GORM adds LIMIT 1
 		WillReturnRows(sqlmock.NewRows([]string{"id", "creator_id", "status"}).AddRow(room.ID, room.CreatorID, room.Status))
 
@@ -75,5 +76,60 @@ func TestGameHub_HandleJoin(t *testing.T) {
 	mock.ExpectCommit()
 
 	hub.handleJoin(userID, GameAction{Type: "join_room", RoomID: roomID})
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+// Test that when the same user has multiple client instances (e.g., multiple tabs),
+// unregistering a stale client does not remove the active client's tracking.
+func TestGameHub_MultipleSocketsSameUserUnregisterBehavior(t *testing.T) {
+	db, mock := setupGameMockDB(t)
+	hub := NewGameHub(db, nil)
+	userID := uint(10)
+	roomID := uint(202)
+
+	connA := &websocket.Conn{}
+	connB := &websocket.Conn{}
+	clientA := &Client{UserID: userID, Conn: connA}
+	clientB := &Client{UserID: userID, Conn: connB}
+
+	// Register first client
+	hub.RegisterClient(roomID, clientA)
+	// Register second client for same user; should replace mapping in room
+	hub.RegisterClient(roomID, clientB)
+
+	hub.mu.RLock()
+	// The room mapping for the user should point to the most recently registered client
+	require.Equal(t, clientB, hub.rooms[roomID][userID])
+	// userRooms should contain the room
+	_, ok := hub.userRooms[userID][roomID]
+	require.True(t, ok)
+	hub.mu.RUnlock()
+
+	// Unregister the first (stale) client. Because the stored client != clientA,
+	// nothing should be removed.
+	hub.UnregisterClient(clientA)
+
+	hub.mu.RLock()
+	// Room should still have clientB
+	require.Equal(t, clientB, hub.rooms[roomID][userID])
+	// userRooms should still track the room
+	_, ok = hub.userRooms[userID][roomID]
+	require.True(t, ok)
+	hub.mu.RUnlock()
+
+	// Now when the active client unregisters, expect DB cleanup query when appropriate
+	mock.ExpectQuery(`^SELECT \* FROM "game_rooms" WHERE "game_rooms"\."id" = \$1.*`).
+		WithArgs(roomID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(roomID))
+
+	hub.UnregisterClient(clientB)
+
+	hub.mu.RLock()
+	_, roomExists := hub.rooms[roomID]
+	require.False(t, roomExists)
+	_, tracked := hub.userRooms[userID]
+	require.False(t, tracked)
+	hub.mu.RUnlock()
+
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

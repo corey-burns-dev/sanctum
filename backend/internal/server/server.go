@@ -426,6 +426,9 @@ func (s *Server) AdminRequired() fiber.Handler {
 // AuthRequired returns the authentication middleware
 func (s *Server) AuthRequired() fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		path := c.Path()
+		isWSPath := strings.HasPrefix(path, "/api/ws")
+
 		// 1. Try WebSocket ticket first (short-lived, single-use)
 		ticket := c.Query("ticket")
 		if ticket != "" && s.redis != nil {
@@ -446,9 +449,11 @@ func (s *Server) AuthRequired() fiber.Handler {
 					return c.Next()
 				}
 			}
-			// If ticket was provided but invalid/expired, we could either fail
-			// or fall back to JWT. Let's fall back for now to keep it flexible,
-			// but in a strict hardening scenario we might want to fail here.
+			// If ticket was provided but invalid/expired, we fail if it's a WS path
+			if isWSPath {
+				return models.RespondWithError(c, fiber.StatusUnauthorized,
+					models.NewUnauthorizedError("Invalid or expired WebSocket ticket"))
+			}
 		}
 
 		// 2. Fall back to JWT (Bearer token or query param)
@@ -461,7 +466,8 @@ func (s *Server) AuthRequired() fiber.Handler {
 			}
 		}
 
-		if tokenString == "" {
+		// Reject token in query param for WS routes (must use ticket)
+		if tokenString == "" && !isWSPath {
 			tokenString = c.Query("token")
 		}
 

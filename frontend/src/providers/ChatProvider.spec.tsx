@@ -4,6 +4,13 @@ import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatProvider, useChatContext } from "./ChatProvider";
 
+// Mock apiClient
+vi.mock("@/api/client", () => ({
+	apiClient: {
+		issueWSTicket: vi.fn().mockResolvedValue({ ticket: "test-ticket", expires_in: 60 }),
+	},
+}));
+
 // Minimal harness component to access context
 function HookTest({ cb }: { cb: (ctx: any) => void }) {
 	const ctx = useChatContext();
@@ -158,6 +165,7 @@ describe("ChatProvider websocket behavior", () => {
 		act(() => {
 			vi.advanceTimersByTime(1);
 		});
+		await act(async () => {});
 
 		expect(MockWebSocket.instances.length).toBe(1);
 
@@ -165,6 +173,7 @@ describe("ChatProvider websocket behavior", () => {
 		act(() => {
 			vi.advanceTimersByTime(2500);
 		});
+		await act(async () => {});
 
 		// New connection attempt should have created another WebSocket instance
 		expect(MockWebSocket.instances.length).toBeGreaterThan(1);

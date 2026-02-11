@@ -1,5 +1,7 @@
 FROM golang:1.25-alpine
 
+ENV PATH="/usr/local/go/bin:${PATH}"
+
 WORKDIR /app
 
 # Install dependencies for testing

@@ -9,7 +9,6 @@ import (
 
 	"sanctum/internal/models"
 
-	"github.com/gofiber/websocket/v2"
 	"gorm.io/gorm"
 )
 
@@ -25,8 +24,8 @@ type GameAction struct {
 type GameHub struct {
 	mu sync.RWMutex
 
-	// Map: roomID -> userID -> connection
-	rooms map[uint]map[uint]*websocket.Conn
+	// Map: roomID -> userID -> client
+	rooms map[uint]map[uint]*Client
 
 	// Map: userID -> set of rooms they are in
 	userRooms map[uint]map[uint]struct{}
@@ -41,60 +40,73 @@ func (h *GameHub) Name() string { return "game hub" }
 // NewGameHub creates a new GameHub instance
 func NewGameHub(db *gorm.DB, notifier *Notifier) *GameHub {
 	return &GameHub{
-		rooms:     make(map[uint]map[uint]*websocket.Conn),
+		rooms:     make(map[uint]map[uint]*Client),
 		userRooms: make(map[uint]map[uint]struct{}),
 		db:        db,
 		notifier:  notifier,
 	}
 }
 
-// Register registers a user's connection in a room
-func (h *GameHub) Register(userID, roomID uint, conn *websocket.Conn) {
+// RegisterClient registers a user's client in a room
+func (h *GameHub) RegisterClient(roomID uint, client *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	if h.rooms[roomID] == nil {
-		h.rooms[roomID] = make(map[uint]*websocket.Conn)
+		h.rooms[roomID] = make(map[uint]*Client)
 	}
-	h.rooms[roomID][userID] = conn
+	h.rooms[roomID][client.UserID] = client
 
-	if h.userRooms[userID] == nil {
-		h.userRooms[userID] = make(map[uint]struct{})
+	if h.userRooms[client.UserID] == nil {
+		h.userRooms[client.UserID] = make(map[uint]struct{})
 	}
-	h.userRooms[userID][roomID] = struct{}{}
+	h.userRooms[client.UserID][roomID] = struct{}{}
 
-	log.Printf("GameHub: User %d registered in room %d", userID, roomID)
+	log.Printf("GameHub: User %d registered in room %d", client.UserID, roomID)
 }
 
-// Unregister removes a user's connection
-func (h *GameHub) Unregister(userID, roomID uint, conn *websocket.Conn) {
+// UnregisterClient removes a user's client from all rooms
+func (h *GameHub) UnregisterClient(client *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	if room, ok := h.rooms[roomID]; ok {
-		if c, ok := room[userID]; ok && c == conn {
-			delete(room, userID)
-			if len(room) == 0 {
-				delete(h.rooms, roomID)
+	userID := client.UserID
+	rooms, ok := h.userRooms[userID]
+	if !ok {
+		return
+	}
+
+	// Remove only the rooms for which this exact client is registered.
+	// This avoids deleting tracking when a newer socket replaced an old one.
+	for roomID := range rooms {
+		if room, ok := h.rooms[roomID]; ok {
+			if c, ok := room[userID]; ok && c == client {
+				// Remove this client's registration for the room
+				delete(room, userID)
+				// If room is now empty, remove it entirely
+				if len(room) == 0 {
+					delete(h.rooms, roomID)
+				}
+
+				// Also remove the room from the user's tracked set
+				delete(h.userRooms[userID], roomID)
+
+				// Database cleanup: If the creator leaves a pending room, cancel it
+				var gRoom models.GameRoom
+				if err := h.db.First(&gRoom, roomID).Error; err == nil {
+					if gRoom.Status == models.GamePending && gRoom.CreatorID == userID {
+						gRoom.Status = models.GameCancelled
+						h.db.Save(&gRoom)
+						log.Printf("GameHub: Pending room %d cancelled because creator (User %d) disconnected", roomID, userID)
+					}
+				}
 			}
 		}
 	}
 
-	if rooms, ok := h.userRooms[userID]; ok {
-		delete(rooms, roomID)
-		if len(rooms) == 0 {
-			delete(h.userRooms, userID)
-		}
-	}
-
-	// Database cleanup: If the creator leaves a pending room, cancel it
-	var room models.GameRoom
-	if err := h.db.First(&room, roomID).Error; err == nil {
-		if room.Status == models.GamePending && room.CreatorID == userID {
-			room.Status = models.GameCancelled
-			h.db.Save(&room)
-			log.Printf("GameHub: Pending room %d cancelled because creator (User %d) disconnected", roomID, userID)
-		}
+	// If the user has no remaining tracked rooms, remove the entry entirely
+	if len(h.userRooms[userID]) == 0 {
+		delete(h.userRooms, userID)
 	}
 }
 
@@ -114,10 +126,8 @@ func (h *GameHub) BroadcastToRoom(roomID uint, action GameAction) {
 		return
 	}
 
-	for _, conn := range users {
-		if err := conn.WriteMessage(websocket.TextMessage, actionJSON); err != nil {
-			log.Printf("GameHub: WebSocket write error in room %d: %v", roomID, err)
-		}
+	for _, client := range users {
+		client.TrySend(actionJSON)
 	}
 }
 
@@ -341,7 +351,7 @@ func (h *GameHub) sendError(userID, roomID uint, message string) {
 		return
 	}
 
-	conn, ok := room[userID]
+	client, ok := room[userID]
 	if !ok {
 		return
 	}
@@ -354,7 +364,7 @@ func (h *GameHub) sendError(userID, roomID uint, message string) {
 		},
 	}
 	respJSON, _ := json.Marshal(resp)
-	_ = conn.WriteMessage(websocket.TextMessage, respJSON)
+	client.TrySend(respJSON)
 }
 
 // StartWiring connects GameHub to Redis
@@ -382,25 +392,23 @@ func (h *GameHub) Shutdown(_ context.Context) error {
 
 	// Close all room connections
 	for roomID, users := range h.rooms {
-		for userID, conn := range users {
+		for userID, client := range users {
 			shutdownMsg := GameAction{
 				Type:    "server_shutdown",
 				RoomID:  roomID,
 				Payload: map[string]string{"message": "Server is shutting down"},
 			}
 			if msgJSON, err := json.Marshal(shutdownMsg); err == nil {
-				if err := conn.WriteMessage(websocket.TextMessage, msgJSON); err != nil {
-					log.Printf("failed to write shutdown message in room %d for user %d: %v", roomID, userID, err)
-				}
+				client.TrySend(msgJSON)
 			}
-			if err := conn.Close(); err != nil {
+			if err := client.Conn.Close(); err != nil {
 				log.Printf("failed to close websocket in room %d for user %d: %v", roomID, userID, err)
 			}
 		}
 	}
 
 	// Clear all state
-	h.rooms = make(map[uint]map[uint]*websocket.Conn)
+	h.rooms = make(map[uint]map[uint]*Client)
 	h.userRooms = make(map[uint]map[uint]struct{})
 
 	return nil

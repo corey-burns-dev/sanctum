@@ -47,7 +47,7 @@ export class ApiError extends Error {
   }
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8375/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
 
 class ApiClient {
   private baseUrl: string
@@ -574,6 +574,13 @@ class ApiClient {
 
   async getCurrentUser(): Promise<User> {
     return this.request('/users/me')
+  }
+
+  // WebSocket Tickets
+  async issueWSTicket(): Promise<{ ticket: string; expires_in: number }> {
+    return this.request('/ws/ticket', {
+      method: 'POST',
+    })
   }
 }
 

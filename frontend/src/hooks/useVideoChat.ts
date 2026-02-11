@@ -1,9 +1,12 @@
 // WebRTC video chat hook — manages camera/mic, peer connections, and signaling via WebSocket
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { ApiError } from '@/api/client'
 import { getWsBaseUrl } from '@/lib/chat-utils'
+import { createTicketedWS, getNextBackoff } from '@/lib/ws-utils'
 
 interface PeerInfo {
+// ...
   userId: number
   username: string
 }
@@ -277,12 +280,6 @@ export function useVideoChat({ roomId, enabled = true }: UseVideoChatOptions) {
     if (!enabled || !roomId) return
     intentionalDisconnectRef.current = false
 
-    const token = localStorage.getItem('token')
-    if (!token) {
-      setError('Not authenticated')
-      return
-    }
-
     // Pre-check camera/mic permission before prompting
     try {
       const cameraPermission = await navigator.permissions.query({
@@ -313,45 +310,58 @@ export function useVideoChat({ roomId, enabled = true }: UseVideoChatOptions) {
     }
 
     // Open signaling WebSocket
-    const wsUrl = `${getWsBaseUrl()}/api/ws/videochat?token=${token}&room=${encodeURIComponent(roomId)}`
-    const ws = new WebSocket(wsUrl)
-    wsRef.current = ws
+    try {
+      const ws = await createTicketedWS({
+        path: `/api/ws/videochat?room=${encodeURIComponent(roomId)}`,
+        onOpen: () => {
+          setIsConnected(true)
+          setError(null)
+          reconnectAttemptsRef.current = 0
+        },
+        onMessage: event => {
+          try {
+            const signal = JSON.parse(event.data) as VideoChatSignal
+            handleSignal(signal)
+          } catch (err) {
+            console.error('Failed to parse signaling message:', err)
+          }
+        },
+        onClose: () => {
+          setIsConnected(false)
 
-    ws.onopen = () => {
-      setIsConnected(true)
-      setError(null)
-      reconnectAttemptsRef.current = 0
-    }
+          // Auto-reconnect with exponential backoff (unless intentional disconnect)
+          if (
+            !intentionalDisconnectRef.current &&
+            reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS
+          ) {
+            const delay = getNextBackoff(reconnectAttemptsRef.current++)
+            reconnectTimeoutRef.current = setTimeout(() => {
+              connect()
+            }, delay)
+          }
+        },
+        onError: () => {
+          setError('WebSocket connection failed')
+          setIsConnected(false)
+        }
+      })
+      wsRef.current = ws
+    } catch (err) {
+      if (intentionalDisconnectRef.current) return
 
-    ws.onmessage = event => {
-      try {
-        const signal = JSON.parse(event.data) as VideoChatSignal
-        handleSignal(signal)
-      } catch (err) {
-        console.error('Failed to parse signaling message:', err)
+      if (err instanceof ApiError && err.status === 401) {
+        setError('Not authenticated')
+        return
       }
-    }
 
-    ws.onclose = () => {
-      setIsConnected(false)
-
-      // Auto-reconnect with exponential backoff (unless intentional disconnect)
-      if (
-        !intentionalDisconnectRef.current &&
-        reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS
-      ) {
-        const delay =
-          RECONNECT_BASE_DELAY_MS * 2 ** reconnectAttemptsRef.current
-        reconnectAttemptsRef.current += 1
+      if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
+        const delay = getNextBackoff(reconnectAttemptsRef.current++)
         reconnectTimeoutRef.current = setTimeout(() => {
           connect()
         }, delay)
+      } else {
+        setError('Failed to connect to signaling server')
       }
-    }
-
-    ws.onerror = () => {
-      setError('WebSocket connection failed')
-      setIsConnected(false)
     }
   }, [enabled, roomId, handleSignal])
 

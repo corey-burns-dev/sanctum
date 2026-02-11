@@ -14,7 +14,7 @@ import (
 
 const (
 	// Max connections per user
-	maxConnsPerUser = 5
+	maxConnsPerUser = 12
 	// Max total connections
 	maxTotalConns = 10000
 )

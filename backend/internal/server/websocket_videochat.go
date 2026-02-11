@@ -74,11 +74,10 @@ func (s *Server) WebSocketVideoChatHandler() fiber.Handler {
 			return
 		}
 
-		// Ensure cleanup on disconnect
-		defer s.videoChatHub.UnregisterClient(client)
+		// Ensure cleanup on disconnect - cleanup is performed by client.ReadPump's defer
 
-		// Join the room (Legacy/Manual call to Join to maintain existing signal flow)
-		s.videoChatHub.Join(roomID, userID, username, conn)
+		// Notify others of the new joiner and send room state to the joiner
+		s.videoChatHub.BroadcastJoin(roomID, userID, username)
 
 		client.IncomingHandler = func(c *notifications.Client, message []byte) {
 			var signal notifications.VideoChatSignal

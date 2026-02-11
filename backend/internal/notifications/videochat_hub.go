@@ -47,10 +47,61 @@ func NewVideoChatHub() *VideoChatHub {
 }
 
 // Join is a legacy wrapper for Register.
-func (h *VideoChatHub) Join(roomID string, userID uint, _ string, conn *websocket.Conn) {
+func (h *VideoChatHub) Join(roomID string, userID uint, username string, conn *websocket.Conn) {
 	if _, err := h.Register(roomID, userID, conn); err != nil {
 		log.Printf("VideoChatHub: Failed to join room %s for user %d: %v", roomID, userID, err)
+		return
 	}
+	h.BroadcastJoin(roomID, userID, username)
+}
+
+// BroadcastJoin notifies existing peers of a new joiner and sends existing peer list to the joiner.
+func (h *VideoChatHub) BroadcastJoin(roomID string, userID uint, username string) {
+	h.mu.RLock()
+	room, ok := h.rooms[roomID]
+	if !ok {
+		h.mu.RUnlock()
+		return
+	}
+
+	// Prepare list of existing users for the new joiner
+	existingUsers := make([]map[string]any, 0, len(room))
+	for uid := range room {
+		if uid == userID {
+			continue
+		}
+		// We don't store username in Client currently, so this might be limited
+		// but we can at least send userIDs.
+		existingUsers = append(existingUsers, map[string]any{
+			"userId": uid,
+			// username is not stored in hub/client, so we'll have to rely on IDs or update storage
+		})
+	}
+	newJoiner := room[userID]
+	h.mu.RUnlock()
+
+	// 1. Tell new joiner who is already there
+	if newJoiner != nil {
+		roomUsersMsg := VideoChatSignal{
+			Type:   "room_users",
+			RoomID: roomID,
+			Payload: map[string]any{
+				"users": existingUsers,
+			},
+		}
+		if msgJSON, err := json.Marshal(roomUsersMsg); err == nil {
+			newJoiner.TrySend(msgJSON)
+		}
+	}
+
+	// 2. Tell others that someone new joined
+	joinMsg := VideoChatSignal{
+		Type:     "user_joined",
+		RoomID:   roomID,
+		UserID:   userID,
+		Username: username,
+	}
+	h.broadcastToRoom(roomID, userID, joinMsg)
 }
 
 // Register adds a user to a video chat room. Returns Client or error if limits exceeded.
@@ -81,22 +132,36 @@ func (h *VideoChatHub) Register(roomID string, userID uint, conn *websocket.Conn
 // UnregisterClient removes a user from a video chat room
 func (h *VideoChatHub) UnregisterClient(client *Client) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 
-	// We need to find which room this client is in.
-	// For efficiency we could track it in Client, but for now we iterate since VideoChat rooms are few.
+	var targetRoomID string
+	found := false
 	for roomID, peers := range h.rooms {
-		if c, ok := peers[client.UserID]; ok && c == client {
+		if c, ok := peers[client.UserID]; ok {
+			// Only remove if the registered client matches this client instance.
+			if c != client {
+				// Another active client is registered for this user in the room; skip.
+				continue
+			}
+			targetRoomID = roomID
 			delete(peers, client.UserID)
 			if len(peers) == 0 {
 				delete(h.rooms, roomID)
 			}
-			log.Printf("VideoChatHub: User %d left room %s", client.UserID, roomID)
-
-			// Notify remaining peers (doing this inside lock for simplicity here, but broadcastToRoom usually does its own locking)
-			// Actually Leave does notification, so we'll call a helper or handle it in the handler.
-			return
+			found = true
+			break
 		}
+	}
+	h.mu.Unlock()
+
+	if found {
+		log.Printf("VideoChatHub: User %d left room %s", client.UserID, targetRoomID)
+		// Notify remaining peers
+		leaveMsg := VideoChatSignal{
+			Type:   "user_left",
+			RoomID: targetRoomID,
+			UserID: client.UserID,
+		}
+		h.broadcastToRoom(targetRoomID, client.UserID, leaveMsg)
 	}
 }
 

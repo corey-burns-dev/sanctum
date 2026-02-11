@@ -332,7 +332,7 @@ test-frontend:
 
 test-api:
 	@echo "$(BLUE)Running API endpoint tests...$(NC)"
-	./test-api.sh
+	./test-routes.sh
 
 test-up:
 	$(DOCKER_COMPOSE) $(COMPOSE_FILES) up -d postgres_test redis

@@ -155,45 +155,22 @@ func (s *Server) WebSocketGameHandler() fiber.Handler {
 		roomID64, _ := strconv.ParseUint(roomIDStr, 10, 32)
 		roomID := uint(roomID64)
 
+		// Create a Client for serialized writes and hub registration
+		client := notifications.NewClient(s.gameHub, c, userID)
+
 		// Register connection with GameHub
-		s.gameHub.Register(userID, roomID, c)
+		s.gameHub.RegisterClient(roomID, client)
 		defer func() {
-			s.gameHub.Unregister(userID, roomID, c)
+			s.gameHub.UnregisterClient(client)
 			_ = c.Close()
 		}()
 
-		// Subscribe to Redis game room notifications
-		ctx := context.Background()
-		redisSub := s.redis.Subscribe(ctx, notifications.GameRoomChannel(roomID))
-		defer func() {
-			_ = redisSub.Close()
-		}()
-
-		// Channel to handle Redis messages
-		redisChan := redisSub.Channel()
-
-		// Launch goroutine to listen for Redis messages and forward to WebSocket
-		go func() {
-			for redisMsg := range redisChan {
-				if err := c.WriteMessage(websocket.TextMessage, []byte(redisMsg.Payload)); err != nil {
-					log.Printf("GameWS: Error writing Redis message to user %d: %v", userID, err)
-					return
-				}
-			}
-		}()
-
-		// Read loop
-		for {
-			_, msg, err := c.ReadMessage()
-			if err != nil {
-				log.Printf("GameWS: Error reading message (User %d, Room %d): %v", userID, roomID, err)
-				break
-			}
-
+		// Set incoming handler for game actions
+		client.IncomingHandler = func(_ *notifications.Client, msg []byte) {
 			var action notifications.GameAction
 			if err := json.Unmarshal(msg, &action); err != nil {
 				log.Printf("GameWS: Failed to unmarshal action: %v", err)
-				continue
+				return
 			}
 
 			action.UserID = userID
@@ -202,6 +179,12 @@ func (s *Server) WebSocketGameHandler() fiber.Handler {
 			// Handle the action through the hub
 			s.gameHub.HandleAction(userID, action)
 		}
+
+		// Launch write pump for serialized writes
+		go client.WritePump()
+
+		// Read pump (blocks until disconnect)
+		client.ReadPump()
 	})
 }
 
