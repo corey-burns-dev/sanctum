@@ -19,7 +19,9 @@ import (
 	"sanctum/internal/notifications"
 	"sanctum/internal/repository"
 	"sanctum/internal/seed"
+	"sanctum/internal/service"
 
+	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/helmet"
@@ -27,7 +29,6 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/monitor"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
-	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/swagger"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
@@ -65,6 +66,10 @@ type Server struct {
 	videoChatHub   *notifications.VideoChatHub
 	hubs           []wireableHub // all hubs for wiring/shutdown iteration
 	featureFlags   *featureflags.Manager
+	postService    *service.PostService
+	commentService *service.CommentService
+	chatService    *service.ChatService
+	userService    *service.UserService
 }
 
 // NewServer creates a new server instance with all dependencies
@@ -105,6 +110,10 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		streamRepo:     streamRepo,
 		featureFlags:   featureflags.NewManager(cfg.FeatureFlags),
 	}
+	server.postService = service.NewPostService(server.postRepo, server.isAdminByUserID)
+	server.commentService = service.NewCommentService(server.commentRepo, server.postRepo, server.isAdminByUserID)
+	server.chatService = service.NewChatService(server.chatRepo, server.userRepo, server.db, server.isAdminByUserID)
+	server.userService = service.NewUserService(server.userRepo)
 
 	if err := seed.Sanctums(db); err != nil {
 		return nil, fmt.Errorf("failed to seed built-in sanctums: %w", err)

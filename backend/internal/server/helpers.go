@@ -2,6 +2,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"unicode"
@@ -77,8 +78,12 @@ func splitCamel(s string) []string {
 
 // isAdmin checks whether the given user has admin privileges.
 func (s *Server) isAdmin(c *fiber.Ctx, userID uint) (bool, error) {
+	return s.isAdminByUserID(c.Context(), userID)
+}
+
+func (s *Server) isAdminByUserID(ctx context.Context, userID uint) (bool, error) {
 	var user models.User
-	if err := s.db.WithContext(c.Context()).Select("is_admin").First(&user, userID).Error; err != nil {
+	if err := s.db.WithContext(ctx).Select("is_admin").First(&user, userID).Error; err != nil {
 		return false, err
 	}
 	return user.IsAdmin, nil

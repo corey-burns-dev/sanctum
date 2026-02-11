@@ -63,6 +63,11 @@ func (m *MockPostRepository) Delete(ctx context.Context, id uint) error {
 	return args.Error(0)
 }
 
+func (m *MockPostRepository) IsLiked(ctx context.Context, userID, postID uint) (bool, error) {
+	args := m.Called(ctx, userID, postID)
+	return args.Bool(0), args.Error(1)
+}
+
 func (m *MockPostRepository) Like(ctx context.Context, userID, postID uint) error {
 	args := m.Called(ctx, userID, postID)
 	return args.Error(0)

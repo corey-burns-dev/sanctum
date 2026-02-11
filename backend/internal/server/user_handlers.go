@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"sanctum/internal/models"
+	"sanctum/internal/service"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -18,7 +19,7 @@ func (s *Server) GetAllUsers(c *fiber.Ctx) error {
 
 	page := parsePagination(c, 100)
 
-	users, err := s.userRepo.List(ctx, page.Limit, page.Offset)
+	users, err := s.userSvc().ListUsers(ctx, page.Limit, page.Offset)
 	if err != nil {
 		// Check for timeout
 		if errors.Is(err, context.DeadlineExceeded) {
@@ -39,7 +40,7 @@ func (s *Server) GetUserProfile(c *fiber.Ctx) error {
 		return nil
 	}
 
-	user, err := s.userRepo.GetByID(c.Context(), id)
+	user, err := s.userSvc().GetUserByID(c.Context(), id)
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusNotFound, err)
 	}
@@ -51,7 +52,7 @@ func (s *Server) GetUserProfile(c *fiber.Ctx) error {
 func (s *Server) GetMyProfile(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(uint)
 
-	user, err := s.userRepo.GetByID(c.Context(), userID)
+	user, err := s.userSvc().GetUserByID(c.Context(), userID)
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusNotFound, err)
 	}
@@ -74,26 +75,18 @@ func (s *Server) UpdateMyProfile(c *fiber.Ctx) error {
 			models.NewValidationError("Invalid request body"))
 	}
 
-	// Get current user
-	user, err := s.userRepo.GetByID(ctx, userID)
+	user, err := s.userSvc().UpdateProfile(ctx, service.UpdateProfileInput{
+		UserID:   userID,
+		Username: req.Username,
+		Bio:      req.Bio,
+		Avatar:   req.Avatar,
+	})
 	if err != nil {
-		return models.RespondWithError(c, fiber.StatusNotFound, err)
-	}
-
-	// Update fields if provided
-	if req.Username != "" {
-		user.Username = req.Username
-	}
-	if req.Bio != "" {
-		user.Bio = req.Bio
-	}
-	if req.Avatar != "" {
-		user.Avatar = req.Avatar
-	}
-
-	// Save updated user
-	if err := s.userRepo.Update(ctx, user); err != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+		status := fiber.StatusInternalServerError
+		if appErr, ok := err.(*models.AppError); ok && appErr.Code == "NOT_FOUND" {
+			status = fiber.StatusNotFound
+		}
+		return models.RespondWithError(c, status, err)
 	}
 
 	return c.JSON(user)
@@ -108,16 +101,13 @@ func (s *Server) PromoteToAdmin(c *fiber.Ctx) error {
 		return nil
 	}
 
-	// Get target user
-	var target models.User
-	if err := s.db.WithContext(ctx).First(&target, targetID).Error; err != nil {
-		return models.RespondWithError(c, fiber.StatusNotFound, err)
-	}
-
-	// Promote user
-	target.IsAdmin = true
-	if err := s.db.WithContext(ctx).Save(&target).Error; err != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	target, err := s.userSvc().SetAdmin(ctx, targetID, true)
+	if err != nil {
+		status := fiber.StatusInternalServerError
+		if appErr, ok := err.(*models.AppError); ok && appErr.Code == "NOT_FOUND" {
+			status = fiber.StatusNotFound
+		}
+		return models.RespondWithError(c, status, err)
 	}
 
 	return c.JSON(fiber.Map{"message": "User promoted to admin", "user": target})
@@ -132,17 +122,21 @@ func (s *Server) DemoteFromAdmin(c *fiber.Ctx) error {
 		return nil
 	}
 
-	// Get target user
-	var target models.User
-	if err := s.db.WithContext(ctx).First(&target, targetID).Error; err != nil {
-		return models.RespondWithError(c, fiber.StatusNotFound, err)
-	}
-
-	// Demote user
-	target.IsAdmin = false
-	if err := s.db.WithContext(ctx).Save(&target).Error; err != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	target, err := s.userSvc().SetAdmin(ctx, targetID, false)
+	if err != nil {
+		status := fiber.StatusInternalServerError
+		if appErr, ok := err.(*models.AppError); ok && appErr.Code == "NOT_FOUND" {
+			status = fiber.StatusNotFound
+		}
+		return models.RespondWithError(c, status, err)
 	}
 
 	return c.JSON(fiber.Map{"message": "User demoted from admin", "user": target})
+}
+
+func (s *Server) userSvc() *service.UserService {
+	if s.userService == nil {
+		s.userService = service.NewUserService(s.userRepo)
+	}
+	return s.userService
 }

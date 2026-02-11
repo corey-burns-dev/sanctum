@@ -4,6 +4,7 @@ package repository
 import (
 	"context"
 
+	"sanctum/internal/cache"
 	"sanctum/internal/models"
 
 	"gorm.io/gorm"
@@ -19,6 +20,7 @@ type PostRepository interface {
 	Search(ctx context.Context, query string, limit, offset int, currentUserID uint) ([]*models.Post, error)
 	Update(ctx context.Context, post *models.Post) error
 	Delete(ctx context.Context, id uint) error
+	IsLiked(ctx context.Context, userID, postID uint) (bool, error)
 	Like(ctx context.Context, userID, postID uint) error
 	Unlike(ctx context.Context, userID, postID uint) error
 }
@@ -39,7 +41,12 @@ func (r *postRepository) Create(ctx context.Context, post *models.Post) error {
 
 func (r *postRepository) GetByID(ctx context.Context, id uint, currentUserID uint) (*models.Post, error) {
 	var post models.Post
-	err := r.db.WithContext(ctx).Preload("User").First(&post, id).Error
+	key := cache.PostKey(id)
+
+	err := cache.Aside(ctx, key, &post, cache.PostTTL, func() error {
+		return r.db.WithContext(ctx).Preload("User").First(&post, id).Error
+	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -143,11 +150,30 @@ func (r *postRepository) populatePostDetails(ctx context.Context, p *models.Post
 }
 
 func (r *postRepository) Update(ctx context.Context, post *models.Post) error {
-	return r.db.WithContext(ctx).Save(post).Error
+	if err := r.db.WithContext(ctx).Save(post).Error; err != nil {
+		return err
+	}
+	cache.Invalidate(ctx, cache.PostKey(post.ID))
+	return nil
 }
 
 func (r *postRepository) Delete(ctx context.Context, id uint) error {
-	return r.db.WithContext(ctx).Delete(&models.Post{}, id).Error
+	if err := r.db.WithContext(ctx).Delete(&models.Post{}, id).Error; err != nil {
+		return err
+	}
+	cache.Invalidate(ctx, cache.PostKey(id))
+	return nil
+}
+
+func (r *postRepository) IsLiked(ctx context.Context, userID, postID uint) (bool, error) {
+	var count int64
+	if err := r.db.WithContext(ctx).
+		Model(&models.Like{}).
+		Where("user_id = ? AND post_id = ?", userID, postID).
+		Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func (r *postRepository) Like(ctx context.Context, userID, postID uint) error {
@@ -159,10 +185,17 @@ func (r *postRepository) Like(ctx context.Context, userID, postID uint) error {
 		 ON CONFLICT (user_id, post_id) DO NOTHING`,
 		userID, postID,
 	)
+	if result.Error == nil {
+		cache.Invalidate(ctx, cache.PostKey(postID))
+	}
 	return result.Error
 }
 
 func (r *postRepository) Unlike(ctx context.Context, userID, postID uint) error {
 	// Hard delete the like record (not soft delete)
-	return r.db.WithContext(ctx).Unscoped().Where("user_id = ? AND post_id = ?", userID, postID).Delete(&models.Like{}).Error
+	err := r.db.WithContext(ctx).Unscoped().Where("user_id = ? AND post_id = ?", userID, postID).Delete(&models.Like{}).Error
+	if err == nil {
+		cache.Invalidate(ctx, cache.PostKey(postID))
+	}
+	return err
 }

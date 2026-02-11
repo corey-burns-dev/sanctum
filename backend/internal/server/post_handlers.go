@@ -2,30 +2,29 @@
 package server
 
 import (
-	"errors"
 	"strconv"
 	"time"
 
 	"sanctum/internal/models"
+	"sanctum/internal/service"
 
 	"github.com/gofiber/fiber/v2"
-	"gorm.io/gorm"
 )
 
 // SearchPosts handles GET /api/posts/search?q=...
 func (s *Server) SearchPosts(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx := c.UserContext()
 	q := c.Query("q")
-	if q == "" {
-		return models.RespondWithError(c, fiber.StatusBadRequest, models.NewValidationError("Search query is required"))
-	}
-
 	page := parsePagination(c, 10)
 	userID, _ := s.optionalUserID(c)
 
-	posts, err := s.postRepo.Search(ctx, q, page.Limit, page.Offset, userID)
+	posts, err := s.postSvc().SearchPosts(ctx, q, page.Limit, page.Offset, userID)
 	if err != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+		status := fiber.StatusInternalServerError
+		if appErr, ok := err.(*models.AppError); ok && appErr.Code == "VALIDATION_ERROR" {
+			status = fiber.StatusBadRequest
+		}
+		return models.RespondWithError(c, status, err)
 	}
 
 	return c.JSON(posts)
@@ -33,7 +32,7 @@ func (s *Server) SearchPosts(c *fiber.Ctx) error {
 
 // CreatePost handles POST /api/posts
 func (s *Server) CreatePost(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx := c.UserContext()
 	userID := c.Locals("userID").(uint)
 
 	var req struct {
@@ -47,28 +46,19 @@ func (s *Server) CreatePost(c *fiber.Ctx) error {
 			models.NewValidationError("Invalid request body"))
 	}
 
-	// Validate required fields
-	if req.Title == "" || req.Content == "" {
-		return models.RespondWithError(c, fiber.StatusBadRequest,
-			models.NewValidationError("Title and content are required"))
-	}
-
-	post := &models.Post{
+	post, err := s.postSvc().CreatePost(ctx, service.CreatePostInput{
+		UserID:    userID,
 		Title:     req.Title,
 		Content:   req.Content,
 		ImageURL:  req.ImageURL,
-		UserID:    userID,
 		SanctumID: req.SanctumID,
-	}
-
-	if err := s.postRepo.Create(ctx, post); err != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
-	}
-
-	// Load user data for response
-	post, err := s.postRepo.GetByID(ctx, post.ID, userID)
+	})
 	if err != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+		status := fiber.StatusInternalServerError
+		if appErr, ok := err.(*models.AppError); ok && appErr.Code == "VALIDATION_ERROR" {
+			status = fiber.StatusBadRequest
+		}
+		return models.RespondWithError(c, status, err)
 	}
 
 	s.publishBroadcastEvent(EventPostCreated, map[string]interface{}{
@@ -82,23 +72,26 @@ func (s *Server) CreatePost(c *fiber.Ctx) error {
 
 // GetPosts handles GET /api/posts
 func (s *Server) GetPosts(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx := c.UserContext()
 	page := parsePagination(c, 20)
 	userID, _ := s.optionalUserID(c)
 
+	var sanctumID *uint
 	sanctumIDStr := c.Query("sanctum_id")
 	if sanctumIDStr != "" {
-		sanctumID, err := strconv.ParseUint(sanctumIDStr, 10, 32)
+		parsed, err := strconv.ParseUint(sanctumIDStr, 10, 32)
 		if err == nil {
-			posts, err := s.postRepo.GetBySanctumID(ctx, uint(sanctumID), page.Limit, page.Offset, userID)
-			if err != nil {
-				return models.RespondWithError(c, fiber.StatusInternalServerError, err)
-			}
-			return c.JSON(posts)
+			id := uint(parsed)
+			sanctumID = &id
 		}
 	}
 
-	posts, err := s.postRepo.List(ctx, page.Limit, page.Offset, userID)
+	posts, err := s.postSvc().ListPosts(ctx, service.ListPostsInput{
+		Limit:         page.Limit,
+		Offset:        page.Offset,
+		CurrentUserID: userID,
+		SanctumID:     sanctumID,
+	})
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
@@ -108,14 +101,14 @@ func (s *Server) GetPosts(c *fiber.Ctx) error {
 
 // GetPost handles GET /api/posts/:id
 func (s *Server) GetPost(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx := c.UserContext()
 	id, err := s.parseID(c, "id")
 	if err != nil {
 		return nil
 	}
 	userID, _ := s.optionalUserID(c)
 
-	post, err := s.postRepo.GetByID(ctx, id, userID)
+	post, err := s.postSvc().GetPost(ctx, id, userID)
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusNotFound, err)
 	}
@@ -125,7 +118,7 @@ func (s *Server) GetPost(c *fiber.Ctx) error {
 
 // GetUserPosts handles GET /api/users/:id/posts
 func (s *Server) GetUserPosts(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx := c.UserContext()
 	userIDParam, err := s.parseID(c, "id")
 	if err != nil {
 		return nil
@@ -134,7 +127,7 @@ func (s *Server) GetUserPosts(c *fiber.Ctx) error {
 	page := parsePagination(c, 20)
 	currentUserID, _ := s.optionalUserID(c)
 
-	posts, err := s.postRepo.GetByUserID(ctx, userIDParam, page.Limit, page.Offset, currentUserID)
+	posts, err := s.postSvc().GetUserPosts(ctx, userIDParam, page.Limit, page.Offset, currentUserID)
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
@@ -144,7 +137,7 @@ func (s *Server) GetUserPosts(c *fiber.Ctx) error {
 
 // UpdatePost handles PUT /api/posts/:id
 func (s *Server) UpdatePost(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx := c.UserContext()
 	userID := c.Locals("userID").(uint)
 	postID, err := s.parseID(c, "id")
 	if err != nil {
@@ -162,32 +155,24 @@ func (s *Server) UpdatePost(c *fiber.Ctx) error {
 			models.NewValidationError("Invalid request body"))
 	}
 
-	// Get existing post
-	var post *models.Post
-	post, err = s.postRepo.GetByID(ctx, postID, userID)
+	post, err := s.postSvc().UpdatePost(ctx, service.UpdatePostInput{
+		UserID:   userID,
+		PostID:   postID,
+		Title:    req.Title,
+		Content:  req.Content,
+		ImageURL: req.ImageURL,
+	})
 	if err != nil {
-		return models.RespondWithError(c, fiber.StatusNotFound, err)
-	}
-
-	// Check ownership
-	if post.UserID != userID {
-		return models.RespondWithError(c, fiber.StatusForbidden,
-			models.NewUnauthorizedError("You can only update your own posts"))
-	}
-
-	// Update fields if provided
-	if req.Title != "" {
-		post.Title = req.Title
-	}
-	if req.Content != "" {
-		post.Content = req.Content
-	}
-	if req.ImageURL != "" {
-		post.ImageURL = req.ImageURL
-	}
-
-	if err := s.postRepo.Update(ctx, post); err != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+		status := fiber.StatusInternalServerError
+		if appErr, ok := err.(*models.AppError); ok {
+			switch appErr.Code {
+			case "UNAUTHORIZED":
+				status = fiber.StatusForbidden
+			case "NOT_FOUND":
+				status = fiber.StatusNotFound
+			}
+		}
+		return models.RespondWithError(c, status, err)
 	}
 
 	return c.JSON(post)
@@ -195,33 +180,27 @@ func (s *Server) UpdatePost(c *fiber.Ctx) error {
 
 // DeletePost handles DELETE /api/posts/:id
 func (s *Server) DeletePost(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx := c.UserContext()
 	userID := c.Locals("userID").(uint)
 	postID, err := s.parseID(c, "id")
 	if err != nil {
 		return nil
 	}
 
-	// Get existing post to check ownership
-	post, err := s.postRepo.GetByID(ctx, postID, userID)
-	if err != nil {
-		return models.RespondWithError(c, fiber.StatusNotFound, err)
-	}
-
-	// Check ownership or admin status
-	if post.UserID != userID {
-		admin, adminErr := s.isAdmin(c, userID)
-		if adminErr != nil {
-			return models.RespondWithError(c, fiber.StatusInternalServerError, adminErr)
+	if err := s.postSvc().DeletePost(ctx, service.DeletePostInput{
+		UserID: userID,
+		PostID: postID,
+	}); err != nil {
+		status := fiber.StatusInternalServerError
+		if appErr, ok := err.(*models.AppError); ok {
+			switch appErr.Code {
+			case "UNAUTHORIZED":
+				status = fiber.StatusForbidden
+			case "NOT_FOUND":
+				status = fiber.StatusNotFound
+			}
 		}
-		if !admin {
-			return models.RespondWithError(c, fiber.StatusForbidden,
-				models.NewUnauthorizedError("You can only delete your own posts"))
-		}
-	}
-
-	if err := s.postRepo.Delete(ctx, postID); err != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+		return models.RespondWithError(c, status, err)
 	}
 
 	return c.SendStatus(fiber.StatusNoContent)
@@ -230,35 +209,14 @@ func (s *Server) DeletePost(c *fiber.Ctx) error {
 // LikePost handles POST /api/posts/:id/like
 // This endpoint toggles the like status - if already liked, it unlikes; if not liked, it likes
 func (s *Server) LikePost(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx := c.UserContext()
 	userID := c.Locals("userID").(uint)
 	postID, err := s.parseID(c, "id")
 	if err != nil {
 		return nil
 	}
 
-	// Check if already liked
-	var existingLike models.Like
-	err = s.db.WithContext(ctx).Where("user_id = ? AND post_id = ?", userID, postID).First(&existingLike).Error
-
-	switch {
-	case err == nil:
-		// Already liked, so unlike it
-		if uerr := s.postRepo.Unlike(ctx, userID, postID); uerr != nil {
-			return models.RespondWithError(c, fiber.StatusInternalServerError, uerr)
-		}
-	case errors.Is(err, gorm.ErrRecordNotFound):
-		// Not liked, so like it
-		if lerr := s.postRepo.Like(ctx, userID, postID); lerr != nil {
-			return models.RespondWithError(c, fiber.StatusInternalServerError, lerr)
-		}
-	default:
-		// Some other error
-		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
-	}
-
-	// Return updated post
-	post, err := s.postRepo.GetByID(ctx, postID, userID)
+	post, err := s.postSvc().ToggleLike(ctx, userID, postID)
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
@@ -275,19 +233,14 @@ func (s *Server) LikePost(c *fiber.Ctx) error {
 
 // UnlikePost handles DELETE /api/posts/:id/like
 func (s *Server) UnlikePost(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx := c.UserContext()
 	userID := c.Locals("userID").(uint)
 	postID, err := s.parseID(c, "id")
 	if err != nil {
 		return nil
 	}
 
-	if unlikeErr := s.postRepo.Unlike(ctx, userID, postID); unlikeErr != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, unlikeErr)
-	}
-
-	// Return updated post
-	post, err := s.postRepo.GetByID(ctx, postID, userID)
+	post, err := s.postSvc().UnlikePost(ctx, userID, postID)
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
@@ -300,4 +253,11 @@ func (s *Server) UnlikePost(c *fiber.Ctx) error {
 	})
 
 	return c.JSON(post)
+}
+
+func (s *Server) postSvc() *service.PostService {
+	if s.postService == nil {
+		s.postService = service.NewPostService(s.postRepo, s.isAdminByUserID)
+	}
+	return s.postService
 }
