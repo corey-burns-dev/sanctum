@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"sanctum/internal/models"
 	"sanctum/internal/validation"
@@ -218,6 +219,15 @@ func (s *Server) CreateSanctumRequest(c *fiber.Ctx) error {
 	if err := s.db.WithContext(ctx).Create(&create).Error; err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
+
+	s.publishAdminEvent(EventSanctumRequestCreated, map[string]interface{}{
+		"id":                 create.ID,
+		"requested_name":     create.RequestedName,
+		"requested_slug":     create.RequestedSlug,
+		"requested_by_user":  create.RequestedByUserID,
+		"status":             create.Status,
+		"created_at":         create.CreatedAt.Format(time.RFC3339Nano),
+	})
 
 	return c.Status(fiber.StatusCreated).JSON(create)
 }
@@ -582,10 +592,18 @@ func (s *Server) ApproveSanctumRequest(c *fiber.Ctx) error {
 	}
 
 	roomID := defaultRoom.ID
-	return c.JSON(fiber.Map{
+	resp := fiber.Map{
 		"request": approvedRequest,
 		"sanctum": toSanctumDTO(createdSanctum, &roomID),
+	}
+
+	s.publishBroadcastEvent(EventSanctumRequestReviewed, map[string]interface{}{
+		"id":         approvedRequest.ID,
+		"status":     approvedRequest.Status,
+		"updated_at": approvedRequest.UpdatedAt.Format(time.RFC3339Nano),
 	})
+
+	return c.JSON(resp)
 }
 
 // RejectSanctumRequest handles POST /api/admin/sanctum-requests/:id/reject
@@ -639,6 +657,12 @@ func (s *Server) RejectSanctumRequest(c *fiber.Ctx) error {
 	if err := s.db.WithContext(ctx).Save(&request).Error; err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
+
+	s.publishBroadcastEvent(EventSanctumRequestReviewed, map[string]interface{}{
+		"id":         request.ID,
+		"status":     request.Status,
+		"updated_at": request.UpdatedAt.Format(time.RFC3339Nano),
+	})
 
 	return c.JSON(request)
 }

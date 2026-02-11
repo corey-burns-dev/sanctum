@@ -9,6 +9,7 @@ import (
 	"sanctum/internal/models"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 )
 
 // errResponseWritten is a sentinel indicating the HTTP response was already
