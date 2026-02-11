@@ -403,7 +403,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: Authenticate user and return JWT token
+      description: Authenticate user and return JWT tokens
       parameters:
       - description: Login credentials
         in: body
@@ -423,6 +423,8 @@ paths:
           description: OK
           schema:
             properties:
+              refresh_token:
+                type: string
               token:
                 type: string
               user:
@@ -443,6 +445,71 @@ paths:
                 type: string
             type: object
       summary: User login
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: Revoke refresh token and blacklist current access token
+      parameters:
+      - description: Logout request
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            refresh_token:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+      summary: User logout
+      tags:
+      - auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Get a new access token using a refresh token
+      parameters:
+      - description: Refresh request
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            refresh_token:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              refresh_token:
+                type: string
+              token:
+                type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Refresh JWT token
       tags:
       - auth
   /auth/signup:
@@ -471,6 +538,8 @@ paths:
           description: Created
           schema:
             properties:
+              refresh_token:
+                type: string
               token:
                 type: string
               user:
