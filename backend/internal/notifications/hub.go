@@ -3,56 +3,93 @@ package notifications
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gofiber/websocket/v2"
 )
 
-// Hub is a minimal websocket hub that maps userID -> list of websocket connections.
-// It listens for Redis pub/sub messages (via Notifier) and fans them out to connected clients.
+const (
+	// Max connections per user
+	maxConnsPerUser = 5
+	// Max total connections
+	maxTotalConns = 10000
+	// Write wait time
+	writeWait = 10 * time.Second
+	// Pong wait time
+	pongWait = 60 * time.Second
+	// Ping period
+	pingPeriod = (pongWait * 9) / 10
+	// Max message size
+	maxMessageSize = 512
+	// Send buffer size
+	sendBufferSize = 256
+)
+
+// Hub is a websocket hub that maps userID -> list of Clients.
 type Hub struct {
-	mu       sync.RWMutex
-	conns    map[uint]map[*websocket.Conn]struct{}
-	shutdown chan struct{}
-	done     chan struct{}
+	mu         sync.RWMutex
+	conns      map[uint]map[*Client]struct{}
+	totalConns int
+	shutdown   chan struct{}
+	done       chan struct{}
 }
 
 // Name returns a human-readable identifier for this hub.
 func (h *Hub) Name() string { return "notification hub" }
 
 // NewHub creates a new Hub instance for managing notifications.
-func NewHub() *Hub {
-	return &Hub{
-		conns:    make(map[uint]map[*websocket.Conn]struct{}),
-		shutdown: make(chan struct{}),
-		done:     make(chan struct{}),
+func (h *Hub) UnregisterClient(client *Client) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if m, ok := h.conns[client.UserID]; ok {
+		if _, exists := m[client]; exists {
+			delete(m, client)
+			h.totalConns--
+		}
+		if len(m) == 0 {
+			delete(h.conns, client.UserID)
+		}
 	}
 }
 
-// Register a connection for a given userID
-func (h *Hub) Register(userID uint, conn *websocket.Conn) {
+// Register a connection for a given userID. Returns the Client or error if limits exceeded.
+func (h *Hub) Register(userID uint, conn *websocket.Conn) (*Client, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+
+	if h.totalConns >= maxTotalConns {
+		return nil, errors.New("server connection limit reached")
+	}
+
 	m, ok := h.conns[userID]
 	if !ok {
-		m = make(map[*websocket.Conn]struct{})
+		m = make(map[*Client]struct{})
 		h.conns[userID] = m
 	}
-	m[conn] = struct{}{}
+
+	if len(m) >= maxConnsPerUser {
+		return nil, errors.New("user connection limit reached")
+	}
+
+	client := NewClient(h, conn, userID)
+
+	m[client] = struct{}{}
+	h.totalConns++
+
+	return client, nil
 }
 
-// Unregister removes a connection
-func (h *Hub) Unregister(userID uint, conn *websocket.Conn) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if m, ok := h.conns[userID]; ok {
-		delete(m, conn)
-		if len(m) == 0 {
-			delete(h.conns, userID)
-		}
+// NewHub creates a new Hub instance for managing notifications.
+func NewHub() *Hub {
+	return &Hub{
+		conns:    make(map[uint]map[*Client]struct{}),
+		shutdown: make(chan struct{}),
+		done:     make(chan struct{}),
 	}
 }
 
@@ -60,10 +97,14 @@ func (h *Hub) Unregister(userID uint, conn *websocket.Conn) {
 func (h *Hub) Broadcast(userID uint, message string) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	if conns, ok := h.conns[userID]; ok {
-		for c := range conns {
-			if err := c.WriteMessage(websocket.TextMessage, []byte(message)); err != nil {
-				log.Printf("websocket write error: %v", err)
+	if clients, ok := h.conns[userID]; ok {
+		data := []byte(message)
+		for c := range clients {
+			select {
+			case c.send <- data:
+			default:
+				// Backpressure: Drop message if buffer full to avoid blocking the hub
+				log.Printf("Backpressure: dropping message for user %d (buffer full)", userID)
 			}
 		}
 	}
@@ -73,18 +114,21 @@ func (h *Hub) Broadcast(userID uint, message string) {
 func (h *Hub) IsOnline(userID uint) bool {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	conns, ok := h.conns[userID]
-	return ok && len(conns) > 0
+	clients, ok := h.conns[userID]
+	return ok && len(clients) > 0
 }
 
 // BroadcastAll sends message to every connected websocket client.
 func (h *Hub) BroadcastAll(message string) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	for _, conns := range h.conns {
-		for c := range conns {
-			if err := c.WriteMessage(websocket.TextMessage, []byte(message)); err != nil {
-				log.Printf("websocket write error: %v", err)
+	data := []byte(message)
+	for _, clients := range h.conns {
+		for c := range clients {
+			select {
+			case c.send <- data:
+			default:
+				// Backpressure
 			}
 		}
 	}

@@ -65,45 +65,26 @@ func (s *Server) WebSocketVideoChatHandler() fiber.Handler {
 			return
 		}
 
-		// Join the room
-		s.videoChatHub.Join(roomID, userID, username, conn)
+		// Register the client
+		client, err := s.videoChatHub.Register(roomID, userID, conn)
+		if err != nil {
+			log.Printf("VideoChat WS: Failed to register user %d: %v", userID, err)
+			_ = conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"error","payload":{"message":"`+err.Error()+`"}}`))
+			_ = conn.Close()
+			return
+		}
 
 		// Ensure cleanup on disconnect
-		defer s.videoChatHub.Leave(roomID, userID)
+		defer s.videoChatHub.UnregisterClient(client)
 
-		// Configure read limits and pong handler for heartbeat
-		conn.SetReadLimit(videoChatMaxMessageSize)
-		_ = conn.SetReadDeadline(time.Now().Add(videoChatPongTimeout))
-		conn.SetPongHandler(func(string) error {
-			return conn.SetReadDeadline(time.Now().Add(videoChatPongTimeout))
-		})
+		// Join the room (Legacy/Manual call to Join to maintain existing signal flow)
+		s.videoChatHub.Join(roomID, userID, username, conn)
 
-		// Start ping ticker to detect dead connections
-		pingTicker := time.NewTicker(videoChatPingInterval)
-		defer pingTicker.Stop()
-
-		go func() {
-			for range pingTicker.C {
-				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-					return
-				}
-			}
-		}()
-
-		// Read loop — relay signaling messages
-		for {
-			_, message, err := conn.ReadMessage()
-			if err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-					log.Printf("VideoChat WS: Unexpected close from user %d: %v", userID, err)
-				}
-				break
-			}
-
+		client.IncomingHandler = func(c *notifications.Client, message []byte) {
 			var signal notifications.VideoChatSignal
 			if err := json.Unmarshal(message, &signal); err != nil {
 				log.Printf("VideoChat WS: Invalid message from user %d: %v", userID, err)
-				continue
+				return
 			}
 
 			signal.UserID = userID
@@ -112,20 +93,22 @@ func (s *Server) WebSocketVideoChatHandler() fiber.Handler {
 
 			switch signal.Type {
 			case "offer", "answer", "ice-candidate":
-				// These are targeted — relay to the specific peer
 				if signal.TargetID == 0 {
 					log.Printf("VideoChat WS: %s from user %d missing target_id", signal.Type, userID)
-					continue
+					return
 				}
 				s.videoChatHub.Relay(roomID, userID, signal.TargetID, signal)
 
 			case "leave":
-				// Explicit leave (before disconnect) — defer handles cleanup
-				return
+				// Explicit leave handled by ReadPump closing
+				_ = c.Conn.Close()
 
 			default:
 				log.Printf("VideoChat WS: Unknown signal type %q from user %d", signal.Type, userID)
 			}
 		}
+
+		go client.WritePump()
+		client.ReadPump()
 	})
 }

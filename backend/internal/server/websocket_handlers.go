@@ -45,12 +45,18 @@ func (s *Server) WebSocketChatHandler() fiber.Handler {
 
 		log.Printf("WebSocket: User %d (%s) connected to chat", userID, username)
 
-		// Create Client
-		client := &notifications.Client{
-			Hub:    s.chatHub,
-			Conn:   conn,
-			Send:   make(chan []byte, 256),
-			UserID: userID,
+		// Register user with ChatHub
+		if s.chatHub == nil {
+			_ = conn.Close()
+			return
+		}
+
+		client, err := s.chatHub.Register(userID, conn)
+		if err != nil {
+			log.Printf("WebSocket Chat: Failed to register user %d: %v", userID, err)
+			_ = conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"`+err.Error()+`"}`))
+			_ = conn.Close()
+			return
 		}
 
 		// Define Incoming Message Handler
@@ -216,11 +222,6 @@ func (s *Server) WebSocketChatHandler() fiber.Handler {
 					}
 				}
 			}
-		}
-
-		// Register user with ChatHub
-		if s.chatHub != nil {
-			s.chatHub.RegisterUser(client)
 		}
 
 		// Send welcome message

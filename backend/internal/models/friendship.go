@@ -22,9 +22,9 @@ const (
 // Friendship represents a friendship relationship between two users.
 type Friendship struct {
 	ID          uint             `gorm:"primaryKey" json:"id"`
-	RequesterID uint             `gorm:"not null" json:"requester_id"`
-	AddresseeID uint             `gorm:"not null" json:"addressee_id"`
-	Status      FriendshipStatus `gorm:"type:varchar(20);default:'pending'" json:"status"`
+	RequesterID uint             `gorm:"not null;index:idx_friendship_users" json:"requester_id"`
+	AddresseeID uint             `gorm:"not null;index:idx_friendship_users" json:"addressee_id"`
+	Status      FriendshipStatus `gorm:"type:varchar(20);default:'pending';index" json:"status"`
 	CreatedAt   time.Time        `json:"created_at"`
 	UpdatedAt   time.Time        `json:"updated_at"`
 

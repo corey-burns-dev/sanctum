@@ -46,31 +46,37 @@ func NewChatHub() *ChatHub {
 	}
 }
 
-// RegisterUser registers a user's websocket client
-func (h *ChatHub) RegisterUser(client *Client) {
+// Register registers a user's websocket connection. Returns Client or error if limits exceeded.
+func (h *ChatHub) Register(userID uint, conn *websocket.Conn) (*Client, error) {
 	h.mu.Lock()
 
 	// Initialize user connection set if needed
-	if h.userConns[client.UserID] == nil {
-		h.userConns[client.UserID] = make(map[*Client]bool)
+	if h.userConns[userID] == nil {
+		h.userConns[userID] = make(map[*Client]bool)
 	}
 
-	// Add the new client
-	h.userConns[client.UserID][client] = true
+	// Enforce per-user limit
+	if len(h.userConns[userID]) >= maxConnsPerUser {
+		h.mu.Unlock()
+		return nil, fmt.Errorf("user connection limit reached")
+	}
 
-	// Collect online users (if this is the first connection for this user, they are 'joining' global state)
-	// But we need to send snapshot to THIS client regardless.
+	// Create new client
+	client := NewClient(h, conn, userID)
+	h.userConns[userID][client] = true
+
+	// Collect online users
 	onlineIDs := make([]uint, 0, len(h.userConns))
 	for id := range h.userConns {
-		if id != client.UserID {
+		if id != userID {
 			onlineIDs = append(onlineIDs, id)
 		}
 	}
 	h.mu.Unlock()
 
-	log.Printf("ChatHub: Registered user %d (Active clients: %d)", client.UserID, len(h.userConns[client.UserID]))
+	log.Printf("ChatHub: Registered user %d (Active clients: %d)", userID, len(h.userConns[userID]))
 
-	// 1. Send initial snapshot of online users to the NEW client
+	// Send initial snapshot
 	if len(onlineIDs) > 0 {
 		snapshotMsg := ChatMessage{
 			Type:    "connected_users",
@@ -81,15 +87,23 @@ func (h *ChatHub) RegisterUser(client *Client) {
 		}
 	}
 
-	// 2. Broadcast "User X is Online" to everyone else (only if this is their first connection?)
-	// Actually, strictly speaking, they are "online" if they have >0 connections.
-	// But broadcasting "online" again triggers green dots which is fine.
+	h.BroadcastGlobalStatus(userID, "online")
+	return client, nil
+}
+
+// RegisterUser is a legacy wrapper for Register. Deprecated: use Register instead.
+func (h *ChatHub) RegisterUser(client *Client) {
+	h.mu.Lock()
+	if h.userConns[client.UserID] == nil {
+		h.userConns[client.UserID] = make(map[*Client]bool)
+	}
+	h.userConns[client.UserID][client] = true
+	h.mu.Unlock()
 	h.BroadcastGlobalStatus(client.UserID, "online")
 }
 
-// UnregisterUser removes a user's websocket connection and cleans up all their conversation subscriptions
-// UnregisterUser removes a user's websocket connection and cleans up all their conversation subscriptions
-func (h *ChatHub) UnregisterUser(client *Client) {
+// UnregisterClient removes a user's websocket connection and cleans up all their conversation subscriptions
+func (h *ChatHub) UnregisterClient(client *Client) {
 	h.mu.Lock()
 
 	// Remove from connection set
@@ -101,9 +115,7 @@ func (h *ChatHub) UnregisterUser(client *Client) {
 			// Proceed to cleanup conversation subscriptions
 		} else {
 			// User still has other connections, so just close this one and return
-			// We DO NOT mark them offline globally.
 			h.mu.Unlock()
-			close(client.Send)
 			log.Printf("ChatHub: Unregistered client for user %d (Remaining clients: %d)", client.UserID, len(clients))
 			return
 		}
@@ -127,11 +139,6 @@ func (h *ChatHub) UnregisterUser(client *Client) {
 		}
 		delete(h.userActiveConvs, client.UserID)
 	}
-
-	// The client set and userConns entry were already cleaned up above
-
-	// Close the channel
-	close(client.Send)
 
 	h.mu.Unlock()
 

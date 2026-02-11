@@ -45,7 +45,7 @@ type Message struct {
 // This is the join table that GORM will use for the many2many relationship
 type ConversationParticipant struct {
 	ConversationID uint      `gorm:"primaryKey" json:"conversation_id"`
-	UserID         uint      `gorm:"primaryKey" json:"user_id"`
+	UserID         uint      `gorm:"primaryKey;index" json:"user_id"`
 	JoinedAt       time.Time `gorm:"autoCreateTime" json:"joined_at"`
 	LastReadAt     time.Time `json:"last_read_at"`
 	UnreadCount    int       `gorm:"default:0" json:"unread_count"`

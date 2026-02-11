@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 
+	"sanctum/internal/cache"
 	"sanctum/internal/models"
 
 	"gorm.io/gorm"
@@ -34,12 +35,20 @@ func NewUserRepository(db *gorm.DB) UserRepository {
 
 func (r *userRepository) GetByID(ctx context.Context, id uint) (*models.User, error) {
 	var user models.User
-	// Don't preload posts by default to avoid N+1 queries
-	if err := r.db.WithContext(ctx).First(&user, id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, models.NewNotFoundError("User", id)
+	key := cache.UserKey(id)
+
+	err := cache.Aside(ctx, key, &user, cache.UserTTL, func() error {
+		if err := r.db.WithContext(ctx).First(&user, id).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return models.NewNotFoundError("User", id)
+			}
+			return models.NewInternalError(err)
 		}
-		return nil, models.NewInternalError(err)
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
 	return &user, nil
 }
@@ -101,6 +110,7 @@ func (r *userRepository) Update(ctx context.Context, user *models.User) error {
 	if err := r.db.WithContext(ctx).Save(user).Error; err != nil {
 		return models.NewInternalError(err)
 	}
+	cache.Invalidate(ctx, cache.UserKey(user.ID))
 	return nil
 }
 
@@ -108,6 +118,7 @@ func (r *userRepository) Delete(ctx context.Context, id uint) error {
 	if err := r.db.WithContext(ctx).Delete(&models.User{}, id).Error; err != nil {
 		return models.NewInternalError(err)
 	}
+	cache.Invalidate(ctx, cache.UserKey(id))
 	return nil
 }
 

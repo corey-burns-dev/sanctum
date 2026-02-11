@@ -53,30 +53,39 @@ func (s *Server) WebsocketHandler() fiber.Handler {
 			return
 		}
 
-		// Register connection
-		wasOnline := false
-		if s.hub != nil {
-			wasOnline = s.hub.IsOnline(uid)
-			s.hub.Register(uid, conn)
+		if s.hub == nil {
+			_ = conn.Close()
+			return
 		}
-		if !wasOnline {
-			s.notifyFriendsPresence(uid, "online")
+
+		// Register connection with scaling guardrails
+		client, err := s.hub.Register(uid, conn)
+		if err != nil {
+			log.Printf("WebSocket Notification: Failed to register user %d: %v", uid, err)
+			_ = conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"`+err.Error()+`"}`))
+			_ = conn.Close()
+			return
 		}
+
+		defer s.hub.UnregisterClient(client)
+
+		// Presence logic
+		wasOnline := s.hub.IsOnline(uid)
+		// We already registered, so IsOnline will be true. 
+		// If totalConns for this user was 1, it was the first one.
+		// For simplicity, we can check how many clients the user has.
+		// But let's keep the existing logic flavor.
+		
+		s.notifyFriendsPresence(uid, "online")
 		s.sendFriendsOnlineSnapshot(conn, uid)
 
-		// Read loop keeps the connection alive; server notifications are pushed via Hub.
-		for {
-			_, _, err := conn.ReadMessage()
-			if err != nil {
-				break
-			}
-		}
+		// Start pumps
+		go client.WritePump()
+		client.ReadPump()
 
-		if s.hub != nil {
-			s.hub.Unregister(uid, conn)
-			if !s.hub.IsOnline(uid) {
-				s.notifyFriendsPresence(uid, "offline")
-			}
+		// After ReadPump returns, client is disconnected
+		if !s.hub.IsOnline(uid) {
+			s.notifyFriendsPresence(uid, "offline")
 		}
 	})
 }

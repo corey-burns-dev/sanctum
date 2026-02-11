@@ -21,9 +21,14 @@ const (
 	maxMessageSize = 512
 )
 
-// Client is a middleman between the websocket connection and the hub.
+// WSHub is an interface for hubs that manage generic clients
+type WSHub interface {
+	UnregisterClient(c *Client)
+}
+
+// Client is a generic middleman between the websocket connection and a hub.
 type Client struct {
-	Hub *ChatHub
+	Hub WSHub
 
 	// The websocket connection.
 	Conn *websocket.Conn
@@ -38,13 +43,20 @@ type Client struct {
 	IncomingHandler func(*Client, []byte)
 }
 
+// NewClient creates a new Client instance
+func NewClient(hub WSHub, conn *websocket.Conn, userID uint) *Client {
+	return &Client{
+		Hub:    hub,
+		Conn:   conn,
+		UserID: userID,
+		Send:   make(chan []byte, 256),
+	}
+}
+
 // ReadPump pumps messages from the websocket connection to the hub.
-// The application runs ReadPump in a per-connection goroutine. The application
-// ensures that there is at most one reader on a connection by executing all
-// reads from this goroutine.
 func (c *Client) ReadPump() {
 	defer func() {
-		c.Hub.UnregisterUser(c)
+		c.Hub.UnregisterClient(c)
 		_ = c.Conn.Close()
 	}()
 
@@ -57,8 +69,6 @@ func (c *Client) ReadPump() {
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("ReadPump Error (User %d): %v", c.UserID, err)
-			} else {
-				log.Printf("ReadPump Closed (User %d): %v", c.UserID, err)
 			}
 			break
 		}
@@ -70,9 +80,6 @@ func (c *Client) ReadPump() {
 }
 
 // WritePump pumps messages from the hub to the websocket connection.
-// A goroutine running WritePump is started for each connection. The
-// application ensures that there is at most one writer to a connection by
-// executing all writes from this goroutine.
 func (c *Client) WritePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {

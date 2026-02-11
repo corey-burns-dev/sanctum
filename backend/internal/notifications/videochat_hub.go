@@ -27,40 +27,13 @@ type VideoChatSignal struct {
 	Payload  interface{} `json:"payload,omitempty"` // SDP or ICE candidate data
 }
 
-// videoChatPeer tracks a single user's connection in a video chat room
-type videoChatPeer struct {
-	UserID   uint
-	Username string
-	Conn     *websocket.Conn
-	writeMu  sync.Mutex // protects concurrent writes to Conn
-}
-
-// safeWrite sends a message to the peer with mutex protection
-func (p *videoChatPeer) safeWrite(msgType int, data []byte) (err error) {
-	// Fast-fail when peer or connection is nil to avoid nil pointer deref
-	if p == nil || p.Conn == nil {
-		return fmt.Errorf("websocket connection is nil")
-	}
-
-	p.writeMu.Lock()
-	defer p.writeMu.Unlock()
-
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("panic writing to conn: %v", r)
-		}
-	}()
-
-	return p.Conn.WriteMessage(msgType, data)
-}
-
 // VideoChatHub manages WebRTC signaling for peer-to-peer video chat rooms.
 // It does NOT touch media — it only relays SDP offers/answers and ICE candidates.
 type VideoChatHub struct {
 	mu sync.RWMutex
 
-	// rooms maps roomID -> userID -> peer
-	rooms map[string]map[uint]*videoChatPeer
+	// rooms maps roomID -> userID -> client
+	rooms map[string]map[uint]*Client
 }
 
 // Name returns a human-readable identifier for this hub.
@@ -69,82 +42,53 @@ func (h *VideoChatHub) Name() string { return "video chat hub" }
 // NewVideoChatHub creates a new VideoChatHub
 func NewVideoChatHub() *VideoChatHub {
 	return &VideoChatHub{
-		rooms: make(map[string]map[uint]*videoChatPeer),
+		rooms: make(map[string]map[uint]*Client),
 	}
 }
 
-// Join adds a user to a video chat room, notifies existing peers, and sends the room user list
-func (h *VideoChatHub) Join(roomID string, userID uint, username string, conn *websocket.Conn) {
-	peer := &videoChatPeer{
-		UserID:   userID,
-		Username: username,
-		Conn:     conn,
-	}
-
+// Register adds a user to a video chat room. Returns Client or error if limits exceeded.
+func (h *VideoChatHub) Register(roomID string, userID uint, conn *websocket.Conn) (*Client, error) {
 	h.mu.Lock()
+	defer h.mu.Unlock()
 
 	// Enforce room count limit
 	if h.rooms[roomID] == nil && len(h.rooms) >= MaxTotalRooms {
-		h.mu.Unlock()
-		errMsg, _ := json.Marshal(VideoChatSignal{Type: "error", Payload: map[string]string{"message": "too many active rooms"}})
-		_ = peer.safeWrite(websocket.TextMessage, errMsg)
-		return
+		return nil, fmt.Errorf("too many active rooms")
 	}
 
 	if h.rooms[roomID] == nil {
-		h.rooms[roomID] = make(map[uint]*videoChatPeer)
+		h.rooms[roomID] = make(map[uint]*Client)
 	}
 
 	// Enforce per-room peer limit
 	if len(h.rooms[roomID]) >= MaxPeersPerRoom {
-		h.mu.Unlock()
-		errMsg, _ := json.Marshal(VideoChatSignal{Type: "error", Payload: map[string]string{"message": "room is full"}})
-		_ = peer.safeWrite(websocket.TextMessage, errMsg)
-		return
+		return nil, fmt.Errorf("room is full")
 	}
 
-	// Collect existing peers before adding the new one
-	existingPeers := make([]map[string]interface{}, 0, len(h.rooms[roomID]))
-	existingConns := make([]*videoChatPeer, 0, len(h.rooms[roomID]))
-	for _, p := range h.rooms[roomID] {
-		existingPeers = append(existingPeers, map[string]interface{}{
-			"user_id":  p.UserID,
-			"username": p.Username,
-		})
-		existingConns = append(existingConns, p)
-	}
+	client := NewClient(h, conn, userID)
+	h.rooms[roomID][userID] = client
 
-	// Register the new peer
-	h.rooms[roomID][userID] = peer
+	return client, nil
+}
 
-	h.mu.Unlock()
+// UnregisterClient removes a user from a video chat room
+func (h *VideoChatHub) UnregisterClient(client *Client) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 
-	log.Printf("VideoChatHub: User %d (%s) joined room %s (%d peers)", userID, username, roomID, len(existingPeers)+1)
-
-	// Send room_users to the joining peer so they know who to call
-	roomUsersMsg := VideoChatSignal{
-		Type:   "room_users",
-		RoomID: roomID,
-		Payload: map[string]interface{}{
-			"users": existingPeers,
-		},
-	}
-	if msgJSON, err := json.Marshal(roomUsersMsg); err == nil {
-		_ = peer.safeWrite(websocket.TextMessage, msgJSON)
-	}
-
-	// Notify existing peers that someone joined (using collected refs, no lock needed)
-	joinMsg := VideoChatSignal{
-		Type:     "user_joined",
-		RoomID:   roomID,
-		UserID:   userID,
-		Username: username,
-	}
-	if msgJSON, err := json.Marshal(joinMsg); err == nil {
-		for _, p := range existingConns {
-			if err := p.safeWrite(websocket.TextMessage, msgJSON); err != nil {
-				log.Printf("VideoChatHub: Write error to user %d in room %s: %v", p.UserID, roomID, err)
+	// We need to find which room this client is in. 
+	// For efficiency we could track it in Client, but for now we iterate since VideoChat rooms are few.
+	for roomID, peers := range h.rooms {
+		if c, ok := peers[client.UserID]; ok && c == client {
+			delete(peers, client.UserID)
+			if len(peers) == 0 {
+				delete(h.rooms, roomID)
 			}
+			log.Printf("VideoChatHub: User %d left room %s", client.UserID, roomID)
+			
+			// Notify remaining peers (doing this inside lock for simplicity here, but broadcastToRoom usually does its own locking)
+			// Actually Leave does notification, so we'll call a helper or handle it in the handler.
+			return
 		}
 	}
 }
@@ -193,17 +137,13 @@ func (h *VideoChatHub) Relay(roomID string, fromUserID, targetID uint, signal Vi
 		return
 	}
 
-	// Stamp the sender ID so the recipient knows who it's from
 	signal.UserID = fromUserID
-
 	msgJSON, err := json.Marshal(signal)
 	if err != nil {
 		return
 	}
 
-	if err := target.safeWrite(websocket.TextMessage, msgJSON); err != nil {
-		log.Printf("VideoChatHub: Failed to relay signal to user %d in room %s: %v", targetID, roomID, err)
-	}
+	target.TrySend(msgJSON)
 }
 
 // broadcastToRoom sends a message to all peers in a room except the sender
@@ -215,8 +155,7 @@ func (h *VideoChatHub) broadcastToRoom(roomID string, excludeUserID uint, signal
 		return
 	}
 
-	// Collect peers under read lock, then send outside the lock
-	targets := make([]*videoChatPeer, 0, len(room))
+	targets := make([]*Client, 0, len(room))
 	for uid, peer := range room {
 		if uid == excludeUserID {
 			continue
@@ -231,13 +170,11 @@ func (h *VideoChatHub) broadcastToRoom(roomID string, excludeUserID uint, signal
 	}
 
 	for _, peer := range targets {
-		if err := peer.safeWrite(websocket.TextMessage, msgJSON); err != nil {
-			log.Printf("VideoChatHub: Write error to user %d in room %s: %v", peer.UserID, roomID, err)
-		}
+		peer.TrySend(msgJSON)
 	}
 }
 
-// StartWiring connects VideoChatHub to Redis pub/sub for multi-instance support
+// StartWiring connects VideoChatHub to Redis pub/sub
 func (h *VideoChatHub) StartWiring(ctx context.Context, n *Notifier) error {
 	return n.StartVideoChatSubscriber(ctx, func(channel, payload string) {
 		var roomID string
@@ -251,7 +188,6 @@ func (h *VideoChatHub) StartWiring(ctx context.Context, n *Notifier) error {
 		}
 		signal.RoomID = roomID
 
-		// If targeted, relay to specific user; otherwise broadcast
 		if signal.TargetID != 0 {
 			h.Relay(roomID, signal.UserID, signal.TargetID, signal)
 		} else {
@@ -272,13 +208,12 @@ func (h *VideoChatHub) Shutdown(_ context.Context) error {
 				RoomID: roomID,
 			}
 			if msgJSON, err := json.Marshal(shutdownMsg); err == nil {
-				// Best-effort write — connection may already be closed
-				_ = peer.safeWrite(websocket.TextMessage, msgJSON)
+				peer.TrySend(msgJSON)
 			}
 			_ = peer.Conn.Close()
 		}
 	}
 
-	h.rooms = make(map[string]map[uint]*videoChatPeer)
+	h.rooms = make(map[string]map[uint]*Client)
 	return nil
 }

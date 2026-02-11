@@ -13,7 +13,7 @@ type Post struct {
 	Title     string   `gorm:"not null" json:"title"`
 	Content   string   `gorm:"type:text;not null" json:"content"`
 	ImageURL  string   `json:"image_url"`
-	UserID    uint     `gorm:"not null" json:"user_id"`
+	UserID    uint     `gorm:"not null;index" json:"user_id"`
 	User      User     `gorm:"foreignKey:UserID" json:"user"`
 	SanctumID *uint    `gorm:"index" json:"sanctum_id,omitempty"`
 	Sanctum   *Sanctum `gorm:"foreignKey:SanctumID" json:"sanctum,omitempty"`
