@@ -90,7 +90,9 @@ Historical and point-in-time analyses are in `docs/reports/` and should be treat
 
 - [x] **Strengthen critical-path integration coverage**
   - Added auth session lifecycle integration coverage (signup → refresh rotation → logout revocation) in `backend/test/auth_session_integration_test.go`
-- [ ] **Add race-detection test job**
+- [x] **Add race-detection test job**
+  - Added PR-time race smoke job in `.github/workflows/ci.yml` (`go test -race ./internal/...`)
+  - Nightly full race sweep remains in `.github/workflows/nightly-race.yml`
 - [ ] **Add load tests for login/feed/chat send**
 
 ### Delivery Safety
