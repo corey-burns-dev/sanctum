@@ -45,16 +45,15 @@ func LoadConfig() (*Config, error) {
 		env = "development"
 	}
 
-	if env != "development" {
+	if env != "development" && env != "" {
 		viper.SetConfigName("config." + env)
 		if err := viper.MergeInConfig(); err != nil {
-			log.Printf("Warning: Profile-specific config 'config.%s.yml' not found, using defaults for %s environment", env, env)
-		} else {
-			log.Printf("Loaded profile-specific configuration: config.%s.yml", env)
+			return nil, fmt.Errorf("required profile-specific config 'config.%s.yml' not found: %w", env, err)
 		}
+		log.Printf("Loaded profile-specific configuration: config.%s.yml", env)
 	}
 
-	// Set default values
+	// Set default values for development
 	viper.SetDefault("PORT", "8375")
 	viper.SetDefault("DB_HOST", "localhost")
 	viper.SetDefault("DB_PORT", "5432")
@@ -66,9 +65,6 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173")
 	viper.SetDefault("APP_ENV", "development")
 	viper.SetDefault("DB_SSLMODE", "disable")
-	viper.SetDefault("TURN_URL", "")
-	viper.SetDefault("TURN_USERNAME", "")
-	viper.SetDefault("TURN_PASSWORD", "")
 
 	var config Config
 	if err := viper.Unmarshal(&config); err != nil {
@@ -93,21 +89,28 @@ func (c *Config) Validate() error {
 
 	isProduction := c.Env == "production" || c.Env == "prod"
 
-	if len(c.JWTSecret) < 32 {
-		if isProduction {
+	// Strict checks for production
+	if isProduction {
+		if c.JWTSecret == "your-secret-key-change-in-production" {
+			return errors.New("JWT_SECRET must be changed from the default value in production")
+		}
+		if len(c.JWTSecret) < 32 {
 			return errors.New("JWT_SECRET must be at least 32 characters in production")
 		}
-		log.Println("WARNING: JWT_SECRET is shorter than 32 characters. Consider using a stronger secret for production.")
-	}
-
-	// Reject well-known default secrets in production
-	if isProduction && c.JWTSecret == "your-secret-key-change-in-production" {
-		return errors.New("JWT_SECRET must be changed from the default value in production")
-	}
-
-	// Enforce SSL for database in production
-	if isProduction && (c.DBSSLMode == "" || c.DBSSLMode == "disable") {
-		log.Println("WARNING: DB_SSLMODE is 'disable' in production. Set DB_SSLMODE=require for encrypted connections.")
+		if c.DBPassword == "password" || c.DBPassword == "" {
+			return errors.New("a strong DB_PASSWORD is required in production")
+		}
+		if c.DBSSLMode == "disable" || c.DBSSLMode == "" {
+			log.Println("WARNING: DB_SSLMODE is 'disable' in production. It is highly recommended to use SSL for database connections.")
+		}
+		if c.AllowedOrigins == "*" {
+			log.Println("WARNING: ALLOWED_ORIGINS is set to '*' in production. This is insecure.")
+		}
+	} else {
+		// Development/Test warnings
+		if len(c.JWTSecret) < 32 {
+			log.Println("WARNING: JWT_SECRET is shorter than 32 characters. Consider using a stronger secret for production.")
+		}
 	}
 
 	return nil

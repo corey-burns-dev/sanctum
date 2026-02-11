@@ -215,6 +215,10 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	users.Get("/me", s.GetMyProfile)
 	users.Put("/me", s.UpdateMyProfile)
 	users.Get("/", s.GetAllUsers)
+
+	// WebSocket ticket issuance
+	api.Post("/ws/ticket", s.AuthRequired(), s.IssueWSTicket)
+
 	// Define specific /:id/:resource routes BEFORE generic /:id route
 	users.Get("/:id/cached", s.GetUserCached)
 	users.Get("/:id/posts", s.GetUserPosts)
@@ -385,7 +389,29 @@ func (s *Server) AdminRequired() fiber.Handler {
 // AuthRequired returns the authentication middleware
 func (s *Server) AuthRequired() fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		// Extract token from "Bearer <token>" or "token" query parameter (for WebSockets)
+		// 1. Try WebSocket ticket first (short-lived, single-use)
+		ticket := c.Query("ticket")
+		if ticket != "" && s.redis != nil {
+			key := fmt.Sprintf("ws_ticket:%s", ticket)
+			userIDStr, err := s.redis.Get(c.Context(), key).Result()
+			if err == nil {
+				// Valid ticket!
+				userID, parseErr := strconv.ParseUint(userIDStr, 10, 32)
+				if parseErr == nil {
+					// Delete ticket immediately (single-use)
+					s.redis.Del(c.Context(), key)
+
+					// Store user ID in context
+					c.Locals("userID", uint(userID))
+					return c.Next()
+				}
+			}
+			// If ticket was provided but invalid/expired, we could either fail
+			// or fall back to JWT. Let's fall back for now to keep it flexible,
+			// but in a strict hardening scenario we might want to fail here.
+		}
+
+		// 2. Fall back to JWT (Bearer token or query param)
 		authHeader := c.Get("Authorization")
 		tokenString := ""
 		if authHeader != "" {

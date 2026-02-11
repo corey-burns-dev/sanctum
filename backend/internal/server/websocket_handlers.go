@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"strconv"
-	"strings"
 	"time"
 
 	"sanctum/internal/middleware"
@@ -16,7 +14,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"
-	"github.com/golang-jwt/jwt/v5"
 )
 
 // WebSocketChatHandler handles WebSocket connections for real-time chat
@@ -24,41 +21,24 @@ func (s *Server) WebSocketChatHandler() fiber.Handler {
 	return websocket.New(func(conn *websocket.Conn) {
 		ctx := context.Background()
 
-		// Authenticate user via query parameter or initial message
-		token := conn.Query("token")
-		if token == "" {
-			// Try to read auth message
-			_, msg, err := conn.ReadMessage()
-			if err != nil {
-				if cerr := conn.Close(); cerr != nil {
-					log.Printf("websocket close error: %v", cerr)
-				}
-				return
-			}
-			txt := string(msg)
-			if !strings.HasPrefix(txt, "auth:") {
-				if werr := conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"first message must be auth:token"}`)); werr != nil {
-					log.Printf("websocket write error: %v", werr)
-				}
-				if cerr := conn.Close(); cerr != nil {
-					log.Printf("websocket close error: %v", cerr)
-				}
-				return
-			}
-			token = strings.TrimPrefix(txt, "auth:")
-		}
-
-		// Validate JWT token
-		userID, username, err := s.validateChatToken(token)
-		if err != nil {
-			if werr := conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"invalid token"}`)); werr != nil {
-				log.Printf("websocket write error: %v", werr)
-			}
-			if cerr := conn.Close(); cerr != nil {
-				log.Printf("websocket close error: %v", cerr)
-			}
+		// Get userID from context locals (set by AuthRequired middleware)
+		userIDVal := conn.Locals("userID")
+		if userIDVal == nil {
+			log.Printf("WebSocket Chat: Unauthenticated connection attempt")
+			_ = conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"unauthorized"}`))
+			_ = conn.Close()
 			return
 		}
+		userID := userIDVal.(uint)
+
+		// Get user info for username
+		user, err := s.userRepo.GetByID(ctx, userID)
+		if err != nil {
+			log.Printf("WebSocket Chat: Failed to get user %d: %v", userID, err)
+			_ = conn.Close()
+			return
+		}
+		username := user.Username
 
 		log.Printf("WebSocket: User %d (%s) connected to chat", userID, username)
 
@@ -270,56 +250,6 @@ func (s *Server) WebSocketChatHandler() fiber.Handler {
 			}
 		}
 	})
-}
-
-// validateChatToken validates a JWT token and returns userID and username
-func (s *Server) validateChatToken(tokenString string) (uint, string, error) {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fiber.NewError(fiber.StatusUnauthorized, "Invalid signing method")
-		}
-		return []byte(s.config.JWTSecret), nil
-	})
-
-	if err != nil || !token.Valid {
-		return 0, "", err
-	}
-
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return 0, "", fiber.NewError(fiber.StatusUnauthorized, "Invalid claims")
-	}
-
-	// Validate issuer and audience manually to support legacy tokens
-	if issuer, issuerOk := claims["iss"].(string); !issuerOk || (issuer != "sanctum-api" && issuer != "vibeshift-api") {
-		return 0, "", fiber.NewError(fiber.StatusUnauthorized, "Invalid token issuer")
-	}
-	if audience, audienceOk := claims["aud"].(string); !audienceOk || (audience != "sanctum-client" && audience != "vibeshift-client") {
-		return 0, "", fiber.NewError(fiber.StatusUnauthorized, "Invalid token audience")
-	}
-
-	sub, ok := claims["sub"].(string)
-	if !ok {
-		return 0, "", fiber.NewError(fiber.StatusUnauthorized, "Invalid subject")
-	}
-
-	userID, err := strconv.ParseUint(sub, 10, 32)
-	if err != nil {
-		return 0, "", err
-	}
-
-	// Use username from claims if available, otherwise fall back to DB
-	if username, ok := claims["username"].(string); ok && username != "" {
-		return uint(userID), username, nil
-	}
-
-	// Fallback: fetch username from DB
-	user, err := s.userRepo.GetByID(context.Background(), uint(userID))
-	if err != nil {
-		return 0, "", err
-	}
-
-	return uint(userID), user.Username, nil
 }
 
 // isUserParticipant checks if a user is a participant in a conversation

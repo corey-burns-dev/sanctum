@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"time"
@@ -25,20 +26,24 @@ const (
 // to coordinate peer-to-peer connections between users in a room.
 func (s *Server) WebSocketVideoChatHandler() fiber.Handler {
 	return websocket.New(func(conn *websocket.Conn) {
-		// Authenticate via query parameter
-		token := conn.Query("token")
-		if token == "" {
-			_ = conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"error","payload":{"message":"token required"}}`))
+		// Get userID from context locals (set by AuthRequired middleware)
+		userIDVal := conn.Locals("userID")
+		if userIDVal == nil {
+			log.Printf("VideoChat WS: Unauthenticated connection attempt")
+			_ = conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"error","payload":{"message":"unauthorized"}}`))
 			_ = conn.Close()
 			return
 		}
+		userID := userIDVal.(uint)
 
-		userID, username, err := s.validateChatToken(token)
+		// Get user info for username
+		user, err := s.userRepo.GetByID(context.Background(), userID)
 		if err != nil {
-			_ = conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"error","payload":{"message":"invalid token"}}`))
+			log.Printf("VideoChat WS: Failed to get user %d: %v", userID, err)
 			_ = conn.Close()
 			return
 		}
+		username := user.Username
 
 		// Room ID from query parameter
 		roomID := conn.Query("room")

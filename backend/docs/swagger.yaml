@@ -930,6 +930,37 @@ paths:
       summary: Get my streams
       tags:
       - Streams
+  /ws/ticket:
+    post:
+      consumes:
+      - application/json
+      description: Generates a short-lived (60s), single-use ticket for WebSocket
+        authentication to avoid sending JWTs in query parameters.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'ticket: string, expires_in: int'
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: 'error: unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "503":
+          description: 'error: Redis not available'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Issue WebSocket ticket
+      tags:
+      - websocket
 schemes:
 - http
 - https

@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"sanctum/internal/config"
 	"sanctum/internal/models"
 
 	"github.com/stretchr/testify/assert"
@@ -53,12 +52,4 @@ func TestIsUserParticipant(t *testing.T) {
 			assert.Equal(t, tt.expectedResult, result)
 		})
 	}
-}
-
-func TestValidateChatToken(t *testing.T) {
-	// This would require generating a real JWT token with s.config.JWTSecret
-	// For simplicity in this example, we verify it returns error with invalid token.
-	s := &Server{config: &config.Config{JWTSecret: "secret"}}
-	_, _, err := s.validateChatToken("invalid.token.here")
-	assert.Error(t, err)
 }

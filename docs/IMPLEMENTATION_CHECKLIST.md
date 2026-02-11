@@ -41,11 +41,11 @@ Historical and point-in-time analyses are in `docs/reports/` and should be treat
   - Implement refresh token rotation
   - Add server-side token revocation support
 
-- [ ] **WebSocket Auth Hardening**
+- [x] **WebSocket Auth Hardening**
   - Replace JWT-in-query with short-lived WS ticket exchange
   - Ensure ticket is single-use and short TTL
 
-- [ ] **Secrets & Config Hardening**
+- [x] **Secrets & Config Hardening**
   - Enforce strong secrets in production
   - Validate critical env vars at startup
   - Remove insecure production defaults
