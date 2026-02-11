@@ -180,6 +180,8 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	auth := api.Group("/auth")
 	auth.Post("/signup", middleware.RateLimit(s.redis, 3, 10*time.Minute, "signup"), s.Signup)
 	auth.Post("/login", middleware.RateLimit(s.redis, 10, 5*time.Minute, "login"), s.Login)
+	auth.Post("/refresh", s.Refresh)
+	auth.Post("/logout", s.Logout)
 
 	// Public post routes (browse/search)
 	publicPosts := api.Group("/posts")
@@ -442,13 +444,14 @@ func (s *Server) AuthRequired() fiber.Handler {
 				models.NewUnauthorizedError("Invalid user ID in token"))
 		}
 
-		// Optional: Check JTI for replay attack prevention (can be disabled in dev)
+		// Check JTI for revocation
 		if jti, exists := claims["jti"].(string); exists && jti != "" {
-			// In a real implementation, you'd check Redis/cache for used JTIs
-			// For now, we'll just validate it exists
-			if len(jti) < 10 { // Basic validation
-				return models.RespondWithError(c, fiber.StatusUnauthorized,
-					models.NewUnauthorizedError("Invalid token ID"))
+			if s.redis != nil {
+				isBlacklisted, err := s.redis.Exists(c.Context(), "blacklist:"+jti).Result()
+				if err == nil && isBlacklisted > 0 {
+					return models.RespondWithError(c, fiber.StatusUnauthorized,
+						models.NewUnauthorizedError("Token has been revoked"))
+				}
 			}
 		}
 

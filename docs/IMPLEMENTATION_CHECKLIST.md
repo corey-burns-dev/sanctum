@@ -36,7 +36,7 @@ Historical and point-in-time analyses are in `docs/reports/` and should be treat
 
 ### Authentication & Security
 
-- [ ] **JWT Refresh & Session Strategy**
+- [x] **JWT Refresh & Session Strategy**
   - Reduce access token lifetime to ~15 minutes
   - Implement refresh token rotation
   - Add server-side token revocation support
