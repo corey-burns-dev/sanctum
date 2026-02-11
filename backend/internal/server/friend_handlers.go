@@ -5,66 +5,35 @@ import (
 	"time"
 
 	"sanctum/internal/models"
+	"sanctum/internal/service"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 // SendFriendRequest handles POST /api/friends/requests/:userId
 func (s *Server) SendFriendRequest(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx := c.UserContext()
 	userID := c.Locals("userID").(uint)
 	targetUserID, err := s.parseID(c, "userId")
 	if err != nil {
 		return nil
 	}
 
-	// Cannot send friend request to yourself
-	if userID == targetUserID {
-		return models.RespondWithError(c, fiber.StatusBadRequest,
-			models.NewValidationError("Cannot send friend request to yourself"))
-	}
-
-	// Check if target user exists
-	_, getUserErr := s.userRepo.GetByID(ctx, uint(targetUserID))
-	if getUserErr != nil {
-		return models.RespondWithError(c, fiber.StatusNotFound, getUserErr)
-	}
-
-	// Check if friendship already exists
-	existing, getFriendshipErr := s.friendRepo.GetFriendshipBetweenUsers(ctx, userID, targetUserID)
-	if getFriendshipErr != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, getFriendshipErr)
-	}
-	if existing != nil {
-		switch existing.Status {
-		case models.FriendshipStatusAccepted:
-			return models.RespondWithError(c, fiber.StatusConflict,
-				models.NewValidationError("You are already friends"))
-		case models.FriendshipStatusPending:
-			if existing.RequesterID == userID {
-				return models.RespondWithError(c, fiber.StatusConflict,
-					models.NewValidationError("Friend request already sent"))
-			}
-			return models.RespondWithError(c, fiber.StatusConflict,
-				models.NewValidationError("You already have a pending friend request from this user"))
-		}
-	}
-
-	// Create a pending friend request; addressee can accept or reject later.
-	friendship := &models.Friendship{
-		RequesterID: userID,
-		AddresseeID: targetUserID,
-		Status:      models.FriendshipStatusPending,
-	}
-
-	if createErr := s.friendRepo.Create(ctx, friendship); createErr != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, createErr)
-	}
-
-	// Load full friendship for response
-	friendship, err = s.friendRepo.GetByID(ctx, friendship.ID)
+	friendship, err := s.friendSvc().SendFriendRequest(ctx, userID, targetUserID)
 	if err != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+		status := fiber.StatusInternalServerError
+		if appErr, ok := err.(*models.AppError); ok {
+			switch appErr.Code {
+			case "NOT_FOUND":
+				status = fiber.StatusNotFound
+			case "VALIDATION_ERROR":
+				status = fiber.StatusConflict
+				if appErr.Message == "Cannot send friend request to yourself" {
+					status = fiber.StatusBadRequest
+				}
+			}
+		}
+		return models.RespondWithError(c, status, err)
 	}
 
 	// Notify both users so UI updates immediately.
@@ -84,10 +53,10 @@ func (s *Server) SendFriendRequest(c *fiber.Ctx) error {
 
 // GetPendingRequests handles GET /api/friends/requests
 func (s *Server) GetPendingRequests(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx := c.UserContext()
 	userID := c.Locals("userID").(uint)
 
-	requests, err := s.friendRepo.GetPendingRequests(ctx, userID)
+	requests, err := s.friendSvc().GetPendingRequests(ctx, userID)
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
@@ -97,10 +66,10 @@ func (s *Server) GetPendingRequests(c *fiber.Ctx) error {
 
 // GetSentRequests handles GET /api/friends/requests/sent
 func (s *Server) GetSentRequests(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx := c.UserContext()
 	userID := c.Locals("userID").(uint)
 
-	requests, err := s.friendRepo.GetSentRequests(ctx, userID)
+	requests, err := s.friendSvc().GetSentRequests(ctx, userID)
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
@@ -110,40 +79,27 @@ func (s *Server) GetSentRequests(c *fiber.Ctx) error {
 
 // AcceptFriendRequest handles POST /api/friends/requests/:requestId/accept
 func (s *Server) AcceptFriendRequest(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx := c.UserContext()
 	userID := c.Locals("userID").(uint)
 	requestID, err := s.parseID(c, "requestId")
 	if err != nil {
 		return nil
 	}
 
-	// Get the friendship request
-	friendship, err := s.friendRepo.GetByID(ctx, requestID)
+	friendship, err := s.friendSvc().AcceptFriendRequest(ctx, userID, requestID)
 	if err != nil {
-		return models.RespondWithError(c, fiber.StatusNotFound, err)
-	}
-
-	// Check if user is the addressee
-	if friendship.AddresseeID != userID {
-		return models.RespondWithError(c, fiber.StatusForbidden,
-			models.NewUnauthorizedError("You can only accept friend requests sent to you"))
-	}
-
-	// Check if already accepted
-	if friendship.Status != models.FriendshipStatusPending {
-		return models.RespondWithError(c, fiber.StatusConflict,
-			models.NewValidationError("Friend request is not pending"))
-	}
-
-	// Accept the request
-	if updateErr := s.friendRepo.UpdateStatus(ctx, requestID, models.FriendshipStatusAccepted); updateErr != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, updateErr)
-	}
-
-	// Get updated friendship
-	friendship, err = s.friendRepo.GetByID(ctx, requestID)
-	if err != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+		status := fiber.StatusInternalServerError
+		if appErr, ok := err.(*models.AppError); ok {
+			switch appErr.Code {
+			case "NOT_FOUND":
+				status = fiber.StatusNotFound
+			case "UNAUTHORIZED":
+				status = fiber.StatusForbidden
+			case "VALIDATION_ERROR":
+				status = fiber.StatusConflict
+			}
+		}
+		return models.RespondWithError(c, status, err)
 	}
 
 	s.publishUserEvent(friendship.RequesterID, EventFriendRequestAccepted, map[string]interface{}{
@@ -162,34 +118,27 @@ func (s *Server) AcceptFriendRequest(c *fiber.Ctx) error {
 
 // RejectFriendRequest handles POST /api/friends/requests/:requestId/reject
 func (s *Server) RejectFriendRequest(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx := c.UserContext()
 	userID := c.Locals("userID").(uint)
 	requestID, err := s.parseID(c, "requestId")
 	if err != nil {
 		return nil
 	}
 
-	// Get the friendship request
-	friendship, err := s.friendRepo.GetByID(ctx, requestID)
+	friendship, err := s.friendSvc().RejectFriendRequest(ctx, userID, requestID)
 	if err != nil {
-		return models.RespondWithError(c, fiber.StatusNotFound, err)
-	}
-
-	// Addressee can reject, requester can cancel their own pending request.
-	if friendship.AddresseeID != userID && friendship.RequesterID != userID {
-		return models.RespondWithError(c, fiber.StatusForbidden,
-			models.NewUnauthorizedError("You can only reject or cancel your own pending requests"))
-	}
-
-	// Check if already processed
-	if friendship.Status != models.FriendshipStatusPending {
-		return models.RespondWithError(c, fiber.StatusConflict,
-			models.NewValidationError("Friend request is not pending"))
-	}
-
-	// Delete the request (reject)
-	if deleteErr := s.friendRepo.Delete(ctx, requestID); deleteErr != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, deleteErr)
+		status := fiber.StatusInternalServerError
+		if appErr, ok := err.(*models.AppError); ok {
+			switch appErr.Code {
+			case "NOT_FOUND":
+				status = fiber.StatusNotFound
+			case "UNAUTHORIZED":
+				status = fiber.StatusForbidden
+			case "VALIDATION_ERROR":
+				status = fiber.StatusConflict
+			}
+		}
+		return models.RespondWithError(c, status, err)
 	}
 
 	eventType := EventFriendRequestRejected
@@ -212,10 +161,10 @@ func (s *Server) RejectFriendRequest(c *fiber.Ctx) error {
 
 // GetFriends handles GET /api/friends
 func (s *Server) GetFriends(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx := c.UserContext()
 	userID := c.Locals("userID").(uint)
 
-	friends, err := s.friendRepo.GetFriends(ctx, userID)
+	friends, err := s.friendSvc().GetFriends(ctx, userID)
 	if err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
@@ -225,41 +174,20 @@ func (s *Server) GetFriends(c *fiber.Ctx) error {
 
 // GetFriendshipStatus handles GET /api/friends/status/:userId
 func (s *Server) GetFriendshipStatus(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx := c.UserContext()
 	userID := c.Locals("userID").(uint)
 	targetUserID, err := s.parseID(c, "userId")
 	if err != nil {
 		return nil
 	}
 
-	// Check if target user exists
-	_, getUserErr := s.userRepo.GetByID(ctx, targetUserID)
-	if getUserErr != nil {
-		return models.RespondWithError(c, fiber.StatusNotFound, getUserErr)
-	}
-
-	// Get friendship status
-	friendship, getFriendshipErr := s.friendRepo.GetFriendshipBetweenUsers(ctx, userID, targetUserID)
-	if getFriendshipErr != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, getFriendshipErr)
-	}
-
-	status := "none"
-	var requestID uint
-	if friendship != nil {
-		switch friendship.Status {
-		case models.FriendshipStatusAccepted:
-			status = "friends"
-		case models.FriendshipStatusPending:
-			requestID = friendship.ID
-			if friendship.RequesterID == userID {
-				status = "pending_sent"
-			} else {
-				status = "pending_received"
-			}
-		default:
-			status = string(friendship.Status)
+	status, requestID, friendship, err := s.friendSvc().GetFriendshipStatus(ctx, userID, targetUserID)
+	if err != nil {
+		httpStatus := fiber.StatusInternalServerError
+		if appErr, ok := err.(*models.AppError); ok && appErr.Code == "NOT_FOUND" {
+			httpStatus = fiber.StatusNotFound
 		}
+		return models.RespondWithError(c, httpStatus, err)
 	}
 
 	return c.JSON(fiber.Map{
@@ -271,26 +199,20 @@ func (s *Server) GetFriendshipStatus(c *fiber.Ctx) error {
 
 // RemoveFriend handles DELETE /api/friends/:userId
 func (s *Server) RemoveFriend(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx := c.UserContext()
 	userID := c.Locals("userID").(uint)
 	targetUserID, err := s.parseID(c, "userId")
 	if err != nil {
 		return nil
 	}
 
-	// Check if friendship exists and is accepted
-	friendship, getFriendshipErr := s.friendRepo.GetFriendshipBetweenUsers(ctx, userID, targetUserID)
-	if getFriendshipErr != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, getFriendshipErr)
-	}
-	if friendship == nil || friendship.Status != models.FriendshipStatusAccepted {
-		return models.RespondWithError(c, fiber.StatusNotFound,
-			models.NewNotFoundError("Friendship", 0))
-	}
-
-	// Remove friendship
-	if removeErr := s.friendRepo.RemoveFriendship(ctx, userID, targetUserID); removeErr != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, removeErr)
+	friendship, err := s.friendSvc().RemoveFriend(ctx, userID, targetUserID)
+	if err != nil {
+		status := fiber.StatusInternalServerError
+		if appErr, ok := err.(*models.AppError); ok && appErr.Code == "NOT_FOUND" {
+			status = fiber.StatusNotFound
+		}
+		return models.RespondWithError(c, status, err)
 	}
 
 	s.publishUserEvent(userID, EventFriendRemoved, map[string]interface{}{
@@ -303,4 +225,8 @@ func (s *Server) RemoveFriend(c *fiber.Ctx) error {
 	})
 
 	return c.SendStatus(fiber.StatusOK)
+}
+
+func (s *Server) friendSvc() *service.FriendService {
+	return service.NewFriendService(s.friendRepo, s.userRepo)
 }
