@@ -1,7 +1,14 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.3.14/schema.json",
   "files": {
-    "includes": ["**", "!!**/dist", "!!**/.astro", "!!**/.next", "!!**/build"],
+    "includes": [
+      "**",
+      "!!**/dist",
+      "!!**/.astro",
+      "!!**/.next",
+      "!!**/build",
+      "!!**/playwright-report"
+    ],
     "ignoreUnknown": false
   },
   "formatter": {

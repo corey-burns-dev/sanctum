@@ -28,7 +28,7 @@ Historical and point-in-time analyses are in `docs/reports/` and should be treat
 
 ### Health & Availability
 
-- [ ] **Split Health Endpoints Correctly**
+- [x] **Split Health Endpoints Correctly**
   - `/health/live` → process is up
   - `/health/ready` → DB, Redis, dependencies
   - Ensure JSON status reflects failures correctly

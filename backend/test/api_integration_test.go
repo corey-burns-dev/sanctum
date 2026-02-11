@@ -36,6 +36,48 @@ func setupApp() *fiber.App {
 	return app
 }
 
+func TestHealthCheck(t *testing.T) {
+	app := setupApp()
+
+	t.Run("Liveness", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/health/live", nil)
+		res, err := app.Test(req, -1)
+		assert.NoError(t, err)
+		defer func() { _ = res.Body.Close() }()
+		assert.Equal(t, 200, res.StatusCode)
+
+		var body map[string]string
+		err = json.NewDecoder(res.Body).Decode(&body)
+		assert.NoError(t, err)
+		assert.Equal(t, "up", body["status"])
+	})
+
+	t.Run("Readiness", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/health/ready", nil)
+		res, err := app.Test(req, -1)
+		assert.NoError(t, err)
+		defer func() { _ = res.Body.Close() }()
+		assert.Equal(t, 200, res.StatusCode)
+
+		var body map[string]interface{}
+		err = json.NewDecoder(res.Body).Decode(&body)
+		assert.NoError(t, err)
+		assert.Equal(t, "healthy", body["status"])
+
+		checks := body["checks"].(map[string]interface{})
+		assert.Equal(t, "healthy", checks["database"])
+		assert.Equal(t, "healthy", checks["redis"])
+	})
+
+	t.Run("LegacyHealth", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/health", nil)
+		res, err := app.Test(req, -1)
+		assert.NoError(t, err)
+		defer func() { _ = res.Body.Close() }()
+		assert.Equal(t, 200, res.StatusCode)
+	})
+}
+
 func TestSignupAndLogin(t *testing.T) {
 	app := setupApp()
 

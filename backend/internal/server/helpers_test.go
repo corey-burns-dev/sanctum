@@ -18,8 +18,12 @@ import (
 // setupMockDB creates a GORM *gorm.DB backed by sqlmock for unit tests.
 func setupMockDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock) {
 	t.Helper()
-	db, mock, err := sqlmock.New()
+	db, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
 	require.NoError(t, err)
+
+	// GORM may ping the database on Open
+	mock.ExpectPing()
+
 	gormDB, err := gorm.Open(postgres.New(postgres.Config{Conn: db}), &gorm.Config{})
 	require.NoError(t, err)
 	return gormDB, mock

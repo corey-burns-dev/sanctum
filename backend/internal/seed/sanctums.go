@@ -18,22 +18,22 @@ type BuiltInSanctum struct {
 
 // BuiltInSanctums defines the permanent system sanctums.
 var BuiltInSanctums = []BuiltInSanctum{
-	{Name: "The Atrium", Slug: "atrium", Description: "Core discussion for Sanctum."},
-	{Name: "The Herald", Slug: "herald", Description: "Announcements and platform updates."},
-	{Name: "Sanctum Support", Slug: "support", Description: "Help and troubleshooting."},
-	{Name: "The Silver Screen", Slug: "movies", Description: "Film discussion and recommendations."},
-	{Name: "The Small Screen", Slug: "television", Description: "TV shows and series conversation."},
-	{Name: "The Archive", Slug: "books", Description: "Books, writing, and reading lists."},
-	{Name: "The Sound Chamber", Slug: "music", Description: "Music discovery and discussion."},
-	{Name: "The Anime Hall", Slug: "anime", Description: "Anime and manga talk."},
-	{Name: "The Game Room", Slug: "gaming", Description: "Gaming across all platforms."},
-	{Name: "The Rig", Slug: "pcgaming", Description: "PC gaming hardware and titles."},
-	{Name: "The Forge", Slug: "development", Description: "Software development discussions."},
-	{Name: "The Machine Room", Slug: "hardware", Description: "Hardware builds and tuning."},
-	{Name: "The Terminal", Slug: "linux", Description: "Linux distros, tooling, and workflows."},
-	{Name: "The Oracle", Slug: "ai", Description: "AI trends, tools, and research."},
-	{Name: "The Training Grounds", Slug: "fitness", Description: "Fitness and training programs."},
-	{Name: "The Hearth", Slug: "food", Description: "Food, cooking, and nutrition."},
+	{Name: "General", Slug: "atrium", Description: "Core discussion for Sanctum."},
+	{Name: "Herald Announcements", Slug: "herald", Description: "Announcements and platform updates."},
+	{Name: "Support", Slug: "support", Description: "Help and troubleshooting."},
+	{Name: "Movies", Slug: "movies", Description: "Film discussion and recommendations."},
+	{Name: "Television", Slug: "television", Description: "TV shows and series conversation."},
+	{Name: "Books", Slug: "books", Description: "Books, writing, and reading lists."},
+	{Name: "Music", Slug: "music", Description: "Music discovery and discussion."},
+	{Name: "Anime", Slug: "anime", Description: "Anime and manga talk."},
+	{Name: "Gaming", Slug: "gaming", Description: "Gaming across all platforms."},
+	{Name: "Pcgaming", Slug: "pcgaming", Description: "PC gaming hardware and titles."},
+	{Name: "Development", Slug: "development", Description: "Software development discussions."},
+	{Name: "Hardware", Slug: "hardware", Description: "Hardware builds and tuning."},
+	{Name: "Linux", Slug: "linux", Description: "Linux distros, tooling, and workflows."},
+	{Name: "Ai", Slug: "ai", Description: "AI trends, tools, and research."},
+	{Name: "Fitness", Slug: "fitness", Description: "Fitness and training programs."},
+	{Name: "Food", Slug: "food", Description: "Food, cooking, and nutrition."},
 }
 
 // Sanctums seeds permanent built-in sanctums and their default chat rooms.
