@@ -26,6 +26,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/monitor"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
+	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/swagger"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
@@ -42,25 +43,26 @@ type wireableHub interface {
 
 // Server holds all dependencies and provides handlers
 type Server struct {
-	config       *config.Config
-	db           *gorm.DB
-	redis        *redis.Client
-	app          *fiber.App
-	shutdownCtx  context.Context
-	shutdownFn   context.CancelFunc
-	userRepo     repository.UserRepository
-	postRepo     repository.PostRepository
-	commentRepo  repository.CommentRepository
-	chatRepo     repository.ChatRepository
-	friendRepo   repository.FriendRepository
-	gameRepo     repository.GameRepository
-	streamRepo   repository.StreamRepository
-	notifier     *notifications.Notifier
-	hub          *notifications.Hub
-	chatHub      *notifications.ChatHub
-	gameHub      *notifications.GameHub
-	videoChatHub *notifications.VideoChatHub
-	hubs         []wireableHub // all hubs for wiring/shutdown iteration
+	config         *config.Config
+	db             *gorm.DB
+	redis          *redis.Client
+	app            *fiber.App
+	promMiddleware *fiberprometheus.FiberPrometheus
+	shutdownCtx    context.Context
+	shutdownFn     context.CancelFunc
+	userRepo       repository.UserRepository
+	postRepo       repository.PostRepository
+	commentRepo    repository.CommentRepository
+	chatRepo       repository.ChatRepository
+	friendRepo     repository.FriendRepository
+	gameRepo       repository.GameRepository
+	streamRepo     repository.StreamRepository
+	notifier       *notifications.Notifier
+	hub            *notifications.Hub
+	chatHub        *notifications.ChatHub
+	gameHub        *notifications.GameHub
+	videoChatHub   *notifications.VideoChatHub
+	hubs           []wireableHub // all hubs for wiring/shutdown iteration
 }
 
 // NewServer creates a new server instance with all dependencies
@@ -84,17 +86,21 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	gameRepo := repository.NewGameRepository(db)
 	streamRepo := repository.NewStreamRepository(db)
 
+	// Initialize Prometheus metrics
+	prom := middleware.InitMetrics("sanctum-api")
+
 	server := &Server{
-		config:      cfg,
-		db:          db,
-		redis:       redisClient,
-		userRepo:    userRepo,
-		postRepo:    postRepo,
-		commentRepo: commentRepo,
-		chatRepo:    chatRepo,
-		friendRepo:  friendRepo,
-		gameRepo:    gameRepo,
-		streamRepo:  streamRepo,
+		config:         cfg,
+		db:             db,
+		redis:          redisClient,
+		promMiddleware: prom,
+		userRepo:       userRepo,
+		postRepo:       postRepo,
+		commentRepo:    commentRepo,
+		chatRepo:       chatRepo,
+		friendRepo:     friendRepo,
+		gameRepo:       gameRepo,
+		streamRepo:     streamRepo,
 	}
 
 	if err := seed.Sanctums(db); err != nil {
@@ -122,10 +128,18 @@ func (s *Server) SetupMiddleware(app *fiber.App) {
 	// Request ID for tracing
 	app.Use(requestid.New())
 
+	// Context Middleware to propagate Request ID and User ID
+	app.Use(middleware.ContextMiddleware())
+
+	// Prometheus Metrics
+	if s.promMiddleware != nil {
+		app.Use(middleware.MetricsMiddleware(s.promMiddleware))
+	}
+
 	// Security headers
 	app.Use(helmet.New())
 
-	// Structured Logging middleware
+	// Structured Logging middleware (after requestid and context middleware)
 	app.Use(middleware.StructuredLogger())
 
 	// CORS middleware should run before middlewares that can short-circuit (e.g. limiter)
@@ -173,8 +187,11 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	api.Get("/", s.HealthCheck) // Vibecheck alias
 
 	// Metrics endpoint for Prometheus
-	api.Get("/metrics", monitor.New(monitor.Config{
-		Title: "Sanctum Backend Metrics",
+	if s.promMiddleware != nil {
+		s.promMiddleware.RegisterAt(app, "/metrics")
+	}
+	api.Get("/metrics/dashboard", monitor.New(monitor.Config{
+		Title: "Sanctum Backend Metrics Dashboard",
 	}))
 
 	// Swagger documentation
@@ -403,6 +420,9 @@ func (s *Server) AuthRequired() fiber.Handler {
 
 					// Store user ID in context
 					c.Locals("userID", uint(userID))
+					// Sync to UserContext for logging and downstream services
+					ctx := context.WithValue(c.UserContext(), middleware.UserIDKey, uint(userID))
+					c.SetUserContext(ctx)
 					return c.Next()
 				}
 			}
@@ -487,6 +507,9 @@ func (s *Server) AuthRequired() fiber.Handler {
 
 		// Store user ID in context
 		c.Locals("userID", uint(userID))
+		// Sync to UserContext for logging and downstream services
+		ctx := context.WithValue(c.UserContext(), middleware.UserIDKey, uint(userID))
+		c.SetUserContext(ctx)
 
 		return c.Next()
 	}

@@ -64,6 +64,7 @@ func (l *CustomGormLogger) Trace(ctx context.Context, begin time.Time, fc func()
 
 	switch {
 	case err != nil && l.Config.LogLevel >= logger.Error && !errors.Is(err, gorm.ErrRecordNotFound):
+		middleware.DatabaseErrors.WithLabelValues("query").Inc()
 		l.logger.ErrorContext(ctx, "GORM query error",
 			slog.String("sql", sql),
 			slog.Int64("rows", rows),

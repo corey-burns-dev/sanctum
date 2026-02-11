@@ -52,10 +52,10 @@ Historical and point-in-time analyses are in `docs/reports/` and should be treat
 
 ### Observability
 
-- [ ] **Structured Logging + Correlation IDs**
+- [x] **Structured Logging + Correlation IDs**
   - Include request ID and key context in logs
 
-- [ ] **Metrics Baseline**
+- [x] **Metrics Baseline**
   - Request rates, error rates, p95/p99 latency
   - Active WebSocket connections
   - Redis and DB error rates

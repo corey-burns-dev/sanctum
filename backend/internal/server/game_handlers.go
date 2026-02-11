@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"sanctum/internal/middleware"
 	"sanctum/internal/models"
 	"sanctum/internal/notifications"
 
@@ -176,6 +177,9 @@ func (s *Server) LeaveGameRoom(c *fiber.Ctx) error {
 // WebSocketGameHandler handles real-time game coordination
 func (s *Server) WebSocketGameHandler() fiber.Handler {
 	return websocket.New(func(c *websocket.Conn) {
+		middleware.ActiveWebSockets.Inc()
+		defer middleware.ActiveWebSockets.Dec()
+
 		userIDVal := c.Locals("userID")
 		if userIDVal == nil {
 			log.Println("GameWS: No userID in locals")

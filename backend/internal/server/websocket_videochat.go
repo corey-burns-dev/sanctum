@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"sanctum/internal/middleware"
 	"sanctum/internal/notifications"
 
 	"github.com/gofiber/fiber/v2"
@@ -26,6 +27,9 @@ const (
 // to coordinate peer-to-peer connections between users in a room.
 func (s *Server) WebSocketVideoChatHandler() fiber.Handler {
 	return websocket.New(func(conn *websocket.Conn) {
+		middleware.ActiveWebSockets.Inc()
+		defer middleware.ActiveWebSockets.Dec()
+
 		// Get userID from context locals (set by AuthRequired middleware)
 		userIDVal := conn.Locals("userID")
 		if userIDVal == nil {

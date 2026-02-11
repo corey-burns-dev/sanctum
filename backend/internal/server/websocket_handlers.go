@@ -19,6 +19,9 @@ import (
 // WebSocketChatHandler handles WebSocket connections for real-time chat
 func (s *Server) WebSocketChatHandler() fiber.Handler {
 	return websocket.New(func(conn *websocket.Conn) {
+		middleware.ActiveWebSockets.Inc()
+		defer middleware.ActiveWebSockets.Dec()
+
 		ctx := context.Background()
 
 		// Get userID from context locals (set by AuthRequired middleware)

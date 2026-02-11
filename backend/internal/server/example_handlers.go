@@ -10,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"
 
+	"sanctum/internal/middleware"
 	"sanctum/internal/models"
 )
 
@@ -34,6 +35,9 @@ func (s *Server) GetUserCached(c *fiber.Ctx) error {
 // Authentication is handled by route middleware and userID is read from connection locals.
 func (s *Server) WebsocketHandler() fiber.Handler {
 	return websocket.New(func(conn *websocket.Conn) {
+		middleware.ActiveWebSockets.Inc()
+		defer middleware.ActiveWebSockets.Dec()
+
 		userIDVal := conn.Locals("userID")
 		if userIDVal == nil {
 			if cerr := conn.Close(); cerr != nil {
