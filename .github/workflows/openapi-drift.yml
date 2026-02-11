@@ -1,0 +1,45 @@
+name: OpenAPI Drift Check
+
+on:
+    pull_request:
+        types: [opened, synchronize, reopened]
+    push:
+        branches: [main, develop]
+    workflow_dispatch:
+
+jobs:
+    openapi-drift:
+        name: OpenAPI drift check
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Set up Go
+              uses: actions/setup-go@v6
+              with:
+                  go-version: "1.25"
+
+            - name: Install swag
+              run: |
+                  go install github.com/swaggo/swag/cmd/swag@latest
+                  echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
+            - name: Regenerate swagger
+              run: |
+                  cd backend
+                  $(go env GOPATH)/bin/swag init -g cmd/server/main.go --output ./docs
+
+            - name: Diff generated swagger
+              run: |
+                  git --no-pager diff --exit-code -- backend/docs/swagger.yaml
+
+            - name: Fail with helpful message
+              if: failure()
+              run: |
+                  echo "OpenAPI/Swagger has drifted from committed backend/docs/swagger.yaml."
+                  echo "Regenerate using 'make swagger' (or run swag init) and commit backend/docs/swagger.yaml."
+                  exit 1

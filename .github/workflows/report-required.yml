@@ -1,0 +1,85 @@
+name: Report Required
+
+on:
+  pull_request:
+    branches: [main, develop]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  report-required:
+    name: Require Report For Substantial Changes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for code-like changes
+        id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+          FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" || true)"
+          echo "Changed files:"
+          echo "$FILES"
+
+          CODE_CHANGED=false
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              backend/*|frontend/*|scripts/*|infra/*|*.go|*.ts|*.tsx|*.js|*.jsx|*.mjs|*.cjs|*.css|*.scss|*.html|*.sql|*.yml|*.yaml|*.toml|*.json|Dockerfile|Dockerfile.*|Makefile|compose*.yml|compose*.yaml)
+                CODE_CHANGED=true
+                break
+                ;;
+            esac
+          done <<< "$FILES"
+
+          echo "code_changed=$CODE_CHANGED" >> "$GITHUB_OUTPUT"
+
+      - name: Check for new report file
+        id: report
+        if: steps.changes.outputs.code_changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+          ADDED_REPORTS="$(
+            git diff --name-status "$BASE_SHA" "$HEAD_SHA" \
+            | awk '$1=="A" {print $2}' \
+            | grep -E '^docs/reports/.*\.md$' \
+            | grep -v '^docs/reports/REPORT_TEMPLATE\.md$' || true
+          )"
+
+          if [ -z "$ADDED_REPORTS" ]; then
+            echo "has_report=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Added report files:"
+          echo "$ADDED_REPORTS"
+          echo "has_report=true" >> "$GITHUB_OUTPUT"
+
+      - name: Fail when report is missing
+        if: steps.changes.outputs.code_changed == 'true' && steps.report.outputs.has_report != 'true'
+        shell: bash
+        run: |
+          echo "Substantial/code changes detected, but no new report was added in docs/reports/."
+          echo "Add a report file named like: docs/reports/YYYY-MM-DD-HHMM-short-slug.md"
+          echo "Use docs/reports/REPORT_TEMPLATE.md."
+          exit 1
+
+      - name: Skip when no substantial changes
+        if: steps.changes.outputs.code_changed != 'true'
+        run: echo "No substantial/code-like changes detected; report not required."
