@@ -88,7 +88,8 @@ Historical and point-in-time analyses are in `docs/reports/` and should be treat
 
 ### Testing and Quality Gates
 
-- [ ] **Strengthen critical-path integration coverage**
+- [x] **Strengthen critical-path integration coverage**
+  - Added auth session lifecycle integration coverage (signup → refresh rotation → logout revocation) in `backend/test/auth_session_integration_test.go`
 - [ ] **Add race-detection test job**
 - [ ] **Add load tests for login/feed/chat send**
 
