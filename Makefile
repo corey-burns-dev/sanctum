@@ -20,7 +20,7 @@ GREEN := \033[1;32m
 YELLOW := \033[1;33m
 NC := \033[0m # No Color
 
-.PHONY: help dev dev-backend dev-frontend dev-both build build-backend build-frontend up down recreate recreate-frontend recreate-backend logs logs-backend logs-frontend logs-all fmt fmt-frontend lint lint-frontend install env restart check-versions clean test test-backend test-frontend test-api test-e2e test-e2e-smoke test-up test-down seed admin-list admin-promote admin-demote admin-bootstrap-me deps-update deps-update-backend deps-update-frontend deps-tidy deps-check deps-vuln deps-audit monitor-up monitor-down monitor-logs monitor-config monitor-lite-up monitor-lite-down report report-open swagger openapi-check
+.PHONY: help dev dev-backend dev-frontend dev-both build build-backend build-frontend up down recreate recreate-frontend recreate-backend logs logs-backend logs-frontend logs-all fmt fmt-frontend lint lint-frontend install env restart check-versions clean test test-backend test-frontend test-api test-e2e test-e2e-smoke test-load test-up test-down seed admin-list admin-promote admin-demote admin-bootstrap-me deps-update deps-update-backend deps-update-frontend deps-tidy deps-check deps-vuln deps-audit monitor-up monitor-down monitor-logs monitor-config monitor-lite-up monitor-lite-down report report-open swagger openapi-check
 
 # Default target
 help:
@@ -350,6 +350,10 @@ test-e2e:
 	@echo "$(BLUE)Running full Playwright E2E suite...$(NC)"
 	@echo "$(YELLOW)⚠️  Ensure backend and frontend are running (make dev or run both locally)$(NC)"
 	cd frontend && PLAYWRIGHT_BASE_URL=http://localhost:5173 PLAYWRIGHT_API_URL=http://localhost:8375/api DB_HOST=localhost DB_PORT=5433 DB_USER=sanctum_user DB_PASSWORD=sanctum_password DB_NAME=sanctum_test $(BUN) run test:e2e
+
+test-load:
+	@echo "$(BLUE)Running backend load smoke tests (login/feed/chat send)...$(NC)"
+	cd backend && APP_ENV=test $(GO) test ./test -tags=load -run TestLoadScenarios -count=1
 
 # Database seeding
 seed:

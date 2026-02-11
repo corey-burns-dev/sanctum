@@ -94,3 +94,21 @@ The integration and migration tests use PostgreSQL and expect these env vars
 Redis is required for the server boot path in integration tests:
 
 - `REDIS_URL` (default in test profile: `localhost:6379`)
+
+## Load Smoke Coverage
+
+Load-smoke coverage for critical paths is implemented with build-tagged tests:
+
+- `test/load_smoke_test.go` covers login, feed read, and chat-send concurrency scenarios.
+
+Run from `backend/`:
+
+```bash
+APP_ENV=test go test ./test -tags=load -run TestLoadScenarios -count=1
+```
+
+Or from repo root:
+
+```bash
+make test-load
+```

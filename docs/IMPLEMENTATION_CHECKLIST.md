@@ -93,7 +93,9 @@ Historical and point-in-time analyses are in `docs/reports/` and should be treat
 - [x] **Add race-detection test job**
   - Added PR-time race smoke job in `.github/workflows/ci.yml` (`go test -race ./internal/...`)
   - Nightly full race sweep remains in `.github/workflows/nightly-race.yml`
-- [ ] **Add load tests for login/feed/chat send**
+- [x] **Add load tests for login/feed/chat send**
+  - Added build-tagged load smoke suite in `backend/test/load_smoke_test.go`
+  - Added `make test-load` and documented execution in `backend/TESTING.md`
 
 ### Delivery Safety
 
