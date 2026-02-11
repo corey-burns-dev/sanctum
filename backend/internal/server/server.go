@@ -161,8 +161,12 @@ func (s *Server) SetupMiddleware(app *fiber.App) {
 func (s *Server) SetupRoutes(app *fiber.App) {
 	api := app.Group("/api")
 
-	// Health check
-	api.Get("/", s.HealthCheck)
+	// Health checks
+	app.Get("/health/live", s.LivenessCheck)
+	app.Get("/health/ready", s.ReadinessCheck)
+	// Backwards-compatible legacy route: map /health to readiness (keeps existing scripts working)
+	app.Get("/health", s.ReadinessCheck)
+	api.Get("/", s.HealthCheck) // Vibecheck alias
 
 	// Metrics endpoint for Prometheus
 	api.Get("/metrics", monitor.New(monitor.Config{
@@ -298,8 +302,21 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	adminSanctumRequests.Post("/:id/reject", s.RejectSanctumRequest)
 }
 
-// HealthCheck handles health check requests
+// HealthCheck is a legacy/simple alias for ReadinessCheck
 func (s *Server) HealthCheck(c *fiber.Ctx) error {
+	return s.ReadinessCheck(c)
+}
+
+// LivenessCheck handles liveness probe requests
+func (s *Server) LivenessCheck(c *fiber.Ctx) error {
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"status": "up",
+		"time":   time.Now(),
+	})
+}
+
+// ReadinessCheck handles readiness probe requests
+func (s *Server) ReadinessCheck(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
 	defer cancel()
 
@@ -317,12 +334,13 @@ func (s *Server) HealthCheck(c *fiber.Ctx) error {
 			redisStatus = "unhealthy"
 		}
 	} else {
+		// Redis is considered required for full readiness in this app
 		redisStatus = "unavailable"
 	}
 
 	status := fiber.StatusOK
 	overallStatus := "healthy"
-	if dbStatus == "unhealthy" || redisStatus == "unhealthy" {
+	if dbStatus == "unhealthy" || redisStatus != "healthy" {
 		status = fiber.StatusServiceUnavailable
 		overallStatus = "unhealthy"
 	}

@@ -1,6 +1,7 @@
 package seed
 
 import (
+	"fmt"
 	"log"
 	"math/rand"
 	"sanctum/internal/models"
@@ -175,6 +176,49 @@ func (s *Seeder) SeedDMs(users []*models.User) error {
 	return nil
 }
 
+// SeedSanctumPosts creates 50 posts for each existing sanctum, with random
+// engagement from the provided users.
+func (s *Seeder) SeedSanctumPosts(users []*models.User) error {
+	log.Println("🏰 Seeding sanctum-specific posts...")
+	var sanctums []*models.Sanctum
+	if err := s.db.Find(&sanctums).Error; err != nil {
+		return err
+	}
+
+	// #nosec G404: Non-cryptographic randomness is acceptable for seeding test data
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	for _, sanctum := range sanctums {
+		log.Printf("  📍 Seeding 50 posts for sanctum: %s", sanctum.Name)
+		for i := 0; i < 50; i++ {
+			creator := users[r.Intn(len(users))]
+			p, err := s.factory.CreatePost(creator, func(p *models.Post) {
+				p.SanctumID = &sanctum.ID
+				p.Title = fmt.Sprintf("[%s] %s", sanctum.Name, p.Title)
+			})
+			if err != nil {
+				continue
+			}
+
+			// Random likes
+			likersCount := r.Intn(len(users) / 3)
+			for j := 0; j < likersCount; j++ {
+				liker := users[r.Intn(len(users))]
+				_ = s.factory.CreateLike(liker, p)
+			}
+
+			// Random comments
+			commentersCount := r.Intn(5) + 2 // At least 2 comments
+			for j := 0; j < commentersCount; j++ {
+				commenter := users[r.Intn(len(users))]
+				_, _ = s.factory.CreateComment(commenter, p)
+			}
+		}
+	}
+
+	return nil
+}
+
 // ApplyPreset runs a named seeder preset (e.g. "MegaPopulated").
 func (s *Seeder) ApplyPreset(name string) error {
 	log.Printf("🌟 Applying seeder preset: %s", name)
@@ -184,7 +228,8 @@ func (s *Seeder) ApplyPreset(name string) error {
 		if err != nil {
 			return err
 		}
-		_, _ = s.SeedEngagement(users, 100)
+		_, _ = s.SeedEngagement(users, 50)
+		_ = s.SeedSanctumPosts(users)
 		_ = s.SeedActiveGames(users)
 		_ = s.SeedDMs(users)
 	default:

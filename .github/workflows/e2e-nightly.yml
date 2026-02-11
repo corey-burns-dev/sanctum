@@ -83,7 +83,7 @@ jobs:
       - name: Wait for services
         run: |
           for i in {1..60}; do
-            if curl -sf http://localhost:8375/health > /dev/null && curl -sf http://localhost:5173 > /dev/null; then
+            if curl -sf http://localhost:8375/health/ready > /dev/null && curl -sf http://localhost:5173 > /dev/null; then
               echo "Services are ready"
               exit 0
             fi
