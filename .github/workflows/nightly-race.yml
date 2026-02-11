@@ -1,0 +1,58 @@
+name: Nightly Go Race Detector
+
+on:
+  schedule:
+    - cron: "0 4 * * *" # every day at 04:00 UTC
+  workflow_dispatch:
+
+jobs:
+  go-race:
+    name: Go race detector
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: sanctum_test
+          POSTGRES_USER: sanctum_user
+          POSTGRES_PASSWORD: sanctum_password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7.2-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.25"
+
+      - name: Wait for services
+        run: |
+          docker ps
+          sleep 5
+
+      - name: Run race tests
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: sanctum_user
+          DB_PASSWORD: sanctum_password
+          DB_NAME: sanctum_test
+          REDIS_URL: localhost:6379
+          APP_ENV: test
+        run: |
+          cd backend
+          CGO_ENABLED=1 go test -race ./...
