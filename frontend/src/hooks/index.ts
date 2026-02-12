@@ -1,5 +1,6 @@
 // Export all hooks from a single entry point
 
+export * from './useAdminModeration'
 export * from './useAudio'
 export * from './useAuth'
 export * from './useChat'
@@ -8,6 +9,7 @@ export * from './useComments'
 export * from './useFriends'
 export * from './useGameRoomSession'
 export * from './useGames'
+export * from './useModeration'
 export * from './usePosts'
 export * from './usePresence'
 export * from './useRealtimeNotifications'

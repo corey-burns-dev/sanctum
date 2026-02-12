@@ -36,6 +36,7 @@ export function ResponsiveImage({
       return (
         <div
           className={`relative w-full ${aspectClass} ${className ?? ''}`}
+          role='img'
           aria-label={alt}
         >
           <div className='w-full h-full rounded-xl bg-muted animate-pulse' />
@@ -44,7 +45,9 @@ export function ResponsiveImage({
     }
 
     return (
-      <div className={`relative w-full bg-muted overflow-hidden rounded-xl ${aspectClass}`}>
+      <div
+        className={`relative w-full bg-muted overflow-hidden rounded-xl ${aspectClass}`}
+      >
         <img
           src={normalizedFallback}
           alt={alt}
@@ -55,13 +58,15 @@ export function ResponsiveImage({
     )
   }
 
-  const webpSrcset = SIZES
-    .map(w => (variants?.[`${w}_webp`] ? `${variants[`${w}_webp`]} ${w}w` : null))
+  const webpSrcset = SIZES.map(w =>
+    variants?.[`${w}_webp`] ? `${variants[`${w}_webp`]} ${w}w` : null
+  )
     .filter(Boolean)
     .join(', ')
 
-  const jpgSrcset = SIZES
-    .map(w => (variants?.[`${w}_jpg`] ? `${variants[`${w}_jpg`]} ${w}w` : null))
+  const jpgSrcset = SIZES.map(w =>
+    variants?.[`${w}_jpg`] ? `${variants[`${w}_jpg`]} ${w}w` : null
+  )
     .filter(Boolean)
     .join(', ')
 
@@ -76,6 +81,7 @@ export function ResponsiveImage({
     return (
       <div
         className={`relative w-full ${aspectClass} ${className ?? ''}`}
+        role='img'
         aria-label={alt}
       >
         <div className='w-full h-full rounded-xl bg-muted animate-pulse' />
@@ -84,9 +90,13 @@ export function ResponsiveImage({
   }
 
   return (
-    <div className={`relative w-full bg-muted overflow-hidden rounded-xl ${aspectClass}`}>
+    <div
+      className={`relative w-full bg-muted overflow-hidden rounded-xl ${aspectClass}`}
+    >
       <picture>
-        {webpSrcset ? <source type='image/webp' srcSet={webpSrcset} sizes={sizes} /> : null}
+        {webpSrcset ? (
+          <source type='image/webp' srcSet={webpSrcset} sizes={sizes} />
+        ) : null}
         <img
           src={fallbackSrc}
           srcSet={jpgSrcset || undefined}

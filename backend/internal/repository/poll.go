@@ -35,9 +35,9 @@ func (r *pollRepository) Create(ctx context.Context, postID uint, question strin
 	}
 	for i, text := range options {
 		opt := models.PollOption{
-			PollID:        poll.ID,
-			OptionText:    text,
-			DisplayOrder:  i,
+			PollID:       poll.ID,
+			OptionText:   text,
+			DisplayOrder: i,
 		}
 		if err := r.db.WithContext(ctx).Create(&opt).Error; err != nil {
 			return nil, err

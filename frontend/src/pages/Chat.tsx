@@ -7,6 +7,7 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Send,
+  Smile,
   Users,
   X,
 } from 'lucide-react'
@@ -27,6 +28,7 @@ import {
   useJoinChatroom,
   useJoinedChatrooms,
   useLeaveConversation,
+  useMarkAsRead,
   useMessages,
   useSendMessage,
 } from '@/hooks/useChat'
@@ -42,10 +44,14 @@ import { cn } from '@/lib/utils'
 import { useChatContext } from '@/providers/ChatProvider'
 import { useChatDockStore } from '@/stores/useChatDockStore'
 
+const QUICK_EMOJI = ['😀', '😂', '😍', '👍', '🔥', '🎉', '😮', '🤝']
+
 export default function Chat() {
   const { id: urlChatId } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [newMessage, setNewMessage] = useState('')
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [mentionQuery, setMentionQuery] = useState('')
   const [showChatrooms, setShowChatrooms] = useState(true)
   const [leftSidebarMode, setLeftSidebarMode] = useState<'rooms' | 'dms'>(
     'rooms'
@@ -59,6 +65,9 @@ export default function Chat() {
   >({})
   const roomAlertedRef = useRef<Set<number>>(new Set())
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const typingDebounceRef = useRef<number | null>(null)
+  const typingInactivityRef = useRef<number | null>(null)
+  const remoteTypingTimeoutsRef = useRef<Record<number, number>>({})
   const queryClient = useQueryClient()
 
   const onlineUserIds = usePresenceStore(state => state.onlineUserIds)
@@ -183,6 +192,7 @@ export default function Chat() {
     }
   )
   const sendMessage = useSendMessage(selectedChatId || 0)
+  const markAsRead = useMarkAsRead()
 
   const fallbackConversation = useMemo(() => {
     if (!selectedChatId) return null
@@ -281,6 +291,17 @@ export default function Chat() {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
   }, [messages.length])
+
+  useEffect(() => {
+    if (!selectedChatId || !canAccessSelectedConversation) return
+    if (isCurrentConversationGroup) return
+    markAsRead.mutate(selectedChatId)
+  }, [
+    selectedChatId,
+    canAccessSelectedConversation,
+    isCurrentConversationGroup,
+    markAsRead,
+  ])
 
   useEffect(() => {
     if (!selectedChatId || !currentConversation) {
@@ -517,6 +538,7 @@ export default function Chat() {
   const {
     joinRoom,
     leaveRoom,
+    sendTyping: ctxSendTyping,
     joinedRooms,
     setOnMessage: _setOnMessage,
     setOnTyping: _setOnTyping,
@@ -583,8 +605,14 @@ export default function Chat() {
       }
     })
     const unsubTyping = subscribeOnTyping(
-      (convId, userId, username, isTyping) => {
+      (convId, userId, username, isTyping, expiresInMs) => {
         if (convId !== selectedChatId) return
+        const timeoutMs = expiresInMs ?? 5000
+        const timeoutMap = remoteTypingTimeoutsRef.current
+        if (timeoutMap[userId]) {
+          window.clearTimeout(timeoutMap[userId])
+          delete timeoutMap[userId]
+        }
         setParticipants(prev => ({
           ...prev,
           [userId]: {
@@ -593,6 +621,19 @@ export default function Chat() {
             online: true,
           },
         }))
+        if (isTyping) {
+          timeoutMap[userId] = window.setTimeout(() => {
+            setParticipants(prev => ({
+              ...prev,
+              [userId]: {
+                ...(prev?.[userId] || { id: userId, username }),
+                typing: false,
+                online: true,
+              },
+            }))
+            delete remoteTypingTimeoutsRef.current[userId]
+          }, timeoutMs)
+        }
       }
     )
 
@@ -615,6 +656,11 @@ export default function Chat() {
       unsubConnectedUsers()
       unsubParticipants()
       unsubChatroomPresence()
+      const timeoutMap = remoteTypingTimeoutsRef.current
+      for (const timeoutID of Object.values(timeoutMap)) {
+        window.clearTimeout(timeoutID)
+      }
+      remoteTypingTimeoutsRef.current = {}
     }
   }, [
     selectedChatId,
@@ -668,6 +714,9 @@ export default function Chat() {
     const messageContent = newMessage
 
     setNewMessage('')
+    setMentionQuery('')
+    setShowEmojiPicker(false)
+    ctxSendTyping(selectedChatId, false)
     sendMessage.mutate(
       { content: messageContent, message_type: 'text', metadata: { tempId } },
       {
@@ -677,7 +726,45 @@ export default function Chat() {
         },
       }
     )
-  }, [newMessage, selectedChatId, currentUser, sendMessage])
+  }, [newMessage, selectedChatId, currentUser, sendMessage, ctxSendTyping])
+
+  const handleInputChange = useCallback(
+    (value: string) => {
+      setNewMessage(value)
+      const mentionMatch = value.match(/(?:^|\\s)@([a-zA-Z0-9_]*)$/)
+      setMentionQuery(mentionMatch ? (mentionMatch[1] ?? '') : '')
+      if (!selectedChatId) return
+
+      if (typingDebounceRef.current) {
+        window.clearTimeout(typingDebounceRef.current)
+      }
+      typingDebounceRef.current = window.setTimeout(() => {
+        if (value.trim()) ctxSendTyping(selectedChatId, true)
+      }, 500)
+
+      if (typingInactivityRef.current) {
+        window.clearTimeout(typingInactivityRef.current)
+      }
+      typingInactivityRef.current = window.setTimeout(() => {
+        ctxSendTyping(selectedChatId, false)
+      }, 5000)
+    },
+    [selectedChatId, ctxSendTyping]
+  )
+
+  const applyMention = useCallback((username: string) => {
+    setNewMessage(prev =>
+      prev.replace(/(?:^|\\s)@[a-zA-Z0-9_]*$/, match =>
+        match.startsWith(' ') ? ` @${username} ` : `@${username} `
+      )
+    )
+    setMentionQuery('')
+  }, [])
+
+  const appendEmoji = useCallback((emoji: string) => {
+    setNewMessage(prev => `${prev}${emoji}`)
+    setShowEmojiPicker(false)
+  }, [])
 
   const handleKeyPress = useCallback(
     (e: React.KeyboardEvent) => {
@@ -688,6 +775,17 @@ export default function Chat() {
     },
     [handleSendMessage]
   )
+
+  useEffect(() => {
+    return () => {
+      if (typingDebounceRef.current) {
+        window.clearTimeout(typingDebounceRef.current)
+      }
+      if (typingInactivityRef.current) {
+        window.clearTimeout(typingInactivityRef.current)
+      }
+    }
+  }, [])
 
   const handleJoinConversation = useCallback(
     (id: number) => {
@@ -807,6 +905,18 @@ export default function Chat() {
       ).length,
     [participants, onlineUserIds]
   )
+  const mentionSuggestions = useMemo(() => {
+    if (!mentionQuery && !newMessage.endsWith('@')) return []
+    const normalized = mentionQuery.toLowerCase()
+    return (currentConversation?.participants || [])
+      .filter(participant => participant.id !== currentUser?.id)
+      .filter(participant =>
+        normalized
+          ? participant.username?.toLowerCase().startsWith(normalized)
+          : true
+      )
+      .slice(0, 5)
+  }, [mentionQuery, newMessage, currentConversation, currentUser?.id])
   const _getRoomOnlineCount = useCallback(
     (room: Conversation) => {
       // Use per-room online IDs from chatroom_presence events (authoritative)
@@ -1135,6 +1245,9 @@ export default function Chat() {
                 messages={messages}
                 isLoading={isLoading}
                 currentUserId={currentUser?.id}
+                isDirectMessage={!isCurrentConversationGroup}
+                showReadReceipts={!isCurrentConversationGroup}
+                conversationId={selectedChatId || undefined}
               />
               <div ref={messagesEndRef} className='h-2' />
             </div>
@@ -1149,17 +1262,57 @@ export default function Chat() {
               )}
 
               {userIsJoined ? (
-                <div className='flex items-center gap-2'>
-                  <Input
-                    placeholder={
-                      wsIsJoined ? 'Type a message...' : 'Connecting...'
-                    }
-                    value={newMessage}
-                    onChange={e => setNewMessage(e.target.value)}
-                    onKeyDown={handleKeyPress}
-                    disabled={!wsIsJoined}
-                    className='h-10 flex-1 rounded-full border-border/60 bg-card'
-                  />
+                <div className='relative flex items-center gap-2'>
+                  <div className='relative flex-1'>
+                    <Input
+                      placeholder={
+                        wsIsJoined ? 'Type a message...' : 'Connecting...'
+                      }
+                      value={newMessage}
+                      onChange={e => handleInputChange(e.target.value)}
+                      onKeyDown={handleKeyPress}
+                      disabled={!wsIsJoined}
+                      className='h-10 flex-1 rounded-full border-border/60 bg-card pr-12'
+                    />
+                    <button
+                      type='button'
+                      onClick={() => setShowEmojiPicker(prev => !prev)}
+                      className='absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground'
+                      title='Insert emoji'
+                    >
+                      <Smile className='h-4 w-4' />
+                    </button>
+                    {showEmojiPicker && (
+                      <div className='absolute bottom-12 right-0 z-20 flex max-w-52 flex-wrap gap-1 rounded-lg border border-border bg-card p-2 shadow-lg'>
+                        {QUICK_EMOJI.map(emoji => (
+                          <button
+                            key={`chat-emoji-${emoji}`}
+                            type='button'
+                            onClick={() => appendEmoji(emoji)}
+                            className='inline-flex h-7 w-7 items-center justify-center rounded text-base transition-colors hover:bg-muted'
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {mentionSuggestions.length > 0 && (
+                      <div className='absolute bottom-12 left-0 z-20 w-full rounded-lg border border-border bg-card p-1 shadow-lg'>
+                        {mentionSuggestions.map(participant => (
+                          <button
+                            key={`chat-mention-${participant.id}`}
+                            type='button'
+                            onClick={() => applyMention(participant.username)}
+                            className='flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted'
+                          >
+                            <span className='font-semibold'>
+                              @{participant.username}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <Button
                     onClick={handleSendMessage}
                     disabled={!newMessage.trim() || !wsIsJoined}

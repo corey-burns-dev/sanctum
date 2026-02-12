@@ -5,6 +5,7 @@ import { apiClient } from '@/api/client'
 import type {
   CreateConversationRequest,
   Message,
+  MessageReactionResponse,
   PaginationParams,
   SendMessageRequest,
 } from '@/api/types'
@@ -23,6 +24,19 @@ const chatKeys = {
   chatroomsJoined: () => [...chatKeys.chatrooms(), 'joined'] as const,
   chatroomModerators: (chatroomId: number) =>
     [...chatKeys.chatrooms(), 'moderators', chatroomId] as const,
+}
+
+function applyReactionSummaryToMessages(
+  messages: Message[] | undefined,
+  messageId: number,
+  reactionSummary: MessageReactionResponse['reactions']
+) {
+  if (!Array.isArray(messages)) return messages
+  return messages.map(message =>
+    message.id === messageId
+      ? { ...message, reaction_summary: reactionSummary }
+      : message
+  )
 }
 
 // ===== Conversations =====
@@ -320,6 +334,52 @@ export function useDeleteMessage(conversationId: number) {
         queryKey: chatKeys.messages(conversationId),
       })
       queryClient.invalidateQueries({ queryKey: chatKeys.conversations() })
+    },
+  })
+}
+
+export function useAddMessageReaction(conversationId: number) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ messageId, emoji }: { messageId: number; emoji: string }) =>
+      apiClient.addMessageReaction(conversationId, messageId, emoji),
+    onSuccess: response => {
+      queryClient.setQueryData<Message[]>(
+        chatKeys.messages(conversationId),
+        oldMessages =>
+          applyReactionSummaryToMessages(
+            oldMessages,
+            response.message_id,
+            response.reactions
+          )
+      )
+    },
+    onError: error => {
+      handleAuthOrFKError(error)
+    },
+  })
+}
+
+export function useRemoveMessageReaction(conversationId: number) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ messageId, emoji }: { messageId: number; emoji: string }) =>
+      apiClient.removeMessageReaction(conversationId, messageId, emoji),
+    onSuccess: response => {
+      queryClient.setQueryData<Message[]>(
+        chatKeys.messages(conversationId),
+        oldMessages =>
+          applyReactionSummaryToMessages(
+            oldMessages,
+            response.message_id,
+            response.reactions
+          )
+      )
+    },
+    onError: error => {
+      handleAuthOrFKError(error)
     },
   })
 }

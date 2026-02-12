@@ -1,16 +1,22 @@
 // Shared hook for user interaction actions — used by UserMenu and UserContextMenu
 
+import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { apiClient } from '@/api/client'
 import type { User } from '@/api/types'
 import { useCreateConversation } from '@/hooks/useChat'
 import {
-    useFriendshipStatus,
-    useRemoveFriend,
-    useSendFriendRequest,
+  useFriendshipStatus,
+  useRemoveFriend,
+  useSendFriendRequest,
 } from '@/hooks/useFriends'
+import {
+  useBlockUser,
+  useMyBlocks,
+  useReportUser,
+  useUnblockUser,
+} from '@/hooks/useModeration'
 import { getCurrentUser } from '@/hooks/useUsers'
-import { useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
 
 export function useUserActions(user: User) {
   const navigate = useNavigate()
@@ -19,6 +25,10 @@ export function useUserActions(user: User) {
   const sendRequest = useSendFriendRequest()
   const removeFriend = useRemoveFriend()
   const createConversation = useCreateConversation()
+  const { data: myBlocks = [] } = useMyBlocks()
+  const blockUser = useBlockUser()
+  const unblockUser = useUnblockUser()
+  const reportUser = useReportUser()
 
   const isSelf = currentUser != null && currentUser.id === user.id
   const status = statusData?.status || 'none'
@@ -77,6 +87,37 @@ export function useUserActions(user: User) {
     removeFriend.mutate(user.id)
   }
 
+  const isBlocked = myBlocks.some(block => block.blocked_id === user.id)
+  const toggleBlockUser = () => {
+    if (isBlocked) {
+      unblockUser.mutate(user.id, {
+        onSuccess: () => toast.success('User unblocked'),
+        onError: () => toast.error('Failed to unblock user'),
+      })
+      return
+    }
+    blockUser.mutate(user.id, {
+      onSuccess: () => toast.success('User blocked'),
+      onError: () => toast.error('Failed to block user'),
+    })
+  }
+
+  const handleReportUser = () => {
+    const reason = window.prompt('Reason for reporting this user?')?.trim()
+    if (!reason) return
+    const details = window.prompt('Additional details (optional)')?.trim()
+    reportUser.mutate(
+      {
+        userId: user.id,
+        payload: { reason, details },
+      },
+      {
+        onSuccess: () => toast.success('User reported'),
+        onError: () => toast.error('Failed to report user'),
+      }
+    )
+  }
+
   const canAddFriend = status === 'none' || status === 'pending_sent'
   const addFriendDisabled =
     sendRequest.isPending ||
@@ -103,5 +144,9 @@ export function useUserActions(user: User) {
     addFriendLabel,
     isFriend,
     removeFriendPending,
+    isBlocked,
+    toggleBlockUser,
+    handleReportUser,
+    blockPending: blockUser.isPending || unblockUser.isPending,
   }
 }

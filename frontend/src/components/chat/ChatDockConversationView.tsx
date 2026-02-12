@@ -1,4 +1,4 @@
-import { ArrowLeft, Expand, Send } from 'lucide-react'
+import { ArrowLeft, Expand, Send, Smile } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Conversation } from '@/api/types'
@@ -17,6 +17,8 @@ interface ChatDockConversationViewProps {
   currentUserId: number | undefined
   sendTyping: (isTyping: boolean) => void
 }
+
+const QUICK_EMOJI = ['😀', '😂', '😍', '👍', '🔥', '🎉', '😮', '🤝']
 
 export function ChatDockConversationView({
   conversationId,
@@ -42,19 +44,16 @@ export function ChatDockConversationView({
   const [inputValue, setInputValue] = useState(
     useChatDockStore.getState().drafts[conversationId] || ''
   )
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const typingTimeoutRef = useRef<number | undefined>(undefined)
+  const typingDebounceRef = useRef<number | undefined>(undefined)
+  const typingInactivityRef = useRef<number | undefined>(undefined)
   const markAsReadRef = useRef(markAsRead)
   markAsReadRef.current = markAsRead
 
   // Sync draft on conversation switch
   useEffect(() => {
     setInputValue(draftsRef.current[conversationId] || '')
-  }, [conversationId])
-
-  // Mark as read on mount / conversation switch
-  useEffect(() => {
-    markAsReadRef.current.mutate(conversationId)
   }, [conversationId])
 
   // Auto-scroll to bottom on new messages
@@ -67,6 +66,12 @@ export function ChatDockConversationView({
   }, [messages])
 
   const isDM = conversation ? !conversation.is_group : false
+  // Mark as read on mount / conversation switch for DMs only.
+  useEffect(() => {
+    if (!isDM) return
+    markAsReadRef.current.mutate(conversationId)
+  }, [conversationId, isDM])
+
   const name = conversation
     ? isDM
       ? getDirectMessageName(conversation, currentUserId)
@@ -88,6 +93,7 @@ export function ChatDockConversationView({
       {
         onSuccess: () => {
           setInputValue('')
+          setShowEmojiPicker(false)
           clearDraft(conversationId)
           sendTyping(false)
         },
@@ -100,16 +106,33 @@ export function ChatDockConversationView({
       setInputValue(value)
       updateDraft(conversationId, value)
 
-      sendTyping(true)
-      if (typingTimeoutRef.current) {
-        window.clearTimeout(typingTimeoutRef.current)
+      if (typingDebounceRef.current) {
+        window.clearTimeout(typingDebounceRef.current)
       }
-      typingTimeoutRef.current = window.setTimeout(() => {
+      typingDebounceRef.current = window.setTimeout(() => {
+        if (value.trim()) sendTyping(true)
+      }, 500)
+
+      if (typingInactivityRef.current) {
+        window.clearTimeout(typingInactivityRef.current)
+      }
+      typingInactivityRef.current = window.setTimeout(() => {
         sendTyping(false)
-      }, 2000)
+      }, 5000)
     },
     [conversationId, updateDraft, sendTyping]
   )
+
+  useEffect(() => {
+    return () => {
+      if (typingDebounceRef.current) {
+        window.clearTimeout(typingDebounceRef.current)
+      }
+      if (typingInactivityRef.current) {
+        window.clearTimeout(typingInactivityRef.current)
+      }
+    }
+  }, [])
 
   const handleExpand = useCallback(() => {
     if (conversation) {
@@ -160,6 +183,10 @@ export function ChatDockConversationView({
               key={msg.id}
               message={msg}
               isOwnMessage={msg.sender_id === currentUserId}
+              currentUserId={currentUserId}
+              isDirectMessage={isDM}
+              showReadReceipt={isDM}
+              conversationId={conversationId}
             />
           ))}
           {messages.length === 0 && (
@@ -172,18 +199,49 @@ export function ChatDockConversationView({
 
       {/* Input */}
       <div className='flex items-center gap-2 border-t border-border/50 px-3 py-2'>
-        <Input
-          value={inputValue}
-          onChange={e => handleInputChange(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              handleSend()
-            }
-          }}
-          placeholder='Type a message...'
-          className='h-8 text-sm'
-        />
+        <div className='relative flex-1'>
+          <Input
+            value={inputValue}
+            onChange={e => handleInputChange(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                handleSend()
+              }
+            }}
+            placeholder='Type a message...'
+            className='h-8 pr-10 text-sm'
+          />
+          <button
+            type='button'
+            onClick={() => setShowEmojiPicker(prev => !prev)}
+            className='absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground'
+            title='Insert emoji'
+          >
+            <Smile className='h-3.5 w-3.5' />
+          </button>
+          {showEmojiPicker && (
+            <div className='absolute bottom-10 right-0 z-30 flex max-w-44 flex-wrap gap-1 rounded-lg border border-border bg-card p-2 shadow-lg'>
+              {QUICK_EMOJI.map(emoji => (
+                <button
+                  key={`dock-emoji-${emoji}`}
+                  type='button'
+                  onClick={() => {
+                    setInputValue(prev => {
+                      const next = `${prev}${emoji}`
+                      updateDraft(conversationId, next)
+                      return next
+                    })
+                    setShowEmojiPicker(false)
+                  }}
+                  className='inline-flex h-6 w-6 items-center justify-center rounded text-sm transition-colors hover:bg-muted'
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <Button
           variant='ghost'
           size='icon'

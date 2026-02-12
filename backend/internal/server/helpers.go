@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 	"unicode"
 
 	"sanctum/internal/models"
@@ -93,6 +94,77 @@ func (s *Server) isAdminByUserID(ctx context.Context, userID uint) (bool, error)
 		return false, err
 	}
 	return user.IsAdmin, nil
+}
+
+func (s *Server) isBannedByUserID(ctx context.Context, userID uint) (bool, error) {
+	if s.db == nil {
+		return false, nil
+	}
+	var user models.User
+	if err := s.db.WithContext(ctx).Select("is_banned").First(&user, userID).Error; err != nil {
+		if isSchemaMissingError(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return user.IsBanned, nil
+}
+
+func (s *Server) areUsersBlocked(ctx context.Context, userID, otherUserID uint) (bool, error) {
+	if s.db == nil {
+		return false, nil
+	}
+	var count int64
+	if err := s.db.WithContext(ctx).
+		Model(&models.UserBlock{}).
+		Where(
+			"(blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)",
+			userID, otherUserID, otherUserID, userID,
+		).
+		Count(&count).Error; err != nil {
+		if isSchemaMissingError(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (s *Server) isUserMutedInChatroom(ctx context.Context, roomID, userID uint) (bool, error) {
+	if s.db == nil {
+		return false, nil
+	}
+	var mute models.ChatroomMute
+	err := s.db.WithContext(ctx).
+		Where("conversation_id = ? AND user_id = ?", roomID, userID).
+		First(&mute).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		if isSchemaMissingError(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	if mute.MutedUntil == nil {
+		return true, nil
+	}
+	return mute.MutedUntil.After(nowUTC()), nil
+}
+
+func nowUTC() time.Time {
+	return time.Now().UTC()
+}
+
+func isSchemaMissingError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "no such table") ||
+		strings.Contains(msg, "no such column") ||
+		strings.Contains(msg, "does not exist")
 }
 
 func (s *Server) getSanctumRoleByUserID(ctx context.Context, userID, sanctumID uint) (models.SanctumMembershipRole, bool, error) {

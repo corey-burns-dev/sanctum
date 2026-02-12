@@ -32,7 +32,10 @@ export function MarkdownContent({
 
   return (
     <div className={cn('max-w-none break-words', className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={markdownComponents}
+      >
         {content}
       </ReactMarkdown>
     </div>

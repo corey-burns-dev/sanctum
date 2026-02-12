@@ -1,7 +1,12 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from '@/api/client'
-import { useCreatePost, useInfinitePosts, useLikePost } from '@/hooks/usePosts'
+import {
+  useCreatePost,
+  useDeletePost,
+  useInfinitePosts,
+  useLikePost,
+} from '@/hooks/usePosts'
 import { getCurrentUser, useIsAuthenticated } from '@/hooks/useUsers'
 import Posts from '@/pages/Posts'
 import { renderWithProviders } from '@/test/test-utils'
@@ -23,6 +28,7 @@ vi.mock('@/hooks/usePosts', () => ({
   useInfinitePosts: vi.fn(),
   useCreatePost: vi.fn(),
   useLikePost: vi.fn(),
+  useDeletePost: vi.fn(),
 }))
 
 vi.mock('@/hooks/useUsers', () => ({
@@ -62,6 +68,10 @@ describe('Posts media upload flow', () => {
     } as never)
     asReturnMock(useCreatePost).mockReturnValue({
       mutateAsync: vi.fn().mockResolvedValue({}),
+      isPending: false,
+    } as never)
+    asReturnMock(useDeletePost).mockReturnValue({
+      mutate: vi.fn(),
       isPending: false,
     } as never)
   })
@@ -113,9 +123,6 @@ describe('Posts media upload flow', () => {
 
     fireEvent.click(screen.getByText(/what's on your mind, alice\?/i))
     fireEvent.click(screen.getByRole('button', { name: 'Media' }))
-    fireEvent.change(screen.getByPlaceholderText('Title (optional)...'), {
-      target: { value: 'My image post' },
-    })
 
     const fileInput = container.querySelector(
       'input[type="file"]'
@@ -130,7 +137,9 @@ describe('Posts media upload flow', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Post' }))
 
-    await waitFor(() => expect(apiClient.uploadImage).toHaveBeenCalledWith(file))
+    await waitFor(() =>
+      expect(apiClient.uploadImage).toHaveBeenCalledWith(file)
+    )
     expect(mutateAsync).not.toHaveBeenCalled()
 
     resolveUpload({
@@ -148,7 +157,7 @@ describe('Posts media upload flow', () => {
     await waitFor(() => {
       expect(mutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({
-          title: 'My image post',
+          title: 'alice',
           post_type: 'media',
           image_url: '/api/images/hash123',
         })
@@ -159,26 +168,28 @@ describe('Posts media upload flow', () => {
   it('renders legacy absolute image URLs as same-origin relative src', () => {
     asReturnMock(useInfinitePosts).mockReturnValue({
       data: {
-        pages: [[
-          {
-            id: 123,
-            title: 'Legacy media',
-            content: '',
-            image_url: 'http://localhost:8375/api/images/hash999',
-            likes_count: 0,
-            comments_count: 0,
-            user_id: 1,
-            created_at: '2026-01-01T00:00:00Z',
-            updated_at: '2026-01-01T00:00:00Z',
-            user: {
-              id: 1,
-              username: 'alice',
-              email: 'alice@example.com',
-              created_at: '',
-              updated_at: '',
+        pages: [
+          [
+            {
+              id: 123,
+              title: 'Legacy media',
+              content: '',
+              image_url: 'http://localhost:8375/api/images/hash999',
+              likes_count: 0,
+              comments_count: 0,
+              user_id: 1,
+              created_at: '2026-01-01T00:00:00Z',
+              updated_at: '2026-01-01T00:00:00Z',
+              user: {
+                id: 1,
+                username: 'alice',
+                email: 'alice@example.com',
+                created_at: '',
+                updated_at: '',
+              },
             },
-          },
-        ]],
+          ],
+        ],
       },
       fetchNextPage: vi.fn(),
       hasNextPage: false,

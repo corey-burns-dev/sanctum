@@ -178,9 +178,13 @@ func (r *chatRepository) GetMessages(ctx context.Context, convID uint, limit, of
 		if readDB == nil {
 			readDB = r.db
 		}
-		err := readDB.WithContext(ctx).
+		query := readDB.WithContext(ctx).
 			Where("conversation_id = ?", convID).
-			Preload("Sender").
+			Preload("Sender")
+		if readDB.Migrator().HasTable(&models.MessageReaction{}) {
+			query = query.Preload("Reactions")
+		}
+		err := query.
 			Order("created_at DESC").
 			Limit(limit).
 			Offset(offset).

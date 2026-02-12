@@ -7,6 +7,10 @@ export interface User {
   bio?: string
   avatar?: string
   is_admin?: boolean
+  is_banned?: boolean
+  banned_at?: string
+  banned_reason?: string
+  banned_by_user_id?: number
   created_at: string
   liked?: boolean
   updated_at: string
@@ -193,9 +197,125 @@ export interface Message {
   message_type: 'text' | 'image' | 'file'
   metadata?: Record<string, unknown>
   is_read: boolean
+  read_at?: string
+  reactions?: MessageReaction[]
+  reaction_summary?: MessageReactionSummary[]
   created_at: string
   updated_at: string
   deleted_at?: string
+}
+
+export interface MessageReaction {
+  id: number
+  message_id: number
+  user_id: number
+  emoji: string
+  created_at: string
+  user?: User
+}
+
+export interface MessageReactionSummary {
+  emoji: string
+  count: number
+  reacted_by_me: boolean
+}
+
+export interface MessageReactionResponse {
+  conversation_id: number
+  message_id: number
+  reactions: MessageReactionSummary[]
+}
+
+export interface MessageMention {
+  id: number
+  message_id: number
+  conversation_id: number
+  mentioned_user_id: number
+  mentioned_by_user_id: number
+  created_at: string
+  read_at?: string
+  message?: Message
+  conversation?: Conversation
+  mentioned_user?: User
+  mentioned_by_user?: User
+}
+
+export interface UserBlock {
+  id: number
+  blocker_id: number
+  blocked_id: number
+  created_at: string
+  blocker?: User
+  blocked?: User
+}
+
+export interface ReportRequest {
+  reason: string
+  details?: string
+}
+
+export type ModerationReportTargetType = 'post' | 'message' | 'user'
+export type ModerationReportStatus = 'open' | 'resolved' | 'dismissed'
+
+export interface ModerationReport {
+  id: number
+  reporter_id: number
+  target_type: ModerationReportTargetType
+  target_id: number
+  reported_user_id?: number
+  reason: string
+  details: string
+  status: ModerationReportStatus
+  resolved_by_user_id?: number
+  resolved_at?: string
+  resolution_note: string
+  created_at: string
+  updated_at: string
+  reporter?: User
+  reported_user?: User
+  resolved_by_user?: User
+}
+
+export interface ResolveModerationReportRequest {
+  status: Exclude<ModerationReportStatus, 'open'>
+  resolution_note?: string
+}
+
+export interface AdminBanRequest {
+  reported_user_id: number
+  report_count: number
+  latest_report_at: string
+  user: User
+}
+
+export interface ChatroomMute {
+  id: number
+  conversation_id: number
+  user_id: number
+  muted_by_user_id: number
+  reason: string
+  muted_until?: string
+  created_at: string
+  updated_at: string
+  user?: User
+  muted_by_user?: User
+}
+
+export interface MuteChatroomUserRequest {
+  reason?: string
+  muted_until?: string
+}
+
+export interface BanUserRequest {
+  reason?: string
+}
+
+export interface AdminUserDetailResponse {
+  user: User
+  reports: ModerationReport[]
+  active_mutes: ChatroomMute[]
+  blocks_given: UserBlock[]
+  blocks_received: UserBlock[]
 }
 
 export interface CreateConversationRequest {

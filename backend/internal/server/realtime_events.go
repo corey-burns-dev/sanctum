@@ -16,6 +16,7 @@ const (
 	EventCommentUpdated         = "comment_updated"
 	EventCommentDeleted         = "comment_deleted"
 	EventMessageReceived        = "message_received"
+	EventChatMention            = "chat_mention"
 	EventFriendRequestReceived  = "friend_request_received"
 	EventFriendRequestSent      = "friend_request_sent"
 	EventFriendRequestAccepted  = "friend_request_accepted"

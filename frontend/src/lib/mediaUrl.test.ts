@@ -14,9 +14,7 @@ describe('normalizeImageURL', () => {
       '/api/images/hash123'
     )
     expect(
-      normalizeImageURL(
-        'https://example.com/api/images/hash123?size=medium'
-      )
+      normalizeImageURL('https://example.com/api/images/hash123?size=medium')
     ).toBe('/api/images/hash123?size=medium')
   })
 

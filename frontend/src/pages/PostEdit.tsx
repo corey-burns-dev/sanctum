@@ -1,11 +1,12 @@
+import { Loader2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { apiClient } from '@/api/client'
+import type { UpdatePostRequest } from '@/api/types'
 import { PostComposerEditor } from '@/components/posts/PostComposerEditor'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { usePost, useUpdatePost } from '@/hooks/usePosts'
-import { Loader2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
 
 export default function PostEdit() {
   const { id } = useParams()
@@ -57,13 +58,14 @@ export default function PostEdit() {
         uploadedImageURL = uploaded.url
       }
 
-      const payload: any = {
+      const payload: UpdatePostRequest = {
         content: content ?? '',
       }
       if (title.trim()) payload.title = title.trim()
       if (uploadedImageURL) payload.image_url = uploadedImageURL
       if (post.post_type === 'link') payload.link_url = linkUrl || undefined
-      if (post.post_type === 'video') payload.youtube_url = youtubeUrl || undefined
+      if (post.post_type === 'video')
+        payload.youtube_url = youtubeUrl || undefined
 
       await updatePost.mutateAsync(payload)
       navigate(`/posts/${post.id}`)
@@ -88,18 +90,30 @@ export default function PostEdit() {
               />
             )}
 
-            <PostComposerEditor value={content} onChange={setContent} minRows={6} />
+            <PostComposerEditor
+              value={content}
+              onChange={setContent}
+              minRows={6}
+            />
 
             {post.post_type === 'media' && (
               <div className='space-y-2'>
                 <input
                   type='file'
                   accept='image/*'
-                  onChange={e => setNewImageFile(e.target.files ? e.target.files[0] : null)}
+                  onChange={e =>
+                    setNewImageFile(
+                      e.target.files?.[0] ? e.target.files[0] : null
+                    )
+                  }
                   className='w-full text-sm'
                 />
                 {imagePreview && (
-                  <img src={imagePreview} alt='Preview' className='max-h-56 w-auto rounded-xl border border-border object-contain' />
+                  <img
+                    src={imagePreview}
+                    alt='Preview'
+                    className='max-h-56 w-auto rounded-xl border border-border object-contain'
+                  />
                 )}
               </div>
             )}
@@ -125,12 +139,18 @@ export default function PostEdit() {
             )}
 
             {post.post_type === 'poll' && (
-              <div className='text-sm text-muted-foreground'>Editing polls is not supported in this editor.</div>
+              <div className='text-sm text-muted-foreground'>
+                Editing polls is not supported in this editor.
+              </div>
             )}
 
             <div className='flex justify-end gap-2'>
-              <Button variant='ghost' onClick={() => navigate(-1)}>Cancel</Button>
-              <Button onClick={handleSave} disabled={updatePost.isLoading}>Save</Button>
+              <Button variant='ghost' onClick={() => navigate(-1)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={updatePost.isLoading}>
+                Save
+              </Button>
             </div>
           </CardContent>
         </Card>

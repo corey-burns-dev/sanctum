@@ -2,17 +2,32 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SanctumDTO } from '@/api/types'
-import { useSanctum, useSanctums } from '@/hooks/useSanctums'
+import {
+  useDemoteSanctumAdmin,
+  useMySanctumMemberships,
+  usePromoteSanctumAdmin,
+  useSanctum,
+  useSanctumAdmins,
+  useSanctums,
+} from '@/hooks/useSanctums'
 import SanctumDetail from '@/pages/SanctumDetail'
 import Sanctums from '@/pages/Sanctums'
 
 vi.mock('@/hooks/useSanctums', () => ({
   useSanctums: vi.fn(),
   useSanctum: vi.fn(),
+  useMySanctumMemberships: vi.fn(),
+  useSanctumAdmins: vi.fn(),
+  usePromoteSanctumAdmin: vi.fn(),
+  useDemoteSanctumAdmin: vi.fn(),
 }))
 
 const mockedUseSanctums = vi.mocked(useSanctums)
 const mockedUseSanctum = vi.mocked(useSanctum)
+const mockedUseMyMemberships = vi.mocked(useMySanctumMemberships)
+const mockedUseSanctumAdmins = vi.mocked(useSanctumAdmins)
+const mockedUsePromoteAdmin = vi.mocked(usePromoteSanctumAdmin)
+const mockedUseDemoteAdmin = vi.mocked(useDemoteSanctumAdmin)
 
 function makeSanctum(id: number, name: string, slug: string): SanctumDTO {
   return {
@@ -31,6 +46,10 @@ describe('Sanctum routes', () => {
   afterEach(() => {
     mockedUseSanctums.mockReset()
     mockedUseSanctum.mockReset()
+    mockedUseMyMemberships.mockReset()
+    mockedUseSanctumAdmins.mockReset()
+    mockedUsePromoteAdmin.mockReset()
+    mockedUseDemoteAdmin.mockReset()
   })
 
   it('loads /sanctums list shell', () => {
@@ -40,6 +59,28 @@ describe('Sanctum routes', () => {
       isError: false,
       error: null,
       refetch: vi.fn(),
+    } as never)
+    mockedUseMyMemberships.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as never)
+    mockedUseSanctumAdmins.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as never)
+    mockedUsePromoteAdmin.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as never)
+    mockedUseDemoteAdmin.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
     } as never)
 
     render(
@@ -81,6 +122,28 @@ describe('Sanctum routes', () => {
       isError: false,
       error: null,
       refetch: vi.fn(),
+    } as never)
+    mockedUseMyMemberships.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as never)
+    mockedUseSanctumAdmins.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as never)
+    mockedUsePromoteAdmin.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as never)
+    mockedUseDemoteAdmin.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
     } as never)
 
     render(

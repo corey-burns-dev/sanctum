@@ -1,7 +1,8 @@
-import { MessageCircle, Send, Trash2, Users } from 'lucide-react'
+import { MessageCircle, Send, Smile, Trash2, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { Conversation, User } from '@/api/types'
+import { MessageItem } from '@/components/chat/MessageItem'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   useConversations,
   useLeaveConversation,
+  useMarkAsRead,
   useMessages,
   useSendMessage,
 } from '@/hooks/useChat'
@@ -17,13 +19,19 @@ import { getCurrentUser } from '@/hooks/useUsers'
 import { useChatContext } from '@/providers/ChatProvider'
 import { useChatDockStore } from '@/stores/useChatDockStore'
 
+const QUICK_EMOJI = ['😀', '😂', '😍', '👍', '🔥', '🎉', '😮', '🤝']
+
 export default function Messages() {
   const { id: urlConvId } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [newMessage, setNewMessage] = useState('')
   const [messageTab, setMessageTab] = useState<'all' | 'unread'>('all')
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [mentionQuery, setMentionQuery] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const typingTimeoutRef = useRef<number | null>(null)
+  const typingDebounceRef = useRef<number | null>(null)
+  const typingInactivityRef = useRef<number | null>(null)
+  const remoteTypingTimeoutsRef = useRef<Record<number, number>>({})
   const hasHydratedMessagesRef = useRef(false)
   const lastChimedMessageIdRef = useRef<number | null>(null)
 
@@ -92,6 +100,18 @@ export default function Messages() {
         : false,
     [onlineUserIds, selectedConversationOtherUserId]
   )
+  const mentionSuggestions = useMemo(() => {
+    if (!mentionQuery && !newMessage.endsWith('@')) return []
+    const normalized = mentionQuery.toLowerCase()
+    return (selectedConversation?.participants || [])
+      .filter(participant => participant.id !== currentUser?.id)
+      .filter(participant =>
+        normalized
+          ? participant.username?.toLowerCase().startsWith(normalized)
+          : true
+      )
+      .slice(0, 5)
+  }, [mentionQuery, newMessage, selectedConversation, currentUser?.id])
 
   // Sync dock unread: reset only when conversation is loaded and in list (not URL-only)
   useEffect(() => {
@@ -134,6 +154,7 @@ export default function Messages() {
     }
   )
   const sendMessage = useSendMessage(selectedConversationId || 0)
+  const markAsRead = useMarkAsRead()
   const leaveConversation = useLeaveConversation()
 
   // Participants state
@@ -150,6 +171,11 @@ export default function Messages() {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
   }, [messages])
+
+  useEffect(() => {
+    if (!canAccessSelectedConversation || !selectedConversationId) return
+    markAsRead.mutate(selectedConversationId)
+  }, [canAccessSelectedConversation, selectedConversationId, markAsRead])
 
   const playIncomingMessageChime = useCallback(() => {
     const AudioContextClass = window.AudioContext
@@ -262,8 +288,14 @@ export default function Messages() {
   // Register typing, presence, and connected-users callbacks; cleanup on unmount
   useEffect(() => {
     const unsubTyping = subscribeOnTyping(
-      (convId, userId, username, isTyping) => {
+      (convId, userId, username, isTyping, expiresInMs) => {
         if (convId !== selectedConversationId) return
+        const timeoutMs = expiresInMs ?? 5000
+        const timeoutMap = remoteTypingTimeoutsRef.current
+        if (timeoutMap[userId]) {
+          window.clearTimeout(timeoutMap[userId])
+          delete timeoutMap[userId]
+        }
         setParticipants(prev => ({
           ...(prev || {}),
           [userId]: {
@@ -272,6 +304,19 @@ export default function Messages() {
             online: true,
           },
         }))
+        if (isTyping) {
+          timeoutMap[userId] = window.setTimeout(() => {
+            setParticipants(prev => ({
+              ...(prev || {}),
+              [userId]: {
+                ...(prev?.[userId] || { id: userId, username }),
+                typing: false,
+                online: true,
+              },
+            }))
+            delete remoteTypingTimeoutsRef.current[userId]
+          }, timeoutMs)
+        }
       }
     )
     const unsubPresence = subscribeOnPresence((userId, username, status) => {
@@ -290,6 +335,11 @@ export default function Messages() {
       unsubTyping()
       unsubPresence()
       unsubConnected()
+      const timeoutMap = remoteTypingTimeoutsRef.current
+      for (const timeoutId of Object.values(timeoutMap)) {
+        window.clearTimeout(timeoutId)
+      }
+      remoteTypingTimeoutsRef.current = {}
     }
   }, [
     selectedConversationId,
@@ -309,6 +359,8 @@ export default function Messages() {
       {
         onSuccess: () => {
           setNewMessage('')
+          setMentionQuery('')
+          setShowEmojiPicker(false)
           ctxSendTyping(selectedConversationId, false)
         },
       }
@@ -324,22 +376,51 @@ export default function Messages() {
 
   const handleInputChange = (val: string) => {
     setNewMessage(val)
-    if (selectedConversationId) ctxSendTyping(selectedConversationId, true)
-    if (typingTimeoutRef.current) {
-      window.clearTimeout(typingTimeoutRef.current)
+
+    const mentionMatch = val.match(/(?:^|\\s)@([a-zA-Z0-9_]*)$/)
+    setMentionQuery(mentionMatch ? (mentionMatch[1] ?? '') : '')
+
+    if (!selectedConversationId) return
+
+    if (typingDebounceRef.current) {
+      window.clearTimeout(typingDebounceRef.current)
     }
-    typingTimeoutRef.current = window.setTimeout(() => {
-      if (selectedConversationId) ctxSendTyping(selectedConversationId, false)
-    }, 1500) as unknown as number
+    typingDebounceRef.current = window.setTimeout(() => {
+      if (val.trim()) ctxSendTyping(selectedConversationId, true)
+    }, 500)
+
+    if (typingInactivityRef.current) {
+      window.clearTimeout(typingInactivityRef.current)
+    }
+    typingInactivityRef.current = window.setTimeout(() => {
+      ctxSendTyping(selectedConversationId, false)
+    }, 5000)
   }
 
-  const formatTimestamp = (timestamp: string) => {
-    return new Date(timestamp).toLocaleTimeString('en-US', {
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+  const applyMention = (username: string) => {
+    setNewMessage(prev =>
+      prev.replace(/(?:^|\\s)@[a-zA-Z0-9_]*$/, match =>
+        match.startsWith(' ') ? ` @${username} ` : `@${username} `
+      )
+    )
+    setMentionQuery('')
   }
+
+  const appendEmoji = (emoji: string) => {
+    setNewMessage(prev => `${prev}${emoji}`)
+    setShowEmojiPicker(false)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (typingDebounceRef.current) {
+        window.clearTimeout(typingDebounceRef.current)
+      }
+      if (typingInactivityRef.current) {
+        window.clearTimeout(typingInactivityRef.current)
+      }
+    }
+  }, [])
 
   // Get conversation display name (other person's name for DMs)
   const getConversationName = useCallback(
@@ -557,44 +638,17 @@ export default function Messages() {
                   </p>
                 </div>
               ) : (
-                messages.map(msg => {
-                  const isOwnMessage = msg.sender_id === currentUser?.id
-                  const sender = msg.sender
-                  return (
-                    <div key={msg.id} className='flex items-start gap-3'>
-                      <Avatar className='w-8 h-8 shrink-0 border'>
-                        <AvatarImage
-                          src={
-                            sender?.avatar ||
-                            `https://i.pravatar.cc/150?u=${sender?.username}`
-                          }
-                        />
-                        <AvatarFallback className='text-xs'>
-                          {sender?.username?.[0]?.toUpperCase() || 'U'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className='flex max-w-[70%] flex-col items-start'>
-                        <div className='flex items-center gap-2 mb-1'>
-                          <span className='font-semibold text-xs'>
-                            {isOwnMessage ? 'You' : sender?.username || 'User'}
-                          </span>
-                          <span className='text-[10px] text-muted-foreground'>
-                            {formatTimestamp(msg.created_at)}
-                          </span>
-                        </div>
-                        <div
-                          className={`rounded-2xl px-4 py-2 text-sm ${
-                            isOwnMessage
-                              ? 'bg-primary text-primary-foreground rounded-tl-none'
-                              : 'bg-secondary text-foreground rounded-tl-none'
-                          }`}
-                        >
-                          {msg.content}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })
+                messages.map(msg => (
+                  <MessageItem
+                    key={msg.id}
+                    message={msg}
+                    isOwnMessage={msg.sender_id === currentUser?.id}
+                    currentUserId={currentUser?.id}
+                    isDirectMessage={true}
+                    showReadReceipt={true}
+                    conversationId={selectedConversationId || undefined}
+                  />
+                ))
               )}
 
               {Object.values(participants).some(p => p.typing) && (
@@ -609,7 +663,10 @@ export default function Messages() {
                       .filter(p => p.typing)
                       .map(p => p.username)
                       .join(', ')}{' '}
-                    is typing...
+                    {Object.values(participants).filter(p => p.typing).length >
+                    1
+                      ? 'are typing...'
+                      : 'is typing...'}
                   </span>
                 </div>
               )}
@@ -619,14 +676,54 @@ export default function Messages() {
           </ScrollArea>
 
           <div className='border-t p-4 shrink-0'>
-            <div className='max-w-3xl mx-auto flex gap-2'>
-              <Input
-                placeholder='Type a message...'
-                value={newMessage}
-                onChange={e => handleInputChange(e.target.value)}
-                onKeyPress={handleKeyPress}
-                className='flex-1 rounded-full bg-secondary border-none px-4'
-              />
+            <div className='relative max-w-3xl mx-auto flex gap-2'>
+              <div className='relative flex-1'>
+                <Input
+                  placeholder='Type a message...'
+                  value={newMessage}
+                  onChange={e => handleInputChange(e.target.value)}
+                  onKeyDown={handleKeyPress}
+                  className='flex-1 rounded-full bg-secondary border-none px-4 pr-12'
+                />
+                <button
+                  type='button'
+                  onClick={() => setShowEmojiPicker(prev => !prev)}
+                  className='absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground'
+                  title='Insert emoji'
+                >
+                  <Smile className='h-4 w-4' />
+                </button>
+                {showEmojiPicker && (
+                  <div className='absolute bottom-12 right-0 z-20 flex max-w-52 flex-wrap gap-1 rounded-lg border border-border bg-card p-2 shadow-lg'>
+                    {QUICK_EMOJI.map(emoji => (
+                      <button
+                        key={`emoji-${emoji}`}
+                        type='button'
+                        onClick={() => appendEmoji(emoji)}
+                        className='inline-flex h-7 w-7 items-center justify-center rounded text-base transition-colors hover:bg-muted'
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {mentionSuggestions.length > 0 && (
+                  <div className='absolute bottom-12 left-0 z-20 w-full rounded-lg border border-border bg-card p-1 shadow-lg'>
+                    {mentionSuggestions.map(participant => (
+                      <button
+                        key={`mention-${participant.id}`}
+                        type='button'
+                        onClick={() => applyMention(participant.username)}
+                        className='flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted'
+                      >
+                        <span className='font-semibold'>
+                          @{participant.username}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <Button
                 onClick={handleSendMessage}
                 disabled={!newMessage.trim()}

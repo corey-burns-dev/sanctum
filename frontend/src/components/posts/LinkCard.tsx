@@ -24,9 +24,7 @@ export function LinkCard({
     >
       <ExternalLink className='w-5 h-5 shrink-0 text-muted-foreground' />
       <div className='min-w-0 flex-1'>
-        {title ? (
-          <p className='font-medium text-sm truncate'>{title}</p>
-        ) : null}
+        {title ? <p className='font-medium text-sm truncate'>{title}</p> : null}
         <p className='text-xs text-muted-foreground truncate'>{displayUrl}</p>
       </div>
     </a>

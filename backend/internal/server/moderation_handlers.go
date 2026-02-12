@@ -1,0 +1,476 @@
+package server
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"time"
+
+	"sanctum/internal/models"
+
+	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
+
+func (s *Server) GetMyBlocks(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	userID := c.Locals("userID").(uint)
+
+	var blocks []models.UserBlock
+	if err := s.db.WithContext(ctx).
+		Where("blocker_id = ?", userID).
+		Preload("Blocked").
+		Order("created_at DESC").
+		Find(&blocks).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	return c.JSON(blocks)
+}
+
+func (s *Server) BlockUser(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	blockerID := c.Locals("userID").(uint)
+	targetID, err := s.parseID(c, "id")
+	if err != nil {
+		return nil
+	}
+	if blockerID == targetID {
+		return models.RespondWithError(c, fiber.StatusBadRequest,
+			models.NewValidationError("cannot block yourself"))
+	}
+
+	var target models.User
+	if err := s.db.WithContext(ctx).Select("id").First(&target, targetID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.RespondWithError(c, fiber.StatusNotFound, models.NewNotFoundError("User", targetID))
+		}
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	relation := models.UserBlock{BlockerID: blockerID, BlockedID: targetID}
+	if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&relation).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	return c.JSON(fiber.Map{"message": "User blocked"})
+}
+
+func (s *Server) UnblockUser(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	blockerID := c.Locals("userID").(uint)
+	targetID, err := s.parseID(c, "id")
+	if err != nil {
+		return nil
+	}
+
+	if err := s.db.WithContext(ctx).
+		Where("blocker_id = ? AND blocked_id = ?", blockerID, targetID).
+		Delete(&models.UserBlock{}).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	return c.JSON(fiber.Map{"message": "User unblocked"})
+}
+
+func (s *Server) ReportUser(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	reporterID := c.Locals("userID").(uint)
+	targetID, err := s.parseID(c, "id")
+	if err != nil {
+		return nil
+	}
+
+	var req struct {
+		Reason  string `json:"reason"`
+		Details string `json:"details"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return models.RespondWithError(c, fiber.StatusBadRequest,
+			models.NewValidationError("Invalid request body"))
+	}
+
+	var target models.User
+	if err := s.db.WithContext(ctx).Select("id").First(&target, targetID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.RespondWithError(c, fiber.StatusNotFound, models.NewNotFoundError("User", targetID))
+		}
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	report, err := s.createModerationReport(ctx, reporterID, models.ReportTargetUser, targetID, &targetID, req.Reason, req.Details)
+	if err != nil {
+		return models.RespondWithError(c, fiber.StatusBadRequest, err)
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(report)
+}
+
+func (s *Server) ReportPost(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	reporterID := c.Locals("userID").(uint)
+	postID, err := s.parseID(c, "id")
+	if err != nil {
+		return nil
+	}
+
+	var req struct {
+		Reason  string `json:"reason"`
+		Details string `json:"details"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return models.RespondWithError(c, fiber.StatusBadRequest,
+			models.NewValidationError("Invalid request body"))
+	}
+
+	var post models.Post
+	if err := s.db.WithContext(ctx).Select("id", "user_id").First(&post, postID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.RespondWithError(c, fiber.StatusNotFound, models.NewNotFoundError("Post", postID))
+		}
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	report, err := s.createModerationReport(ctx, reporterID, models.ReportTargetPost, postID, &post.UserID, req.Reason, req.Details)
+	if err != nil {
+		return models.RespondWithError(c, fiber.StatusBadRequest, err)
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(report)
+}
+
+func (s *Server) ReportMessage(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	reporterID := c.Locals("userID").(uint)
+	convID, err := s.parseID(c, "id")
+	if err != nil {
+		return nil
+	}
+	messageID, err := s.parseID(c, "messageId")
+	if err != nil {
+		return nil
+	}
+
+	var req struct {
+		Reason  string `json:"reason"`
+		Details string `json:"details"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return models.RespondWithError(c, fiber.StatusBadRequest,
+			models.NewValidationError("Invalid request body"))
+	}
+
+	if _, err := s.chatSvc().GetConversationForUser(ctx, convID, reporterID); err != nil {
+		status := fiber.StatusForbidden
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			status = fiber.StatusNotFound
+		}
+		return models.RespondWithError(c, status, err)
+	}
+
+	var message models.Message
+	if err := s.db.WithContext(ctx).
+		Select("id", "sender_id", "conversation_id").
+		Where("id = ? AND conversation_id = ?", messageID, convID).
+		First(&message).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.RespondWithError(c, fiber.StatusNotFound, models.NewNotFoundError("Message", messageID))
+		}
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	report, err := s.createModerationReport(ctx, reporterID, models.ReportTargetMessage, messageID, &message.SenderID, req.Reason, req.Details)
+	if err != nil {
+		return models.RespondWithError(c, fiber.StatusBadRequest, err)
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(report)
+}
+
+func (s *Server) GetAdminReports(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	status := strings.TrimSpace(c.Query("status"))
+	targetType := strings.TrimSpace(c.Query("target_type"))
+	page := parsePagination(c, 100)
+
+	query := s.db.WithContext(ctx).Model(&models.ModerationReport{})
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	if targetType != "" {
+		query = query.Where("target_type = ?", targetType)
+	}
+
+	var reports []models.ModerationReport
+	if err := query.
+		Preload("Reporter").
+		Preload("ReportedUser").
+		Preload("ResolvedByUser").
+		Order("created_at DESC").
+		Limit(page.Limit).
+		Offset(page.Offset).
+		Find(&reports).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	return c.JSON(reports)
+}
+
+func (s *Server) ResolveAdminReport(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	adminID := c.Locals("userID").(uint)
+	reportID, err := s.parseID(c, "id")
+	if err != nil {
+		return nil
+	}
+
+	var req struct {
+		Status         string `json:"status"`
+		ResolutionNote string `json:"resolution_note"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return models.RespondWithError(c, fiber.StatusBadRequest,
+			models.NewValidationError("Invalid request body"))
+	}
+	status := strings.TrimSpace(strings.ToLower(req.Status))
+	if status != models.ReportStatusResolved && status != models.ReportStatusDismissed {
+		return models.RespondWithError(c, fiber.StatusBadRequest,
+			models.NewValidationError("status must be resolved or dismissed"))
+	}
+	now := time.Now().UTC()
+	updates := map[string]interface{}{
+		"status":              status,
+		"resolved_by_user_id": adminID,
+		"resolved_at":         now,
+		"resolution_note":     strings.TrimSpace(req.ResolutionNote),
+	}
+	if err := s.db.WithContext(ctx).
+		Model(&models.ModerationReport{}).
+		Where("id = ?", reportID).
+		Updates(updates).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	var report models.ModerationReport
+	if err := s.db.WithContext(ctx).
+		Preload("Reporter").
+		Preload("ReportedUser").
+		Preload("ResolvedByUser").
+		First(&report, reportID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.RespondWithError(c, fiber.StatusNotFound, models.NewNotFoundError("ModerationReport", reportID))
+		}
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	return c.JSON(report)
+}
+
+func (s *Server) GetAdminBanRequests(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	page := parsePagination(c, 100)
+
+	type BanRequestRow struct {
+		ReportedUserID uint      `json:"reported_user_id"`
+		ReportCount    int64     `json:"report_count"`
+		LatestReportAt time.Time `json:"latest_report_at"`
+	}
+
+	var rows []BanRequestRow
+	if err := s.db.WithContext(ctx).
+		Table("moderation_reports").
+		Select("reported_user_id, COUNT(*) as report_count, MAX(created_at) as latest_report_at").
+		Where("status = ? AND target_type = ? AND reported_user_id IS NOT NULL", models.ReportStatusOpen, models.ReportTargetUser).
+		Group("reported_user_id").
+		Order("report_count DESC, latest_report_at DESC").
+		Limit(page.Limit).
+		Offset(page.Offset).
+		Scan(&rows).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	userIDs := make([]uint, 0, len(rows))
+	for _, row := range rows {
+		userIDs = append(userIDs, row.ReportedUserID)
+	}
+	usersByID := map[uint]models.User{}
+	if len(userIDs) > 0 {
+		var users []models.User
+		if err := s.db.WithContext(ctx).Where("id IN ?", userIDs).Find(&users).Error; err != nil {
+			return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+		}
+		for _, user := range users {
+			usersByID[user.ID] = user
+		}
+	}
+
+	resp := make([]fiber.Map, 0, len(rows))
+	for _, row := range rows {
+		resp = append(resp, fiber.Map{
+			"reported_user_id": row.ReportedUserID,
+			"report_count":     row.ReportCount,
+			"latest_report_at": row.LatestReportAt,
+			"user":             usersByID[row.ReportedUserID],
+		})
+	}
+	return c.JSON(resp)
+}
+
+func (s *Server) GetAdminUsers(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	page := parsePagination(c, 100)
+	q := strings.TrimSpace(strings.ToLower(c.Query("q")))
+
+	query := s.db.WithContext(ctx).Model(&models.User{})
+	if q != "" {
+		like := "%" + q + "%"
+		query = query.Where("LOWER(username) LIKE ? OR LOWER(email) LIKE ?", like, like)
+	}
+
+	var users []models.User
+	if err := query.Order("id ASC").Limit(page.Limit).Offset(page.Offset).Find(&users).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+	return c.JSON(users)
+}
+
+func (s *Server) GetAdminUserDetail(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	targetID, err := s.parseID(c, "id")
+	if err != nil {
+		return nil
+	}
+
+	var user models.User
+	if err := s.db.WithContext(ctx).First(&user, targetID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.RespondWithError(c, fiber.StatusNotFound, models.NewNotFoundError("User", targetID))
+		}
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	var reports []models.ModerationReport
+	_ = s.db.WithContext(ctx).
+		Where("reported_user_id = ?", targetID).
+		Order("created_at DESC").
+		Limit(200).
+		Find(&reports).Error
+
+	var activeMutes []models.ChatroomMute
+	_ = s.db.WithContext(ctx).
+		Where("user_id = ?", targetID).
+		Order("created_at DESC").
+		Find(&activeMutes).Error
+
+	var blocksGiven []models.UserBlock
+	_ = s.db.WithContext(ctx).Where("blocker_id = ?", targetID).Order("created_at DESC").Limit(200).Find(&blocksGiven).Error
+
+	var blocksReceived []models.UserBlock
+	_ = s.db.WithContext(ctx).Where("blocked_id = ?", targetID).Order("created_at DESC").Limit(200).Find(&blocksReceived).Error
+
+	return c.JSON(fiber.Map{
+		"user":            user,
+		"reports":         reports,
+		"active_mutes":    activeMutes,
+		"blocks_given":    blocksGiven,
+		"blocks_received": blocksReceived,
+	})
+}
+
+func (s *Server) BanUser(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	adminID := c.Locals("userID").(uint)
+	targetID, err := s.parseID(c, "id")
+	if err != nil {
+		return nil
+	}
+	if adminID == targetID {
+		return models.RespondWithError(c, fiber.StatusBadRequest,
+			models.NewValidationError("cannot ban yourself"))
+	}
+
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return models.RespondWithError(c, fiber.StatusBadRequest,
+			models.NewValidationError("Invalid request body"))
+	}
+	now := time.Now().UTC()
+	updates := map[string]interface{}{
+		"is_banned":         true,
+		"banned_at":         now,
+		"banned_reason":     strings.TrimSpace(req.Reason),
+		"banned_by_user_id": adminID,
+	}
+	if err := s.db.WithContext(ctx).
+		Model(&models.User{}).
+		Where("id = ?", targetID).
+		Updates(updates).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	return c.JSON(fiber.Map{"message": "User banned"})
+}
+
+func (s *Server) UnbanUser(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	targetID, err := s.parseID(c, "id")
+	if err != nil {
+		return nil
+	}
+	updates := map[string]interface{}{
+		"is_banned":         false,
+		"banned_at":         nil,
+		"banned_reason":     "",
+		"banned_by_user_id": nil,
+	}
+	if err := s.db.WithContext(ctx).
+		Model(&models.User{}).
+		Where("id = ?", targetID).
+		Updates(updates).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	return c.JSON(fiber.Map{"message": "User unbanned"})
+}
+
+func (s *Server) createModerationReport(
+	ctx context.Context,
+	reporterID uint,
+	targetType string,
+	targetID uint,
+	reportedUserID *uint,
+	reason string,
+	details string,
+) (*models.ModerationReport, error) {
+	reason = strings.TrimSpace(reason)
+	details = strings.TrimSpace(details)
+	if reason == "" {
+		return nil, models.NewValidationError("reason is required")
+	}
+
+	report := &models.ModerationReport{
+		ReporterID:     reporterID,
+		TargetType:     targetType,
+		TargetID:       targetID,
+		ReportedUserID: reportedUserID,
+		Reason:         reason,
+		Details:        details,
+		Status:         models.ReportStatusOpen,
+	}
+	if err := s.db.WithContext(ctx).Create(report).Error; err != nil {
+		return nil, err
+	}
+	s.publishAdminEvent("moderation_report_created", map[string]interface{}{
+		"id":               report.ID,
+		"target_type":      report.TargetType,
+		"target_id":        report.TargetID,
+		"reported_user_id": report.ReportedUserID,
+		"status":           report.Status,
+		"created_at":       report.CreatedAt.UTC().Format(time.RFC3339Nano),
+	})
+
+	return report, nil
+}

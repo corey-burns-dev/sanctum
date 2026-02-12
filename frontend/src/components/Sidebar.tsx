@@ -1,22 +1,16 @@
+import { LogOut, ShieldCheck, Sparkles, User } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
 import { ModeToggle } from '@/components/mode-toggle'
 import { isRouteActive, sideNavSections } from '@/components/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import {
-    getCurrentUser,
-    useIsAuthenticated,
-    useLogout,
-} from '@/hooks'
+import { getCurrentUser, useIsAuthenticated, useLogout } from '@/hooks'
 import { cn } from '@/lib/utils'
-import { LogOut, ShieldCheck, Sparkles, User } from 'lucide-react'
-import { Link, useLocation } from 'react-router-dom'
 
 export function Sidebar() {
   const location = useLocation()
   const isAuthenticated = useIsAuthenticated()
   const currentUser = getCurrentUser()
   const logout = useLogout()
-
-  
 
   if (!isAuthenticated) return null
 
@@ -29,8 +23,8 @@ export function Sidebar() {
     if (services) {
       services.items.push({
         icon: ShieldCheck,
-        label: 'Sanctum Admin',
-        path: '/admin/sanctum-requests',
+        label: 'Admin Console',
+        path: '/admin',
       })
     }
   }

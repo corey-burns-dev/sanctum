@@ -164,6 +164,7 @@ func (s *Server) SendMessage(c *fiber.Ctx) error {
 	if message.Sender != nil {
 		senderUsername = message.Sender.Username
 	}
+	s.persistMessageMentions(ctx, convID, message, userID, conv.Participants)
 
 	// Broadcast message to all WebSocket-connected participants in real-time via ChatHub
 	if s.chatHub != nil {
@@ -233,6 +234,68 @@ func (s *Server) GetMessages(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(messages)
+}
+
+// MarkConversationRead handles POST /api/conversations/:id/read
+func (s *Server) MarkConversationRead(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	userID := c.Locals("userID").(uint)
+	convID, err := s.parseID(c, "id")
+	if err != nil {
+		return nil
+	}
+
+	conv, err := s.chatSvc().GetConversationForUser(ctx, convID, userID)
+	if err != nil {
+		status := fiber.StatusInternalServerError
+		var appErr *models.AppError
+		if errors.As(err, &appErr) && appErr.Code == "UNAUTHORIZED" {
+			status = fiber.StatusForbidden
+		} else if errors.Is(err, gorm.ErrRecordNotFound) {
+			status = fiber.StatusNotFound
+		}
+		return models.RespondWithError(c, status, err)
+	}
+	if conv.IsGroup {
+		return models.RespondWithError(c, fiber.StatusBadRequest,
+			models.NewValidationError("Read receipts are only supported for direct messages"))
+	}
+
+	now := time.Now().UTC()
+	if err := s.db.WithContext(ctx).
+		Model(&models.ConversationParticipant{}).
+		Where("conversation_id = ? AND user_id = ?", convID, userID).
+		Updates(map[string]interface{}{
+			"last_read_at": now,
+			"unread_count": 0,
+		}).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	if err := s.db.WithContext(ctx).
+		Model(&models.Message{}).
+		Where("conversation_id = ? AND sender_id <> ? AND is_read = ?", convID, userID, false).
+		Updates(map[string]interface{}{
+			"is_read": true,
+			"read_at": now,
+		}).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	if s.chatHub != nil {
+		s.chatHub.BroadcastToConversation(convID, notifications.ChatMessage{
+			Type:           "message_read",
+			ConversationID: convID,
+			UserID:         userID,
+			Payload: map[string]interface{}{
+				"conversation_id": convID,
+				"user_id":         userID,
+				"read_at":         now.Format(time.RFC3339Nano),
+			},
+		})
+	}
+
+	return c.JSON(fiber.Map{"message": "Conversation marked as read"})
 }
 
 // AddParticipant handles POST /api/conversations/:id/participants
@@ -391,6 +454,7 @@ func (s *Server) JoinChatroom(c *fiber.Ctx) error {
 	}
 
 	s.broadcastChatroomPresenceSnapshot(ctx, roomID, userID, "", "joined_room")
+	s.maybeSendWelcomeRoomJoinMessage(ctx, userID, roomID)
 
 	return c.JSON(fiber.Map{"message": "Joined chatroom successfully"})
 }

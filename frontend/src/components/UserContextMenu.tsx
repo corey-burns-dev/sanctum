@@ -1,20 +1,22 @@
+import {
+  Ban,
+  Flag,
+  Gamepad2,
+  MessageCircle,
+  User as UserIcon,
+  UserMinus,
+  UserPlus,
+} from 'lucide-react'
 import type { User } from '@/api/types'
 import {
-    ContextMenu,
-    ContextMenuContent,
-    ContextMenuItem,
-    ContextMenuLabel,
-    ContextMenuSeparator,
-    ContextMenuTrigger,
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
 } from '@/components/ui/context-menu'
 import { useUserActions } from '@/hooks/useUserActions'
-import {
-    Gamepad2,
-    MessageCircle,
-    User as UserIcon,
-    UserMinus,
-    UserPlus,
-} from 'lucide-react'
 
 interface UserContextMenuProps {
   user: User
@@ -34,6 +36,10 @@ export function UserContextMenu({ user, children }: UserContextMenuProps) {
     addFriendLabel,
     isFriend,
     removeFriendPending,
+    isBlocked,
+    toggleBlockUser,
+    handleReportUser,
+    blockPending,
   } = useUserActions(user)
 
   if (isSelf) {
@@ -76,8 +82,6 @@ export function UserContextMenu({ user, children }: UserContextMenuProps) {
           <span>Message</span>
         </ContextMenuItem>
 
-
-
         <ContextMenuItem
           onClick={event => {
             event.stopPropagation()
@@ -116,6 +120,31 @@ export function UserContextMenu({ user, children }: UserContextMenuProps) {
             <span>Remove Friend</span>
           </ContextMenuItem>
         )}
+
+        <ContextMenuSeparator />
+
+        <ContextMenuItem
+          onClick={event => {
+            event.stopPropagation()
+            toggleBlockUser()
+          }}
+          disabled={blockPending}
+          className='text-destructive focus:text-destructive'
+        >
+          <Ban className='mr-2 h-4 w-4' />
+          <span>{isBlocked ? 'Unblock User' : 'Block User'}</span>
+        </ContextMenuItem>
+
+        <ContextMenuItem
+          onClick={event => {
+            event.stopPropagation()
+            handleReportUser()
+          }}
+          className='text-destructive focus:text-destructive'
+        >
+          <Flag className='mr-2 h-4 w-4' />
+          <span>Report User</span>
+        </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
   )

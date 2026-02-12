@@ -28,16 +28,24 @@ export function PollBlock({
   }
 
   const hasVoted = poll.user_vote_option_id != null
+  const interactiveProps = onVoteClick
+    ? {
+        onClick: onVoteClick,
+        onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onVoteClick(e as unknown as React.MouseEvent)
+          }
+        },
+        role: 'button' as const,
+        tabIndex: 0,
+      }
+    : {}
 
   return (
     <div
       className='rounded-xl border border-border/60 bg-muted/30 p-4 space-y-3'
-      onClick={onVoteClick}
-      onKeyDown={e => {
-        if (e.key === 'Enter' || e.key === ' ') onVoteClick?.(e as unknown as React.MouseEvent)
-      }}
-      role={onVoteClick ? 'button' : undefined}
-      tabIndex={onVoteClick ? 0 : undefined}
+      {...interactiveProps}
     >
       <p className='font-medium text-sm'>{poll.question}</p>
       <div className='space-y-2'>
@@ -51,7 +59,9 @@ export function PollBlock({
               {hasVoted || !isAuthenticated ? (
                 <div className='space-y-1'>
                   <div className='flex items-center justify-between gap-2 text-sm'>
-                    <span className={cn('truncate', isSelected && 'font-medium')}>
+                    <span
+                      className={cn('truncate', isSelected && 'font-medium')}
+                    >
                       {opt.option_text}
                     </span>
                     <span className='text-muted-foreground shrink-0'>

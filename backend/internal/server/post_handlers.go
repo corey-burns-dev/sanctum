@@ -36,13 +36,13 @@ func (s *Server) CreatePost(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(uint)
 
 	var req struct {
-		Title      string                   `json:"title"`
-		Content    string                   `json:"content"`
-		ImageURL   string                   `json:"image_url,omitempty"`
-		PostType   string                   `json:"post_type,omitempty"`
-		LinkURL    string                   `json:"link_url,omitempty"`
-		YoutubeURL string                   `json:"youtube_url,omitempty"`
-		SanctumID  *uint                    `json:"sanctum_id,omitempty"`
+		Title      string                       `json:"title"`
+		Content    string                       `json:"content"`
+		ImageURL   string                       `json:"image_url,omitempty"`
+		PostType   string                       `json:"post_type,omitempty"`
+		LinkURL    string                       `json:"link_url,omitempty"`
+		YoutubeURL string                       `json:"youtube_url,omitempty"`
+		SanctumID  *uint                        `json:"sanctum_id,omitempty"`
 		Poll       *service.CreatePostPollInput `json:"poll,omitempty"`
 	}
 	if err := c.BodyParser(&req); err != nil {

@@ -321,6 +321,8 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	users := protected.Group("/users")
 	users.Get("/me", s.GetMyProfile)
 	users.Put("/me", s.UpdateMyProfile)
+	users.Get("/me/mentions", s.GetMyMentions)
+	users.Get("/blocks/me", s.GetMyBlocks)
 	users.Get("/", s.GetAllUsers)
 
 	// WebSocket ticket issuance
@@ -332,6 +334,9 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	users.Get("/:id/posts", s.GetUserPosts)
 	users.Post("/:id/promote-admin", s.AdminRequired(), s.PromoteToAdmin)
 	users.Post("/:id/demote-admin", s.AdminRequired(), s.DemoteFromAdmin)
+	users.Post("/:id/block", s.BlockUser)
+	users.Delete("/:id/block", s.UnblockUser)
+	users.Post("/:id/report", s.ReportUser)
 	users.Get("/:id", s.GetUserProfile)
 
 	// Friend routes
@@ -360,6 +365,7 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 		s.redis, 1, time.Minute, "create_comment"), s.CreateComment)
 	posts.Put("/:id/comments/:commentId", s.UpdateComment)
 	posts.Delete("/:id/comments/:commentId", s.DeleteComment)
+	posts.Post("/:id/report", s.ReportPost)
 	posts.Post("/:id/poll/vote", s.VotePoll)
 	// Generic /:id routes (for item detail, update, delete)
 	posts.Put("/:id", s.UpdatePost)
@@ -373,6 +379,10 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	conversations.Get("/:id/messages", s.GetMessages)
 	conversations.Post("/:id/messages", middleware.RateLimit(
 		s.redis, 15, time.Minute, "send_chat"), s.SendMessage)
+	conversations.Post("/:id/read", s.MarkConversationRead)
+	conversations.Post("/:id/messages/:messageId/reactions", s.AddMessageReaction)
+	conversations.Delete("/:id/messages/:messageId/reactions", s.RemoveMessageReaction)
+	conversations.Post("/:id/messages/:messageId/report", s.ReportMessage)
 	conversations.Post("/:id/participants", s.AddParticipant)
 	conversations.Delete("/:id", s.LeaveConversation)
 	// Generic /:id route must be last
@@ -384,6 +394,9 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	chatrooms.Get("/joined", s.GetJoinedChatrooms)                            // Get rooms user has joined
 	chatrooms.Post("/:id/join", s.JoinChatroom)                               // Join a chatroom
 	chatrooms.Delete("/:id/participants/:participantId", s.RemoveParticipant) // Remove participant (admin/creator only)
+	chatrooms.Get("/:id/mutes", s.ListChatroomMutes)
+	chatrooms.Post("/:id/mutes/:userId", s.MuteChatroomUser)
+	chatrooms.Delete("/:id/mutes/:userId", s.UnmuteChatroomUser)
 	chatrooms.Get("/:id/moderators", s.GetChatroomModerators)
 	chatrooms.Post("/:id/moderators/:userId", s.AddChatroomModerator)
 	chatrooms.Delete("/:id/moderators/:userId", s.RemoveChatroomModerator)
@@ -405,6 +418,13 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	// Admin routes
 	admin := protected.Group("/admin", s.AdminRequired())
 	admin.Get("/feature-flags", s.GetFeatureFlags)
+	admin.Get("/reports", s.GetAdminReports)
+	admin.Post("/reports/:id/resolve", s.ResolveAdminReport)
+	admin.Get("/ban-requests", s.GetAdminBanRequests)
+	admin.Get("/users", s.GetAdminUsers)
+	admin.Get("/users/:id", s.GetAdminUserDetail)
+	admin.Post("/users/:id/ban", s.BanUser)
+	admin.Post("/users/:id/unban", s.UnbanUser)
 	adminSanctumRequests := admin.Group("/sanctum-requests")
 	adminSanctumRequests.Get("/", s.GetAdminSanctumRequests)
 	adminSanctumRequests.Post("/:id/approve", s.ApproveSanctumRequest)
@@ -508,6 +528,14 @@ func (s *Server) AuthRequired() fiber.Handler {
 					// Sync to UserContext for logging and downstream services
 					ctx := context.WithValue(c.UserContext(), middleware.UserIDKey, uint(userID))
 					c.SetUserContext(ctx)
+					banned, berr := s.isBannedByUserID(c.UserContext(), uint(userID))
+					if berr != nil {
+						return models.RespondWithError(c, fiber.StatusInternalServerError, berr)
+					}
+					if banned {
+						return models.RespondWithError(c, fiber.StatusForbidden,
+							models.NewForbiddenError("Account is banned"))
+					}
 					return c.Next()
 				}
 			}
@@ -598,6 +626,14 @@ func (s *Server) AuthRequired() fiber.Handler {
 		// Sync to UserContext for logging and downstream services
 		ctx := context.WithValue(c.UserContext(), middleware.UserIDKey, uint(userID))
 		c.SetUserContext(ctx)
+		banned, berr := s.isBannedByUserID(c.UserContext(), uint(userID))
+		if berr != nil {
+			return models.RespondWithError(c, fiber.StatusInternalServerError, berr)
+		}
+		if banned {
+			return models.RespondWithError(c, fiber.StatusForbidden,
+				models.NewForbiddenError("Account is banned"))
+		}
 
 		return c.Next()
 	}

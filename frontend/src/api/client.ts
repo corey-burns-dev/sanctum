@@ -1,10 +1,14 @@
 import { logger } from '../lib/logger'
 import type {
+  AdminBanRequest,
   AdminSanctumRequestActionResponse,
   AdminSanctumRequestStatus,
+  AdminUserDetailResponse,
   AuthResponse,
+  BanUserRequest,
   BulkSanctumMembershipsInput,
   ChatroomModerator,
+  ChatroomMute,
   Comment,
   Conversation,
   CreateCommentRequest,
@@ -16,8 +20,14 @@ import type {
   GameRoom,
   LoginRequest,
   Message,
+  MessageMention,
+  MessageReactionResponse,
+  ModerationReport,
+  MuteChatroomUserRequest,
   PaginationParams,
   Post,
+  ReportRequest,
+  ResolveModerationReportRequest,
   SanctumAdmin,
   SanctumDTO,
   SanctumMembership,
@@ -30,6 +40,7 @@ import type {
   UpdateProfileRequest,
   UploadedImage,
   User,
+  UserBlock,
 } from './types'
 
 // Add a custom error type that includes request ID
@@ -280,6 +291,13 @@ class ApiClient {
     })
   }
 
+  async reportPost(id: number, data: ReportRequest): Promise<ModerationReport> {
+    return this.request(`/posts/${id}/report`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
   async searchPosts(params: SearchParams): Promise<Post[]> {
     const query = new URLSearchParams()
     query.set('q', params.q)
@@ -396,6 +414,41 @@ class ApiClient {
     })
   }
 
+  async getMyMentions(params?: PaginationParams): Promise<MessageMention[]> {
+    const query = new URLSearchParams()
+    if (params?.offset !== undefined)
+      query.set('offset', params.offset.toString())
+    if (params?.limit !== undefined) query.set('limit', params.limit.toString())
+    const queryString = query.toString() ? `?${query.toString()}` : ''
+    return this.request(`/users/me/mentions${queryString}`)
+  }
+
+  async getMyBlocks(): Promise<UserBlock[]> {
+    return this.request('/users/blocks/me')
+  }
+
+  async blockUser(userId: number): Promise<{ message: string }> {
+    return this.request(`/users/${userId}/block`, {
+      method: 'POST',
+    })
+  }
+
+  async unblockUser(userId: number): Promise<{ message: string }> {
+    return this.request(`/users/${userId}/block`, {
+      method: 'DELETE',
+    })
+  }
+
+  async reportUser(
+    userId: number,
+    data: ReportRequest
+  ): Promise<ModerationReport> {
+    return this.request(`/users/${userId}/report`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
   // Chat - Conversations
   async getConversations(): Promise<Conversation[]> {
     return this.request('/conversations')
@@ -463,6 +516,48 @@ class ApiClient {
     )
   }
 
+  async addMessageReaction(
+    conversationId: number,
+    messageId: number,
+    emoji: string
+  ): Promise<MessageReactionResponse> {
+    return this.request(
+      `/conversations/${conversationId}/messages/${messageId}/reactions`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ emoji }),
+      }
+    )
+  }
+
+  async removeMessageReaction(
+    conversationId: number,
+    messageId: number,
+    emoji: string
+  ): Promise<MessageReactionResponse> {
+    const query = new URLSearchParams({ emoji })
+    return this.request(
+      `/conversations/${conversationId}/messages/${messageId}/reactions?${query.toString()}`,
+      {
+        method: 'DELETE',
+      }
+    )
+  }
+
+  async reportMessage(
+    conversationId: number,
+    messageId: number,
+    data: ReportRequest
+  ): Promise<ModerationReport> {
+    return this.request(
+      `/conversations/${conversationId}/messages/${messageId}/report`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    )
+  }
+
   // Chatrooms (public group conversations)
   async getAllChatrooms(): Promise<(Conversation & { is_joined: boolean })[]> {
     return this.request('/chatrooms')
@@ -498,6 +593,30 @@ class ApiClient {
     userId: number
   ): Promise<{ message: string }> {
     return this.request(`/chatrooms/${chatroomId}/moderators/${userId}`, {
+      method: 'DELETE',
+    })
+  }
+
+  async getChatroomMutes(chatroomId: number): Promise<ChatroomMute[]> {
+    return this.request(`/chatrooms/${chatroomId}/mutes`)
+  }
+
+  async muteChatroomUser(
+    chatroomId: number,
+    userId: number,
+    data: MuteChatroomUserRequest
+  ): Promise<{ message: string }> {
+    return this.request(`/chatrooms/${chatroomId}/mutes/${userId}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async unmuteChatroomUser(
+    chatroomId: number,
+    userId: number
+  ): Promise<{ message: string }> {
+    return this.request(`/chatrooms/${chatroomId}/mutes/${userId}`, {
       method: 'DELETE',
     })
   }
@@ -582,6 +701,74 @@ class ApiClient {
   ): Promise<SanctumAdmin> {
     return this.request(`/sanctums/${slug}/admins/${userId}`, {
       method: 'DELETE',
+    })
+  }
+
+  async getAdminReports(params?: {
+    status?: string
+    target_type?: string
+    limit?: number
+    offset?: number
+  }): Promise<ModerationReport[]> {
+    const query = new URLSearchParams()
+    if (params?.status) query.set('status', params.status)
+    if (params?.target_type) query.set('target_type', params.target_type)
+    if (params?.limit !== undefined) query.set('limit', String(params.limit))
+    if (params?.offset !== undefined) query.set('offset', String(params.offset))
+    const queryString = query.toString() ? `?${query.toString()}` : ''
+    return this.request(`/admin/reports${queryString}`)
+  }
+
+  async resolveAdminReport(
+    id: number,
+    data: ResolveModerationReportRequest
+  ): Promise<ModerationReport> {
+    return this.request(`/admin/reports/${id}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async getAdminBanRequests(
+    params?: PaginationParams
+  ): Promise<AdminBanRequest[]> {
+    const query = new URLSearchParams()
+    if (params?.offset !== undefined)
+      query.set('offset', params.offset.toString())
+    if (params?.limit !== undefined) query.set('limit', params.limit.toString())
+    const queryString = query.toString() ? `?${query.toString()}` : ''
+    return this.request(`/admin/ban-requests${queryString}`)
+  }
+
+  async getAdminUsers(
+    params?: PaginationParams & { q?: string }
+  ): Promise<User[]> {
+    const query = new URLSearchParams()
+    if (params?.q) query.set('q', params.q)
+    if (params?.offset !== undefined)
+      query.set('offset', params.offset.toString())
+    if (params?.limit !== undefined) query.set('limit', params.limit.toString())
+    const queryString = query.toString() ? `?${query.toString()}` : ''
+    return this.request(`/admin/users${queryString}`)
+  }
+
+  async getAdminUserDetail(id: number): Promise<AdminUserDetailResponse> {
+    return this.request(`/admin/users/${id}`)
+  }
+
+  async banAdminUser(
+    id: number,
+    data: BanUserRequest = {}
+  ): Promise<{ message: string }> {
+    return this.request(`/admin/users/${id}/ban`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async unbanAdminUser(id: number): Promise<{ message: string }> {
+    return this.request(`/admin/users/${id}/unban`, {
+      method: 'POST',
     })
   }
 

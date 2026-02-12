@@ -49,7 +49,6 @@ This document contains both production-ready feature ideas and experimental/lear
   - Implement cache invalidation on room updates
   - Add cache-aside pattern for all read-heavy operations
 
-
 ## 🟡 High Priority - Tier 2: Scale-Ready Architecture
 
 ### Code Architecture
@@ -265,23 +264,23 @@ An admin page is essential for a "moderated" growth strategy. Since you are usin
 
 ### **Moderation & Ban Management**
 
-* **Flagged Content:** A list of posts or comments reported by users for violating the "No Politics/News" rule.
-* **Ban Requests:** If you implement a "Report User" feature, this queue shows users with repeated violations.
-* **User Management:** Ability to search for a user and toggle a `IsBanned` or `IsModerator` flag on their profile.
+**Flagged Content:** A list of posts or comments reported by users for violating the "No Politics/News" rule.
+
+**Ban Requests:** If you implement a "Report User" feature, this queue shows users with repeated violations.
+
+**User Management:** Ability to search for a user and toggle a `IsBanned` or `IsModerator` flag on their profile.
 
 ### **System Health & Statistics**
 
-* **Growth Metrics:** Real-time counters for `Total Users`, `Active Sanctuaries`, and `Daily Posts`.
-* **Traffic Monitoring:** Integrate a view for your rate-limiter to see if any specific IP addresses are hitting the API too hard.
+**Growth Metrics:** Real-time counters for `Total Users`, `Active Sanctuaries`, and `Daily Posts`.
+**Traffic Monitoring:** Integrate a view for your rate-limiter to see if any specific IP addresses are hitting the API too hard.
 
 ### **New Admin Feature Ideas**
 
-* **"Shadow Ban" Toggle:** Instead of a hard ban, you could "Shadow Ban" a user where only they see their own posts. This is a classic "senior-level" anti-abuse tactic.
-* **Global Announcement Tool:** A way to push a "System Message" notification to every user's `RealtimeNotifications` feed.
-* **Content Spotlight:** An admin tool to mark specific "Community of the Month" or "Default" sanctuararies to help new users find quality content.
-* **Audit Log:** A read-only list of every action taken by admins (e.g., "Admin A approved Community X") to ensure accountability.
-
----
+**"Shadow Ban" Toggle:** Instead of a hard ban, you could "Shadow Ban" a user where only they see their own posts. This is a classic "senior-level" anti-abuse tactic.
+**Global Announcement Tool:** A way to push a "System Message" notification to every user's `RealtimeNotifications` feed.
+**Content Spotlight:** An admin tool to mark specific "Community of the Month" or "Default" sanctuararies to help new users find quality content.
+**Audit Log:** A read-only list of every action taken by admins (e.g., "Admin A approved Community X") to ensure accountability.
 
 ## 🎮 Real-Time & Multiplayer Learning Features
 
@@ -512,6 +511,7 @@ If the goal is **maximum learning + cool factor**, prioritize:
 ## 📝 Implementation Notes
 
 **For AI Agents:**
+
 - Each checkbox represents a discrete task
 - Tasks include specific endpoints, models, and technical details
 - Prioritize Tier 1 (🔴) before Tier 2 (🟡)
@@ -521,6 +521,7 @@ If the goal is **maximum learning + cool factor**, prioritize:
 - Update OpenAPI spec with new endpoints
 
 **Current Strengths:**
+
 - ✅ Structured logging with slog
 - ✅ Redis Pub/Sub for WebSocket scaling
 - ✅ Basic rate limiting
@@ -528,6 +529,7 @@ If the goal is **maximum learning + cool factor**, prioritize:
 - ✅ Integration test suite
 
 **Immediate Next Steps:**
+
 1. Implement Service layer refactor
 2. Add database read/write separation
 3. Integrate job queue for async processing

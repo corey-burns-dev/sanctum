@@ -80,9 +80,10 @@ func (n *Notifier) PublishTypingIndicator(
 	}
 	channel := fmt.Sprintf("typing:conv:%d", conversationID)
 	payload := map[string]interface{}{
-		"user_id":   userID,
-		"username":  username,
-		"is_typing": isTyping,
+		"user_id":       userID,
+		"username":      username,
+		"is_typing":     isTyping,
+		"expires_in_ms": 5000,
 	}
 	payloadJSON, _ := json.Marshal(payload)
 	return n.rdb.Publish(ctx, channel, string(payloadJSON)).Err()

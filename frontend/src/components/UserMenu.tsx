@@ -1,21 +1,23 @@
+import {
+  Ban,
+  Flag,
+  Gamepad2,
+  MessageCircle,
+  User as UserIcon,
+  UserMinus,
+  UserPlus,
+} from 'lucide-react'
 import type { User } from '@/api/types'
 import { UserContextMenu } from '@/components/UserContextMenu'
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useUserActions } from '@/hooks/useUserActions'
-import {
-    Gamepad2,
-    MessageCircle,
-    User as UserIcon,
-    UserMinus,
-    UserPlus,
-} from 'lucide-react'
 
 interface UserMenuProps {
   user: User
@@ -35,6 +37,10 @@ export function UserMenu({ user, children }: UserMenuProps) {
     addFriendLabel,
     isFriend,
     removeFriendPending,
+    isBlocked,
+    toggleBlockUser,
+    handleReportUser,
+    blockPending,
   } = useUserActions(user)
 
   if (isSelf) {
@@ -82,8 +88,6 @@ export function UserMenu({ user, children }: UserMenuProps) {
             <span>Message</span>
           </DropdownMenuItem>
 
-
-
           <DropdownMenuItem
             onClick={event => {
               event.stopPropagation()
@@ -122,6 +126,31 @@ export function UserMenu({ user, children }: UserMenuProps) {
               <span>Remove Friend</span>
             </DropdownMenuItem>
           )}
+
+          <DropdownMenuSeparator />
+
+          <DropdownMenuItem
+            onClick={event => {
+              event.stopPropagation()
+              toggleBlockUser()
+            }}
+            disabled={blockPending}
+            className='text-destructive focus:text-destructive'
+          >
+            <Ban className='mr-2 h-4 w-4' />
+            <span>{isBlocked ? 'Unblock User' : 'Block User'}</span>
+          </DropdownMenuItem>
+
+          <DropdownMenuItem
+            onClick={event => {
+              event.stopPropagation()
+              handleReportUser()
+            }}
+            className='text-destructive focus:text-destructive'
+          >
+            <Flag className='mr-2 h-4 w-4' />
+            <span>Report User</span>
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </UserContextMenu>

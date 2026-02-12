@@ -1,10 +1,4 @@
-import {
-  Bold,
-  Italic,
-  List,
-  ListOrdered,
-  type LucideIcon,
-} from 'lucide-react'
+import { Bold, Italic, List, ListOrdered, type LucideIcon } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -21,15 +15,12 @@ function wrapSelection(
   const end = textarea.selectionEnd
   const selected = textarea.value.slice(start, end)
   const newText =
-    textarea.value.slice(0, start) + before + selected + after + textarea.value.slice(end)
+    textarea.value.slice(0, start) +
+    before +
+    selected +
+    after +
+    textarea.value.slice(end)
   return newText
-}
-
-function insertAtCursor(textarea: HTMLTextAreaElement, prefix: string): string {
-  const start = textarea.selectionStart
-  const before = textarea.value.slice(0, start)
-  const after = textarea.value.slice(start)
-  return before + prefix + after
 }
 
 function applyAction(
@@ -42,18 +33,20 @@ function applyAction(
     case 'italic':
       return wrapSelection(textarea, '*', '*')
     case 'bulletList': {
-      const lineStart = textarea.value.lastIndexOf('\n', textarea.selectionStart - 1) + 1
+      const lineStart =
+        textarea.value.lastIndexOf('\n', textarea.selectionStart - 1) + 1
       const insertPos = lineStart
       const before = textarea.value.slice(0, insertPos)
       const after = textarea.value.slice(insertPos)
-      return before + '- ' + after
+      return `${before}- ${after}`
     }
     case 'numberedList': {
-      const lineStart = textarea.value.lastIndexOf('\n', textarea.selectionStart - 1) + 1
+      const lineStart =
+        textarea.value.lastIndexOf('\n', textarea.selectionStart - 1) + 1
       const insertPos = lineStart
       const before = textarea.value.slice(0, insertPos)
       const after = textarea.value.slice(insertPos)
-      return before + '1. ' + after
+      return `${before}1. ${after}`
     }
     default:
       return textarea.value
@@ -91,7 +84,12 @@ export function PostComposerEditor({
   }
 
   return (
-    <div className={cn('rounded-xl border border-border/60 overflow-hidden', className)}>
+    <div
+      className={cn(
+        'rounded-xl border border-border/60 overflow-hidden',
+        className
+      )}
+    >
       <div className='flex items-center gap-0.5 border-b border-border/60 bg-muted/30 px-1 py-1'>
         <ToolbarButton
           icon={Bold}

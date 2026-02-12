@@ -23,21 +23,19 @@ describe('apiClient uploadImage', () => {
   })
 
   it('sends multipart/form-data without forcing Content-Type', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(
-        okJson({
-          id: 1,
-          hash: 'abc',
-          url: '/api/images/abc',
-          thumbnail_url: '/api/images/abc?size=thumbnail',
-          medium_url: '/api/images/abc?size=medium',
-          width: 10,
-          height: 10,
-          size_bytes: 12,
-          mime_type: 'image/png',
-        })
-      )
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      okJson({
+        id: 1,
+        hash: 'abc',
+        url: '/api/images/abc',
+        thumbnail_url: '/api/images/abc?size=thumbnail',
+        medium_url: '/api/images/abc?size=medium',
+        width: 10,
+        height: 10,
+        size_bytes: 12,
+        mime_type: 'image/png',
+      })
+    )
 
     const file = new File([new Uint8Array([1, 2, 3])], 'avatar.png', {
       type: 'image/png',
@@ -59,19 +57,17 @@ describe('apiClient uploadImage', () => {
   })
 
   it('keeps JSON Content-Type for non-FormData requests', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(
-        okJson({
-          id: 10,
-          title: 'hello',
-          content: 'world',
-          likes_count: 0,
-          user_id: 1,
-          created_at: '',
-          updated_at: '',
-        })
-      )
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      okJson({
+        id: 10,
+        title: 'hello',
+        content: 'world',
+        likes_count: 0,
+        user_id: 1,
+        created_at: '',
+        updated_at: '',
+      })
+    )
 
     await apiClient.createPost({ title: 'hello', content: 'world' })
 

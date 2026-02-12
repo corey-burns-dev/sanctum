@@ -8,7 +8,9 @@ import {
   useRef,
   useState,
 } from 'react'
+import { apiClient } from '@/api/client'
 import type { Message, User } from '@/api/types'
+import { useMyBlocks } from '@/hooks/useModeration'
 import { useIsAuthenticated } from '@/hooks/useUsers'
 import { createTicketedWS, getNextBackoff } from '@/lib/ws-utils'
 
@@ -26,6 +28,9 @@ interface ChatWebSocketMessage {
     | 'participant_joined'
     | 'participant_left'
     | 'chatroom_presence'
+    | 'message_read'
+    | 'message_reaction_updated'
+    | 'chat_mention'
   conversation_id?: number
   user_id?: number
   username?: string
@@ -48,7 +53,8 @@ interface ChatContextValue {
     conversationId: number,
     userId: number,
     username: string,
-    isTyping: boolean
+    isTyping: boolean,
+    expiresInMs?: number
   ) => void
   onPresence?: (userId: number, username: string, status: string) => void
   onConnectedUsers?: (userIds: number[]) => void
@@ -70,7 +76,8 @@ interface ChatContextValue {
       conversationId: number,
       userId: number,
       username: string,
-      isTyping: boolean
+      isTyping: boolean,
+      expiresInMs?: number
     ) => void
   ) => void
   setOnPresence: (
@@ -100,7 +107,8 @@ interface ChatContextValue {
       conversationId: number,
       userId: number,
       username: string,
-      isTyping: boolean
+      isTyping: boolean,
+      expiresInMs?: number
     ) => void
   ) => () => void
   subscribeOnPresence: (
@@ -141,6 +149,7 @@ interface ChatProviderProps {
 
 export function ChatProvider({ children }: ChatProviderProps) {
   const isAuthenticated = useIsAuthenticated()
+  const { data: myBlocks = [] } = useMyBlocks({ enabled: isAuthenticated })
   const queryClient = useQueryClient()
   const [isConnected, setIsConnected] = useState(false)
   const [joinedRooms, setJoinedRooms] = useState<Set<number>>(new Set())
@@ -163,7 +172,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
         conversationId: number,
         userId: number,
         username: string,
-        isTyping: boolean
+        isTyping: boolean,
+        expiresInMs?: number
       ) => void
     >
   >(new Set())
@@ -192,6 +202,13 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
   // Recent-message dedupe cache: key = `${convId}:${messageId}` -> timestamp
   const recentMessageMapRef = useRef<Map<string, number>>(new Map())
+  const blockedUserIDsRef = useRef<Set<number>>(new Set())
+
+  useEffect(() => {
+    blockedUserIDsRef.current = new Set(
+      myBlocks.map(block => block.blocked_id).filter(Boolean)
+    )
+  }, [myBlocks])
 
   const setOnMessage = useCallback(
     // Deprecated compatibility helper — prefer subscribeOnMessage
@@ -208,7 +225,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
         conversationId: number,
         userId: number,
         username: string,
-        isTyping: boolean
+        isTyping: boolean,
+        expiresInMs?: number
       ) => void
     ) => {
       if (!callback) return
@@ -274,7 +292,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
         conversationId: number,
         userId: number,
         username: string,
-        isTyping: boolean
+        isTyping: boolean,
+        expiresInMs?: number
       ) => void
     ) => {
       typingHandlersRef.current.add(cb)
@@ -325,6 +344,17 @@ export function ChatProvider({ children }: ChatProviderProps) {
     []
   )
 
+  const refreshBlockedUsers = useCallback(async () => {
+    try {
+      const blocks = await apiClient.getMyBlocks()
+      blockedUserIDsRef.current = new Set(
+        blocks.map(block => block.blocked_id).filter(Boolean)
+      )
+    } catch {
+      blockedUserIDsRef.current = new Set()
+    }
+  }, [])
+
   const connect = useCallback(async () => {
     if (!isAuthenticated) return
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return
@@ -337,6 +367,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         currentUserRef.current = { id: user.id, username: user.username }
       } catch {}
     }
+    await refreshBlockedUsers()
 
     // Close existing connection
     if (wsRef.current) {
@@ -424,6 +455,12 @@ export function ChatProvider({ children }: ChatProviderProps) {
                 const convId = payload.conversation_id || data.conversation_id
                 const message = payload as Message
                 if (!convId || !message || !message.id) break
+                if (
+                  typeof message.sender_id === 'number' &&
+                  blockedUserIDsRef.current.has(message.sender_id)
+                ) {
+                  break
+                }
 
                 // Dedupe by conversation + message.id using short TTL map
                 const key = `${convId}:${message.id}`
@@ -469,6 +506,12 @@ export function ChatProvider({ children }: ChatProviderProps) {
                 const message = payload as Message
                 if (!convId || !message || !message.id) break
                 if (!isKnownConversation(convId)) break
+                if (
+                  typeof message.sender_id === 'number' &&
+                  blockedUserIDsRef.current.has(message.sender_id)
+                ) {
+                  break
+                }
 
                 const key = `${convId}:${message.id}`
                 const now = Date.now()
@@ -508,10 +551,13 @@ export function ChatProvider({ children }: ChatProviderProps) {
                 const userId = payload.user_id || payload.userId || data.user_id
                 const username = payload.username || data.username
                 const isTyping = payload.is_typing ?? payload.isTyping
+                const expiresInMsRaw = payload.expires_in_ms
+                const expiresInMs =
+                  typeof expiresInMsRaw === 'number' ? expiresInMsRaw : 5000
                 if (!convId) break
                 for (const cb of typingHandlersRef.current) {
                   try {
-                    cb(convId, userId, username, !!isTyping)
+                    cb(convId, userId, username, !!isTyping, expiresInMs)
                   } catch (e) {
                     console.error('typing handler failed', e)
                   }
@@ -580,13 +626,72 @@ export function ChatProvider({ children }: ChatProviderProps) {
                 break
               }
 
-              case 'read':
-                // Invalidate messages to refresh read status
-                if (data.conversation_id) {
+              case 'message_reaction_updated': {
+                const payload = data.payload || data
+                const convId = payload.conversation_id || data.conversation_id
+                const messageID = payload.message_id
+                const reactions = payload.reactions
+                if (!convId || typeof messageID !== 'number') break
+                queryClient.setQueryData<Message[]>(
+                  ['chat', 'messages', convId],
+                  oldMessages =>
+                    oldMessages?.map(message =>
+                      message.id === messageID
+                        ? {
+                            ...message,
+                            reaction_summary: Array.isArray(reactions)
+                              ? reactions
+                              : [],
+                          }
+                        : message
+                    ) ?? oldMessages
+                )
+                break
+              }
+
+              case 'message_read':
+              case 'read': {
+                const payload = data.payload || data
+                const convId = payload.conversation_id || data.conversation_id
+                const readByUserID =
+                  payload.user_id || payload.userId || data.user_id
+                const readAt = payload.read_at
+                if (!convId) break
+
+                const currentUserID = currentUserRef.current?.id
+                if (
+                  typeof currentUserID === 'number' &&
+                  typeof readByUserID === 'number' &&
+                  readByUserID !== currentUserID
+                ) {
+                  queryClient.setQueryData<Message[]>(
+                    ['chat', 'messages', convId],
+                    oldMessages =>
+                      oldMessages?.map(message =>
+                        message.sender_id === currentUserID
+                          ? {
+                              ...message,
+                              is_read: true,
+                              read_at:
+                                typeof readAt === 'string'
+                                  ? readAt
+                                  : message.read_at,
+                            }
+                          : message
+                      ) ?? oldMessages
+                  )
+                } else {
                   queryClient.invalidateQueries({
-                    queryKey: ['chat', 'messages', data.conversation_id],
+                    queryKey: ['chat', 'messages', convId],
                   })
                 }
+                break
+              }
+
+              case 'chat_mention':
+                queryClient.invalidateQueries({
+                  queryKey: ['moderation', 'mentions'],
+                })
                 break
             }
           } catch (error) {
@@ -623,7 +728,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         reconnectTimeoutRef.current = window.setTimeout(connect, delay)
       }
     }
-  }, [isAuthenticated, queryClient])
+  }, [isAuthenticated, queryClient, refreshBlockedUsers])
 
   // Connect on mount / auth change
   useEffect(() => {
@@ -640,6 +745,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
       setIsConnected(false)
       joinedRoomsRef.current.clear()
       setJoinedRooms(new Set())
+      blockedUserIDsRef.current.clear()
       return
     }
 

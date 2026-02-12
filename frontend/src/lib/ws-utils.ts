@@ -1,4 +1,4 @@
-import { apiClient, ApiError } from '@/api/client'
+import { ApiError, apiClient } from '@/api/client'
 import { getWsBaseUrl } from './chat-utils'
 
 /**
@@ -25,7 +25,10 @@ export async function createTicketedWS(
     if (import.meta.env.DEV) {
       try {
         // eslint-disable-next-line no-console
-        console.debug('[ws] ticket issued (not logged) expires_in=', ticketResp.expires_in)
+        console.debug(
+          '[ws] ticket issued (not logged) expires_in=',
+          ticketResp.expires_in
+        )
       } catch {}
     }
   } catch (err) {
@@ -77,7 +80,11 @@ export async function createTicketedWS(
     if (import.meta.env.DEV) {
       try {
         // eslint-disable-next-line no-console
-        console.error('[ws] WebSocket constructor failed for', wsUrlNoTicket, err)
+        console.error(
+          '[ws] WebSocket constructor failed for',
+          wsUrlNoTicket,
+          err
+        )
       } catch {}
     }
     throw err

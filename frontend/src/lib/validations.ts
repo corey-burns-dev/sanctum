@@ -104,7 +104,10 @@ export const createPostSchema = z
           path: ['poll', 'question'],
         })
       }
-      if (!data.poll?.options?.length || data.poll.options.filter(Boolean).length < 2) {
+      if (
+        !data.poll?.options?.length ||
+        data.poll.options.filter(Boolean).length < 2
+      ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: 'Poll must have at least two options',

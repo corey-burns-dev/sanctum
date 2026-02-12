@@ -1,3 +1,14 @@
+import { useQueryClient } from '@tanstack/react-query'
+import { Gamepad2, Users as UsersIcon } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
+import {
+  Link,
+  Route,
+  BrowserRouter as Router,
+  Routes,
+  useLocation,
+} from 'react-router-dom'
 import { BottomBar } from '@/components/BottomBar'
 import { ChatDock } from '@/components/chat/ChatDock'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
@@ -11,17 +22,6 @@ import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications'
 import { cn } from '@/lib/utils'
 import { ChatProvider } from '@/providers/ChatProvider'
 import { routePrefetchMap } from '@/utils/prefetch'
-import { useQueryClient } from '@tanstack/react-query'
-import { Gamepad2, Users as UsersIcon } from 'lucide-react'
-import type { ReactNode } from 'react'
-import { lazy, Suspense, useEffect } from 'react'
-import {
-    Link,
-    Route,
-    BrowserRouter as Router,
-    Routes,
-    useLocation,
-} from 'react-router-dom'
 
 const Login = lazy(() => import('@/pages/Login'))
 const Signup = lazy(() => import('@/pages/Signup'))
@@ -53,6 +53,14 @@ const SanctumDetail = lazy(() => import('@/pages/SanctumDetail'))
 const SanctumRequestForm = lazy(() => import('@/pages/SanctumRequestForm'))
 const MySanctumRequests = lazy(() => import('@/pages/MySanctumRequests'))
 const AdminSanctumRequests = lazy(() => import('@/pages/AdminSanctumRequests'))
+const AdminLayout = lazy(() => import('@/pages/admin/AdminLayout'))
+const AdminOverview = lazy(() => import('@/pages/admin/AdminOverview'))
+const AdminReports = lazy(() => import('@/pages/admin/AdminReports'))
+const AdminBanRequests = lazy(() => import('@/pages/admin/AdminBanRequests'))
+const AdminUsers = lazy(() => import('@/pages/admin/AdminUsers'))
+const AdminUserDetail = lazy(() => import('@/pages/admin/AdminUserDetail'))
+const AdminRoomMutes = lazy(() => import('@/pages/admin/AdminRoomMutes'))
+const AdminPlaceholder = lazy(() => import('@/pages/admin/AdminPlaceholder'))
 const OnboardingSanctums = lazy(() => import('@/pages/OnboardingSanctums'))
 
 function PageLoader() {
@@ -376,13 +384,60 @@ function RoutesWithPrefetch() {
           }
         />
         <Route
-          path='/admin/sanctum-requests'
+          path='/admin'
           element={
             <ProtectedRoute>
-              <AdminSanctumRequests />
+              <AdminLayout />
             </ProtectedRoute>
           }
-        />
+        >
+          <Route index element={<AdminOverview />} />
+          <Route path='reports' element={<AdminReports />} />
+          <Route
+            path='reports/posts'
+            element={<AdminReports fixedTargetType='post' />}
+          />
+          <Route
+            path='reports/messages'
+            element={<AdminReports fixedTargetType='message' />}
+          />
+          <Route
+            path='reports/users'
+            element={<AdminReports fixedTargetType='user' />}
+          />
+          <Route path='ban-requests' element={<AdminBanRequests />} />
+          <Route path='users' element={<AdminUsers />} />
+          <Route path='users/:id' element={<AdminUserDetail />} />
+          <Route path='room-mutes' element={<AdminRoomMutes />} />
+          <Route path='sanctum-requests' element={<AdminSanctumRequests />} />
+          <Route
+            path='user-lists'
+            element={
+              <AdminPlaceholder
+                title='User Lists'
+                description='Custom cohorts, trust tiers, and watchlists.'
+              />
+            }
+          />
+          <Route
+            path='user-info'
+            element={
+              <AdminPlaceholder
+                title='User Info'
+                description='Cross-user lookup and quick moderation audit details.'
+              />
+            }
+          />
+          <Route
+            path='feature-flags'
+            element={
+              <AdminPlaceholder
+                title='Feature Flags'
+                description='Global rollout controls and toggles.'
+              />
+            }
+          />
+        </Route>
       </Routes>
     </Suspense>
   )

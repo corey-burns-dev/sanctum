@@ -1,11 +1,11 @@
 import type { LucideIcon } from 'lucide-react'
 import {
-    Gamepad2,
-    Home,
-    Landmark,
-    MessageCircle,
-    MessageSquare,
-    Users,
+  Gamepad2,
+  Home,
+  Landmark,
+  MessageCircle,
+  MessageSquare,
+  Users,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -45,16 +45,15 @@ export const mobileNav: NavItem[] = [
 ]
 
 const routeTitles: Array<{ path: string; title: string }> = [
-  
   { path: '/messages', title: 'Messages' },
   { path: '/chat', title: 'Chatrooms' },
-  { path: '/admin/sanctum-requests', title: 'Sanctum Requests (Admin)' },
+  { path: '/admin', title: 'Admin Console' },
   { path: '/sanctums/requests', title: 'My Sanctum Requests' },
   { path: '/sanctums/request', title: 'Request Sanctum' },
   { path: '/sanctums', title: 'Sanctums' },
   { path: '/s', title: 'Sanctum' },
   { path: '/friends', title: 'Friends' },
-  
+
   { path: '/games', title: 'Games' },
   { path: '/users', title: 'People' },
   { path: '/profile', title: 'Profile' },

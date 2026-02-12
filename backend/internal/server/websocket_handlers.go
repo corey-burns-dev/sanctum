@@ -11,6 +11,7 @@ import (
 	"sanctum/internal/middleware"
 	"sanctum/internal/models"
 	"sanctum/internal/notifications"
+	"sanctum/internal/service"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"
@@ -148,23 +149,25 @@ func (s *Server) WebSocketChatHandler() fiber.Handler {
 							return
 						}
 
-						// Create message in database
-						message := &models.Message{
+						message, conv, err := s.chatSvc().SendMessage(ctx, service.SendMessageInput{
+							UserID:         userID,
 							ConversationID: convID,
-							SenderID:       userID,
 							Content:        content,
 							MessageType:    "text",
-						}
-
-						if err := s.chatRepo.CreateMessage(ctx, message); err != nil {
-							log.Printf("WebSocket: Failed to create message: %v", err)
+						})
+						if err != nil {
+							response := notifications.ChatMessage{
+								Type: "error",
+								Payload: map[string]string{
+									"message": err.Error(),
+								},
+							}
+							if respJSON, marshalErr := json.Marshal(response); marshalErr == nil {
+								c.TrySend(respJSON)
+							}
 							return
 						}
-
-						// Load sender info - best-effort attempt
-						if sender, err := s.userRepo.GetByID(ctx, userID); err == nil {
-							message.Sender = sender
-						}
+						s.persistMessageMentions(ctx, convID, message, userID, conv.Participants)
 
 						// Broadcast via Redis
 						if s.notifier != nil {
@@ -193,6 +196,22 @@ func (s *Server) WebSocketChatHandler() fiber.Handler {
 								Payload:        message,
 							})
 						}
+
+						if !conv.IsGroup {
+							for _, participant := range conv.Participants {
+								if participant.ID == userID {
+									continue
+								}
+								s.publishUserEvent(participant.ID, EventMessageReceived, map[string]interface{}{
+									"conversation_id": conv.ID,
+									"message_id":      message.ID,
+									"is_group":        conv.IsGroup,
+									"from_user":       userSummaryPtr(message.Sender),
+									"preview":         message.Content,
+									"created_at":      time.Now().UTC().Format(time.RFC3339Nano),
+								})
+							}
+						}
 					}
 				}
 
@@ -208,7 +227,7 @@ func (s *Server) WebSocketChatHandler() fiber.Handler {
 						// Broadcast read receipt
 						if s.notifier != nil {
 							readMsg := notifications.ChatMessage{
-								Type:           "read",
+								Type:           "message_read",
 								ConversationID: convID,
 								UserID:         userID,
 								Username:       username,

@@ -1,0 +1,213 @@
+package server
+
+import (
+	"context"
+	"errors"
+	"sort"
+	"strings"
+
+	"sanctum/internal/models"
+	"sanctum/internal/notifications"
+
+	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
+
+type MessageReactionSummary struct {
+	Emoji       string `json:"emoji"`
+	Count       int    `json:"count"`
+	ReactedByMe bool   `json:"reacted_by_me"`
+}
+
+func (s *Server) AddMessageReaction(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	userID := c.Locals("userID").(uint)
+	convID, err := s.parseID(c, "id")
+	if err != nil {
+		return nil
+	}
+	messageID, err := s.parseID(c, "messageId")
+	if err != nil {
+		return nil
+	}
+
+	var req struct {
+		Emoji string `json:"emoji"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return models.RespondWithError(c, fiber.StatusBadRequest,
+			models.NewValidationError("Invalid request body"))
+	}
+	emoji := strings.TrimSpace(req.Emoji)
+	if emoji == "" || len(emoji) > 32 {
+		return models.RespondWithError(c, fiber.StatusBadRequest,
+			models.NewValidationError("emoji is required"))
+	}
+
+	if _, err := s.chatSvc().GetConversationForUser(ctx, convID, userID); err != nil {
+		status := fiber.StatusForbidden
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			status = fiber.StatusNotFound
+		}
+		return models.RespondWithError(c, status, err)
+	}
+
+	var message models.Message
+	if err := s.db.WithContext(ctx).
+		Select("id", "conversation_id").
+		Where("id = ? AND conversation_id = ?", messageID, convID).
+		First(&message).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.RespondWithError(c, fiber.StatusNotFound, models.NewNotFoundError("Message", messageID))
+		}
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	reaction := models.MessageReaction{MessageID: messageID, UserID: userID, Emoji: emoji}
+	if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&reaction).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	summary, err := s.getMessageReactionSummary(ctx, messageID, userID)
+	if err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	if s.chatHub != nil {
+		s.chatHub.BroadcastToConversation(convID, notifications.ChatMessage{
+			Type:           "message_reaction_updated",
+			ConversationID: convID,
+			UserID:         userID,
+			Payload: map[string]interface{}{
+				"conversation_id": convID,
+				"message_id":      messageID,
+				"reactions":       summary,
+			},
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"conversation_id": convID,
+		"message_id":      messageID,
+		"reactions":       summary,
+	})
+}
+
+func (s *Server) RemoveMessageReaction(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	userID := c.Locals("userID").(uint)
+	convID, err := s.parseID(c, "id")
+	if err != nil {
+		return nil
+	}
+	messageID, err := s.parseID(c, "messageId")
+	if err != nil {
+		return nil
+	}
+	emoji := strings.TrimSpace(c.Query("emoji"))
+	if emoji == "" {
+		return models.RespondWithError(c, fiber.StatusBadRequest,
+			models.NewValidationError("emoji query parameter is required"))
+	}
+
+	if _, err := s.chatSvc().GetConversationForUser(ctx, convID, userID); err != nil {
+		status := fiber.StatusForbidden
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			status = fiber.StatusNotFound
+		}
+		return models.RespondWithError(c, status, err)
+	}
+
+	if err := s.db.WithContext(ctx).
+		Where("message_id = ? AND user_id = ? AND emoji = ?", messageID, userID, emoji).
+		Delete(&models.MessageReaction{}).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	summary, err := s.getMessageReactionSummary(ctx, messageID, userID)
+	if err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	if s.chatHub != nil {
+		s.chatHub.BroadcastToConversation(convID, notifications.ChatMessage{
+			Type:           "message_reaction_updated",
+			ConversationID: convID,
+			UserID:         userID,
+			Payload: map[string]interface{}{
+				"conversation_id": convID,
+				"message_id":      messageID,
+				"reactions":       summary,
+			},
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"conversation_id": convID,
+		"message_id":      messageID,
+		"reactions":       summary,
+	})
+}
+
+func (s *Server) GetMyMentions(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	userID := c.Locals("userID").(uint)
+	page := parsePagination(c, 50)
+
+	var mentions []models.MessageMention
+	if err := s.db.WithContext(ctx).
+		Where("mentioned_user_id = ?", userID).
+		Preload("Message").
+		Preload("Message.Sender").
+		Preload("Conversation").
+		Order("created_at DESC").
+		Limit(page.Limit).
+		Offset(page.Offset).
+		Find(&mentions).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	return c.JSON(mentions)
+}
+
+func (s *Server) getMessageReactionSummary(ctx context.Context, messageID, currentUserID uint) ([]MessageReactionSummary, error) {
+	var reactions []models.MessageReaction
+	if err := s.db.WithContext(ctx).Where("message_id = ?", messageID).Find(&reactions).Error; err != nil {
+		return nil, err
+	}
+	if len(reactions) == 0 {
+		return []MessageReactionSummary{}, nil
+	}
+
+	type aggregate struct {
+		count int
+		mine  bool
+	}
+	agg := make(map[string]aggregate)
+	for _, reaction := range reactions {
+		entry := agg[reaction.Emoji]
+		entry.count++
+		if reaction.UserID == currentUserID {
+			entry.mine = true
+		}
+		agg[reaction.Emoji] = entry
+	}
+
+	summary := make([]MessageReactionSummary, 0, len(agg))
+	for emoji, entry := range agg {
+		summary = append(summary, MessageReactionSummary{
+			Emoji:       emoji,
+			Count:       entry.count,
+			ReactedByMe: entry.mine,
+		})
+	}
+	sort.Slice(summary, func(i, j int) bool {
+		if summary[i].Count == summary[j].Count {
+			return summary[i].Emoji < summary[j].Emoji
+		}
+		return summary[i].Count > summary[j].Count
+	})
+
+	return summary, nil
+}

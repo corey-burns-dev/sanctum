@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
+	"time"
 
 	"sanctum/internal/models"
 	"sanctum/internal/repository"
@@ -66,6 +68,13 @@ func (s *ChatService) CreateConversation(ctx context.Context, in CreateConversat
 
 	if !in.IsGroup && len(in.ParticipantIDs) == 1 && in.ParticipantIDs[0] != in.UserID && s.db != nil {
 		otherUserID := in.ParticipantIDs[0]
+		blocked, err := s.usersBlocked(ctx, in.UserID, otherUserID)
+		if err != nil {
+			return nil, err
+		}
+		if blocked {
+			return nil, models.NewForbiddenError("Cannot start a conversation with this user")
+		}
 		var existing models.Conversation
 		findErr := s.db.WithContext(ctx).
 			Model(&models.Conversation{}).
@@ -153,6 +162,29 @@ func (s *ChatService) SendMessage(ctx context.Context, in SendMessageInput) (*mo
 	if !isConversationParticipant(conv, in.UserID) {
 		return nil, nil, models.NewUnauthorizedError("You are not a participant in this conversation")
 	}
+	if !conv.IsGroup && len(conv.Participants) == 2 {
+		for _, participant := range conv.Participants {
+			if participant.ID == in.UserID {
+				continue
+			}
+			blocked, berr := s.usersBlocked(ctx, in.UserID, participant.ID)
+			if berr != nil {
+				return nil, nil, berr
+			}
+			if blocked {
+				return nil, nil, models.NewForbiddenError("Messaging is blocked between these users")
+			}
+		}
+	}
+	if conv.IsGroup {
+		muted, merr := s.userMutedInRoom(ctx, conv.ID, in.UserID)
+		if merr != nil {
+			return nil, nil, merr
+		}
+		if muted {
+			return nil, nil, models.NewForbiddenError("You are muted in this room")
+		}
+	}
 
 	message := &models.Message{
 		ConversationID: in.ConversationID,
@@ -180,7 +212,25 @@ func (s *ChatService) GetMessagesForUser(ctx context.Context, convID, userID uin
 	if !isConversationParticipant(conv, userID) {
 		return nil, models.NewUnauthorizedError("You are not a participant in this conversation")
 	}
-	return s.chatRepo.GetMessages(ctx, convID, limit, offset)
+	messages, err := s.chatRepo.GetMessages(ctx, convID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	blockedByUser, berr := s.blockedUserIDs(ctx, userID)
+	if berr != nil {
+		return nil, berr
+	}
+	if len(blockedByUser) == 0 {
+		return messages, nil
+	}
+	filtered := make([]*models.Message, 0, len(messages))
+	for _, message := range messages {
+		if blockedByUser[message.SenderID] {
+			continue
+		}
+		filtered = append(filtered, message)
+	}
+	return filtered, nil
 }
 
 func (s *ChatService) AddParticipant(ctx context.Context, convID, actorUserID, participantUserID uint) error {
@@ -338,4 +388,78 @@ func isConversationParticipant(conv *models.Conversation, userID uint) bool {
 		}
 	}
 	return false
+}
+
+func (s *ChatService) usersBlocked(ctx context.Context, userID, otherUserID uint) (bool, error) {
+	if s.db == nil {
+		return false, nil
+	}
+	var count int64
+	if err := s.db.WithContext(ctx).
+		Model(&models.UserBlock{}).
+		Where(
+			"(blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)",
+			userID, otherUserID, otherUserID, userID,
+		).
+		Count(&count).Error; err != nil {
+		if isSchemaMissingError(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (s *ChatService) userMutedInRoom(ctx context.Context, roomID, userID uint) (bool, error) {
+	if s.db == nil {
+		return false, nil
+	}
+	var mute models.ChatroomMute
+	err := s.db.WithContext(ctx).
+		Where("conversation_id = ? AND user_id = ?", roomID, userID).
+		First(&mute).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		if isSchemaMissingError(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	if mute.MutedUntil == nil {
+		return true, nil
+	}
+	return mute.MutedUntil.After(time.Now().UTC()), nil
+}
+
+func (s *ChatService) blockedUserIDs(ctx context.Context, userID uint) (map[uint]bool, error) {
+	if s.db == nil {
+		return map[uint]bool{}, nil
+	}
+	var blocked []uint
+	if err := s.db.WithContext(ctx).
+		Model(&models.UserBlock{}).
+		Where("blocker_id = ?", userID).
+		Pluck("blocked_id", &blocked).Error; err != nil {
+		if isSchemaMissingError(err) {
+			return map[uint]bool{}, nil
+		}
+		return nil, err
+	}
+	result := make(map[uint]bool, len(blocked))
+	for _, id := range blocked {
+		result[id] = true
+	}
+	return result, nil
+}
+
+func isSchemaMissingError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "no such table") ||
+		strings.Contains(msg, "no such column") ||
+		strings.Contains(msg, "does not exist")
 }

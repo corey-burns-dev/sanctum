@@ -21,6 +21,9 @@ interface ChatWebSocketMessage {
     | 'connected'
     | 'joined'
     | 'read'
+    | 'message_read'
+    | 'message_reaction_updated'
+    | 'chat_mention'
     | 'user_status'
     | 'connected_users'
     | 'participant_joined'
@@ -324,6 +327,7 @@ export function useChatWebSocket({
                 }
                 break
 
+              case 'message_read':
               case 'read':
                 // Invalidate messages to refresh read status
                 queryClient.invalidateQueries({

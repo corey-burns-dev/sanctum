@@ -9,15 +9,19 @@ import (
 
 // User represents a user in the Sanctum application.
 type User struct {
-	ID        uint           `gorm:"primaryKey" json:"id"`
-	Username  string         `gorm:"unique;not null" json:"username"`
-	Email     string         `gorm:"unique;not null" json:"email"`
-	Password  string         `gorm:"not null" json:"-"`
-	Bio       string         `json:"bio"`
-	Avatar    string         `json:"avatar"`
-	IsAdmin   bool           `gorm:"default:false" json:"is_admin"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
-	Posts     []Post         `gorm:"foreignKey:UserID" json:"posts,omitempty"`
+	ID             uint           `gorm:"primaryKey" json:"id"`
+	Username       string         `gorm:"unique;not null" json:"username"`
+	Email          string         `gorm:"unique;not null" json:"email"`
+	Password       string         `gorm:"not null" json:"-"`
+	Bio            string         `json:"bio"`
+	Avatar         string         `json:"avatar"`
+	IsAdmin        bool           `gorm:"default:false" json:"is_admin"`
+	IsBanned       bool           `gorm:"default:false" json:"is_banned"`
+	BannedAt       *time.Time     `json:"banned_at,omitempty"`
+	BannedReason   string         `gorm:"type:text;default:''" json:"banned_reason,omitempty"`
+	BannedByUserID *uint          `json:"banned_by_user_id,omitempty"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
+	Posts          []Post         `gorm:"foreignKey:UserID" json:"posts,omitempty"`
 }

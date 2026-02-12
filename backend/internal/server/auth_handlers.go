@@ -90,6 +90,7 @@ func (s *Server) Signup(c *fiber.Ctx) error {
 	if createErr := s.userRepo.Create(c.Context(), user); createErr != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, createErr)
 	}
+	s.maybeSendWelcomeSignupDM(c.Context(), user.ID)
 
 	// Generate tokens
 	accessToken, err := s.generateAccessToken(user.ID, user.Username)
@@ -154,6 +155,10 @@ func (s *Server) Login(c *fiber.Ctx) error {
 	if user == nil {
 		return models.RespondWithError(c, fiber.StatusUnauthorized,
 			models.NewUnauthorizedError("Invalid credentials"))
+	}
+	if user.IsBanned {
+		return models.RespondWithError(c, fiber.StatusForbidden,
+			models.NewForbiddenError("Account is banned"))
 	}
 
 	// Compare password

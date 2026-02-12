@@ -6,12 +6,18 @@ interface MessageListProps {
   messages: Message[]
   isLoading: boolean
   currentUserId?: number
+  isDirectMessage?: boolean
+  showReadReceipts?: boolean
+  conversationId?: number
 }
 
 export const MessageList = memo(function MessageList({
   messages,
   isLoading,
   currentUserId,
+  isDirectMessage = false,
+  showReadReceipts = false,
+  conversationId,
 }: MessageListProps) {
   if (isLoading) {
     return (
@@ -36,6 +42,10 @@ export const MessageList = memo(function MessageList({
           key={msg.id}
           message={msg}
           isOwnMessage={msg.sender_id === currentUserId}
+          currentUserId={currentUserId}
+          isDirectMessage={isDirectMessage}
+          showReadReceipt={showReadReceipts}
+          conversationId={conversationId}
         />
       ))}
     </div>

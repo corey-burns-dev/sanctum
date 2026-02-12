@@ -82,8 +82,8 @@ export function TopBar() {
   if (currentUser?.is_admin) {
     navItems.push({
       icon: ShieldCheck,
-      label: 'Sanctum Admin',
-      path: '/admin/sanctum-requests',
+      label: 'Admin Console',
+      path: '/admin',
     })
   }
 

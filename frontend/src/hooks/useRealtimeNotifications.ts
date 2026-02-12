@@ -25,6 +25,7 @@ type RealtimeEventType =
   | 'friends_online_snapshot'
   | 'sanctum_request_created'
   | 'sanctum_request_reviewed'
+  | 'chat_mention'
 
 interface RealtimeEvent {
   type?: RealtimeEventType
@@ -333,6 +334,25 @@ export function useRealtimeNotifications(enabled = true) {
                     createdAt: new Date().toISOString(),
                   })
                 }
+                break
+              }
+              case 'chat_mention': {
+                void queryClient.invalidateQueries({
+                  queryKey: ['moderation', 'mentions'],
+                })
+                const preview = asString(payload.preview)
+                const fromUserID = asNumber(payload.from_user_id)
+                addNotification({
+                  title: 'You were mentioned',
+                  description: preview
+                    ? `"${preview.slice(0, 120)}"`
+                    : 'A new mention in chat',
+                  createdAt: new Date().toISOString(),
+                  meta: {
+                    type: 'chat_mention',
+                    userId: fromUserID ?? undefined,
+                  },
+                })
                 break
               }
               case 'friend_request_received': {

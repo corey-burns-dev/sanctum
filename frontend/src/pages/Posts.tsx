@@ -1,9 +1,9 @@
 // API
 
-import { apiClient } from '@/api/client'
 import { useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
 import {
+  Flag,
   Heart,
   Image,
   Link2,
@@ -15,8 +15,9 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { apiClient } from '@/api/client'
 // Types
-import type { Post, PostType } from '@/api/types'
+import type { Post, PostType, UpdatePostRequest } from '@/api/types'
 import { LinkCard } from '@/components/posts/LinkCard'
 import { PollBlock } from '@/components/posts/PollBlock'
 import { PostCaption } from '@/components/posts/PostCaption'
@@ -27,18 +28,24 @@ import { YouTubeEmbed } from '@/components/posts/YouTubeEmbed'
 import { UserMenu } from '@/components/UserMenu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogFooter,
-  DialogTitle,
   DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui/dialog'
-import { Card, CardContent } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
+import { useReportPost } from '@/hooks/useModeration'
 // Hooks
-import { useCreatePost, useDeletePost, useInfinitePosts, useLikePost } from '@/hooks/usePosts'
+import {
+  useCreatePost,
+  useDeletePost,
+  useInfinitePosts,
+  useLikePost,
+} from '@/hooks/usePosts'
 import { getCurrentUser, useIsAuthenticated } from '@/hooks/useUsers'
 import { getAvatarUrl } from '@/lib/chat-utils'
 import { handleAuthOrFKError } from '@/lib/handleAuthOrFKError'
@@ -53,6 +60,21 @@ const POST_TYPES: { type: PostType; label: string; icon: typeof Type }[] = [
   { type: 'poll', label: 'Poll', icon: MessageCircle },
 ]
 
+type PollOptionDraft = {
+  id: string
+  value: string
+}
+
+let pollOptionSeed = 0
+
+function createPollOption(value = ''): PollOptionDraft {
+  pollOptionSeed += 1
+  return {
+    id: `poll-option-${pollOptionSeed}`,
+    value,
+  }
+}
+
 export default function Posts() {
   const [newPostType, setNewPostType] = useState<PostType>('text')
   const [newPostTitle, setNewPostTitle] = useState('')
@@ -62,7 +84,10 @@ export default function Posts() {
   const [newPostLinkUrl, setNewPostLinkUrl] = useState('')
   const [newPostYoutubeUrl, setNewPostYoutubeUrl] = useState('')
   const [newPollQuestion, setNewPollQuestion] = useState('')
-  const [newPollOptions, setNewPollOptions] = useState<string[]>(['', ''])
+  const [newPollOptions, setNewPollOptions] = useState<PollOptionDraft[]>([
+    createPollOption(),
+    createPollOption(),
+  ])
   const [isExpandingPost, setIsExpandingPost] = useState(false)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
 
@@ -73,6 +98,7 @@ export default function Posts() {
     useInfinitePosts(10)
   const createPostMutation = useCreatePost()
   const likePostMutation = useLikePost()
+  const reportPostMutation = useReportPost()
   const deletePostMutation = useDeletePost()
   const [deletingPostId, setDeletingPostId] = useState<number | null>(null)
   const [editingPostId, setEditingPostId] = useState<number | null>(null)
@@ -136,7 +162,7 @@ export default function Posts() {
       case 'poll':
         return (
           Boolean(newPollQuestion.trim()) &&
-          newPollOptions.filter(o => o.trim()).length >= 2
+          newPollOptions.filter(option => option.value.trim()).length >= 2
         )
       default:
         return Boolean(newPostContent.trim())
@@ -186,7 +212,9 @@ export default function Posts() {
         newPostType === 'poll'
           ? {
               question: newPollQuestion.trim(),
-              options: newPollOptions.filter(o => o.trim()),
+              options: newPollOptions
+                .map(option => option.value.trim())
+                .filter(Boolean),
             }
           : undefined,
     }
@@ -200,7 +228,7 @@ export default function Posts() {
       setNewPostLinkUrl('')
       setNewPostYoutubeUrl('')
       setNewPollQuestion('')
-      setNewPollOptions(['', ''])
+      setNewPollOptions([createPollOption(), createPollOption()])
       setIsExpandingPost(false)
       queryClient.invalidateQueries({ queryKey: ['posts'] })
     } catch (error) {
@@ -226,12 +254,6 @@ export default function Posts() {
     })
   }
 
-  const startEditPost = (post: Post) => {
-    setEditingPostId(post.id)
-    setEditingPostTitle(post.title ?? '')
-    setEditingPostContent(post.content ?? '')
-  }
-
   const cancelEditPost = () => {
     setEditingPostId(null)
     setEditingPostTitle('')
@@ -241,7 +263,7 @@ export default function Posts() {
   const saveEditPost = async (postId: number) => {
     if (!editingPostContent.trim()) return
     try {
-      const updatePayload: any = {
+      const updatePayload: UpdatePostRequest = {
         content: editingPostContent,
       }
       if (editingPostTitle.trim()) updatePayload.title = editingPostTitle
@@ -299,7 +321,9 @@ export default function Posts() {
                           <Button
                             key={type}
                             type='button'
-                            variant={newPostType === type ? 'secondary' : 'ghost'}
+                            variant={
+                              newPostType === type ? 'secondary' : 'ghost'
+                            }
                             size='sm'
                             className='gap-1.5'
                             onClick={() => setNewPostType(type)}
@@ -344,9 +368,7 @@ export default function Posts() {
                             accept='image/jpeg,image/png,image/gif,image/webp'
                             onChange={e =>
                               setNewPostImageFile(
-                                e.target.files && e.target.files[0]
-                                  ? e.target.files[0]
-                                  : null
+                                e.target.files?.[0] ? e.target.files[0] : null
                               )
                             }
                             className='w-full text-sm bg-muted/30 px-4 py-2 rounded-xl focus:outline-none file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium'
@@ -367,9 +389,7 @@ export default function Posts() {
                             type='url'
                             placeholder='YouTube URL (required)...'
                             value={newPostYoutubeUrl}
-                            onChange={e =>
-                              setNewPostYoutubeUrl(e.target.value)
-                            }
+                            onChange={e => setNewPostYoutubeUrl(e.target.value)}
                             className='w-full text-sm bg-muted/30 px-4 py-2 rounded-xl focus:outline-none placeholder:text-muted-foreground/40'
                           />
                           <Textarea
@@ -407,24 +427,25 @@ export default function Posts() {
                             type='text'
                             placeholder='Poll question (required)...'
                             value={newPollQuestion}
-                            onChange={e =>
-                              setNewPollQuestion(e.target.value)
-                            }
+                            onChange={e => setNewPollQuestion(e.target.value)}
                             className='w-full text-sm font-medium bg-muted/30 px-4 py-2 rounded-xl focus:outline-none placeholder:text-muted-foreground/40'
                           />
                           <div className='space-y-1.5'>
                             {newPollOptions.map((opt, i) => (
                               <div
-                                key={i}
+                                key={opt.id}
                                 className='flex gap-2 items-center'
                               >
                                 <input
                                   type='text'
                                   placeholder={`Option ${i + 1}`}
-                                  value={opt}
+                                  value={opt.value}
                                   onChange={e => {
                                     const next = [...newPollOptions]
-                                    next[i] = e.target.value
+                                    next[i] = {
+                                      ...next[i],
+                                      value: e.target.value,
+                                    }
                                     setNewPollOptions(next)
                                   }}
                                   className='flex-1 text-sm bg-muted/30 px-4 py-2 rounded-xl focus:outline-none placeholder:text-muted-foreground/40'
@@ -438,7 +459,7 @@ export default function Posts() {
                                     if (newPollOptions.length > 2) {
                                       setNewPollOptions(
                                         newPollOptions.filter(
-                                          (_, j) => j !== i
+                                          option => option.id !== opt.id
                                         )
                                       )
                                     }
@@ -456,7 +477,7 @@ export default function Posts() {
                               onClick={() =>
                                 setNewPollOptions([
                                   ...newPollOptions,
-                                  '',
+                                  createPollOption(),
                                 ])
                               }
                             >
@@ -567,6 +588,30 @@ export default function Posts() {
                     </UserMenu>
                   )}
                 </div>
+                {currentUser && currentUser.id !== post.user_id && (
+                  <Button
+                    size='sm'
+                    variant='ghost'
+                    className='h-8 w-8 p-0 text-muted-foreground hover:text-destructive'
+                    onClick={event => {
+                      event.stopPropagation()
+                      const reason = window
+                        .prompt('Reason for reporting this post?')
+                        ?.trim()
+                      if (!reason) return
+                      const details = window
+                        .prompt('Additional details (optional)')
+                        ?.trim()
+                      reportPostMutation.mutate({
+                        postId: post.id,
+                        payload: { reason, details },
+                      })
+                    }}
+                    title='Report post'
+                  >
+                    <Flag className='h-4 w-4' />
+                  </Button>
+                )}
                 {currentUser && currentUser.id === post.user_id && (
                   <div className='flex gap-2 relative'>
                     <Button
@@ -575,7 +620,9 @@ export default function Posts() {
                       className='h-8 w-8 p-0'
                       onClick={event => {
                         event.stopPropagation()
-                        setOpenMenuPostId(prev => (prev === post.id ? null : post.id))
+                        setOpenMenuPostId(prev =>
+                          prev === post.id ? null : post.id
+                        )
                       }}
                       aria-expanded={openMenuPostId === post.id}
                       aria-haspopup='menu'
@@ -604,8 +651,10 @@ export default function Posts() {
                         role='menu'
                         className='absolute right-0 top-9 z-20 w-36 bg-card border border-border rounded-md shadow-lg'
                         onClick={e => e.stopPropagation()}
+                        onKeyDown={e => e.stopPropagation()}
                       >
                         <button
+                          type='button'
                           role='menuitem'
                           className='w-full text-left px-3 py-2 hover:bg-muted'
                           onClick={() => {
@@ -616,6 +665,7 @@ export default function Posts() {
                           Edit
                         </button>
                         <button
+                          type='button'
                           role='menuitem'
                           className='w-full text-left px-3 py-2 text-destructive hover:bg-muted'
                           onClick={() => {
@@ -657,10 +707,7 @@ export default function Posts() {
                       >
                         Cancel
                       </Button>
-                      <Button
-                        size='sm'
-                        onClick={() => saveEditPost(post.id)}
-                      >
+                      <Button size='sm' onClick={() => saveEditPost(post.id)}>
                         Save
                       </Button>
                     </div>
@@ -676,10 +723,7 @@ export default function Posts() {
                   </div>
                 ) : post.link_url ? (
                   <div className='space-y-2'>
-                    <LinkCard
-                      url={post.link_url}
-                      title={post.title}
-                    />
+                    <LinkCard url={post.link_url} title={post.title} />
                     {post.content ? (
                       <div className='p-4 bg-muted/30 rounded-xl border border-border/60'>
                         <PostCaption content={post.content} />
@@ -707,14 +751,13 @@ export default function Posts() {
                       cropMode={post.image_crop_mode}
                       loading='lazy'
                     />
-                    {post.content ? <PostCaption content={post.content} /> : null}
+                    {post.content ? (
+                      <PostCaption content={post.content} />
+                    ) : null}
                   </div>
                 ) : (
                   <div className='p-4 bg-muted/30 rounded-xl border border-border/60'>
-                    <PostCaption
-                      title={post.title}
-                      content={post.content}
-                    />
+                    <PostCaption title={post.title} content={post.content} />
                   </div>
                 )}
               </div>
@@ -806,16 +849,24 @@ export default function Posts() {
           ))}
 
           {/* Delete confirmation dialog */}
-          <Dialog open={!!deletingPostId} onOpenChange={open => { if (!open) setDeletingPostId(null) }}>
+          <Dialog
+            open={!!deletingPostId}
+            onOpenChange={open => {
+              if (!open) setDeletingPostId(null)
+            }}
+          >
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Delete post?</DialogTitle>
                 <DialogDescription>
-                  This action cannot be undone. Are you sure you want to delete this post?
+                  This action cannot be undone. Are you sure you want to delete
+                  this post?
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button variant='ghost' onClick={() => setDeletingPostId(null)}>Cancel</Button>
+                <Button variant='ghost' onClick={() => setDeletingPostId(null)}>
+                  Cancel
+                </Button>
                 <Button
                   className='text-destructive'
                   onClick={async () => {

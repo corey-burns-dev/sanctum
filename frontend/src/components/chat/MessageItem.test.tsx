@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { MessageItem } from '@/components/chat/MessageItem'
-import { buildMessage, buildUser } from '@/test/test-utils'
+import { buildMessage, buildUser, render } from '@/test/test-utils'
 
 vi.mock('@/components/UserMenu', () => ({
   UserMenu: ({
