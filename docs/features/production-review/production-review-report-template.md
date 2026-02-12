@@ -482,7 +482,7 @@ if err := server.Start(); err != nil {
 
 ### D. References
 
-- Production Readiness Checklist: `docs/production_ready_at_scale_checklist.md`
+- Production Readiness Checklist: `docs/operations/production-readiness.md`
 - Previous Review: `docs/reports/2026-01-31-deployment-readiness.md`
 - API Documentation: `backend/docs/swagger.json`
 

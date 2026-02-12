@@ -233,7 +233,7 @@
 
 ### [MEDIUM] TODOs in documentation indicate incomplete features
 
-- `docs/API-ARCHITECTURE.md`: 5 outstanding TODOs.
+- `docs/architecture/api-architecture.md`: 5 outstanding TODOs.
 
 ### [LOW] No rate limiting on WebSocket messages
 

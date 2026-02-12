@@ -69,17 +69,17 @@
 
 ## E2E (Playwright)
 
-- User submits Sanctum request and sees it in My Requests
-  - `frontend/tests/e2e/sanctum-user-request.spec.ts` (`@smoke`)
-- Admin approves request and sanctum appears in list/detail
-  - `frontend/tests/e2e/sanctum-admin-approve.spec.ts` (`@smoke`)
-- Open Chat button navigates using `default_chat_room_id`
-  - `frontend/tests/e2e/sanctum-open-chat.spec.ts`
-- Non-admin access control for admin page/approve endpoint
-  - `frontend/tests/e2e/sanctum-access-control.spec.ts`
-- Auth flows (signup, login)
-  - `frontend/tests/e2e/auth-flows.spec.ts`
-- Friends page
-  - `frontend/tests/e2e/friends-workflow.spec.ts`
-- Navigation (sanctums, posts)
-  - `frontend/tests/e2e/navigation.spec.ts`
+ - User submits Sanctum request and sees it in My Requests
+  - `frontend/test/tests/e2e/sanctum-user-request.spec.ts` (`@smoke`)
+ - Admin approves request and sanctum appears in list/detail
+  - `frontend/test/tests/e2e/sanctum-admin-approve.spec.ts` (`@smoke`)
+ - Open Chat button navigates using `default_chat_room_id`
+  - `frontend/test/tests/e2e/sanctum-open-chat.spec.ts`
+ - Non-admin access control for admin page/approve endpoint
+  - `frontend/test/tests/e2e/sanctum-access-control.spec.ts`
+ - Auth flows (signup, login)
+  - `frontend/test/tests/e2e/auth-flows.spec.ts`
+ - Friends page
+  - `frontend/test/tests/e2e/friends-workflow.spec.ts`
+ - Navigation (sanctums, posts)
+  - `frontend/test/tests/e2e/navigation.spec.ts`

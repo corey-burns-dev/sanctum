@@ -352,7 +352,7 @@ Issues that:
 
 ### Documentation
 
-- `docs/production_ready_at_scale_checklist.md` - Production checklist
+- `docs/operations/production-readiness.md` - Production checklist
 - `docs/reports/2026-01-31-deployment-readiness.md` - Previous audit
 
 ## Success Criteria

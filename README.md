@@ -104,10 +104,10 @@ Sanctum is a Reddit-style social platform focused on creativity, hobbies, and sh
 - `make admin-demote user_id=<id>` — Demote an admin user
 - `make admin-bootstrap-me email=<email>` — Make exactly one admin (you)
 
-Admin guide: `docs/ADMIN_ROLE.md`
+Admin guide: `docs/features/admin-role.md`
 
-Signup Sanctum onboarding TODO and backend endpoint contract:
-`docs/ONBOARDING_SANCTUMS_TODO.md`
+Signup onboarding flow and backend endpoint contract:
+`docs/features/onboarding-flow.md`
 
 ## Project Structure
 
