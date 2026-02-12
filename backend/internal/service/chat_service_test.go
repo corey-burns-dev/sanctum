@@ -67,7 +67,7 @@ func noopChatRepo() *chatRepoStub {
 }
 
 func TestChatService_CreateConversation_Validation(t *testing.T) {
-	svc := NewChatService(noopChatRepo(), noopUserRepo(), nil, nil)
+	svc := NewChatService(noopChatRepo(), noopUserRepo(), nil, nil, nil)
 
 	t.Run("Group without name", func(t *testing.T) {
 		_, err := svc.CreateConversation(context.Background(), CreateConversationInput{
@@ -97,7 +97,7 @@ func TestChatService_SendMessage_Unauthorized(t *testing.T) {
 		}, nil
 	}
 
-	svc := NewChatService(repo, noopUserRepo(), nil, nil)
+	svc := NewChatService(repo, noopUserRepo(), nil, nil, nil)
 
 	_, _, err := svc.SendMessage(context.Background(), SendMessageInput{
 		UserID:         1,
@@ -115,7 +115,7 @@ func TestChatService_FullFlow(t *testing.T) {
 
 	repo := repository.NewChatRepository(db)
 	userRepo := repository.NewUserRepository(db)
-	svc := NewChatService(repo, userRepo, db, nil)
+	svc := NewChatService(repo, userRepo, db, nil, nil)
 
 	ctx := context.Background()
 	u1 := &models.User{Username: "u1", Email: "u1@e.com"}
@@ -193,7 +193,7 @@ func TestChatService_Chatrooms(t *testing.T) {
 
 	repo := repository.NewChatRepository(db)
 	userRepo := repository.NewUserRepository(db)
-	svc := NewChatService(repo, userRepo, db, nil)
+	svc := NewChatService(repo, userRepo, db, nil, nil)
 
 	ctx := context.Background()
 	u1 := &models.User{Username: "u1", Email: "u1@e.com"}
@@ -232,7 +232,7 @@ func TestChatService_RemoveParticipant_Authorization(t *testing.T) {
 		return false, nil
 	}
 
-	svc := NewChatService(repo, noopUserRepo(), db, isAdmin)
+	svc := NewChatService(repo, noopUserRepo(), db, isAdmin, nil)
 
 	// User 1 tries to remove user 3 from room created by user 2
 	_, err := svc.RemoveParticipant(context.Background(), 1, 1, 3)
@@ -243,7 +243,7 @@ func TestChatService_RemoveParticipant_Authorization(t *testing.T) {
 	isAdminAdmin := func(ctx context.Context, userID uint) (bool, error) {
 		return true, nil
 	}
-	svcAdmin := NewChatService(repo, noopUserRepo(), db, isAdminAdmin)
+	svcAdmin := NewChatService(repo, noopUserRepo(), db, isAdminAdmin, nil)
 	_, err = svcAdmin.RemoveParticipant(context.Background(), 1, 1, 3)
 	assert.NoError(t, err)
 }

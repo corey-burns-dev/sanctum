@@ -21,6 +21,8 @@ const chatKeys = {
   chatrooms: () => [...chatKeys.all, 'chatrooms'] as const,
   chatroomsAll: () => [...chatKeys.chatrooms(), 'all'] as const,
   chatroomsJoined: () => [...chatKeys.chatrooms(), 'joined'] as const,
+  chatroomModerators: (chatroomId: number) =>
+    [...chatKeys.chatrooms(), 'moderators', chatroomId] as const,
 }
 
 // ===== Conversations =====
@@ -60,6 +62,48 @@ export function useJoinChatroom() {
       queryClient.invalidateQueries({
         queryKey: chatKeys.conversation(chatroomId),
       })
+    },
+    onError: error => {
+      handleAuthOrFKError(error)
+    },
+  })
+}
+
+export function useChatroomModerators(chatroomId: number) {
+  return useQuery({
+    queryKey: chatKeys.chatroomModerators(chatroomId),
+    queryFn: () => apiClient.getChatroomModerators(chatroomId),
+    enabled: chatroomId > 0,
+  })
+}
+
+export function useAddChatroomModerator(chatroomId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (userId: number) =>
+      apiClient.addChatroomModerator(chatroomId, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.chatroomModerators(chatroomId),
+      })
+      queryClient.invalidateQueries({ queryKey: chatKeys.chatrooms() })
+    },
+    onError: error => {
+      handleAuthOrFKError(error)
+    },
+  })
+}
+
+export function useRemoveChatroomModerator(chatroomId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (userId: number) =>
+      apiClient.removeChatroomModerator(chatroomId, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.chatroomModerators(chatroomId),
+      })
+      queryClient.invalidateQueries({ queryKey: chatKeys.chatrooms() })
     },
     onError: error => {
       handleAuthOrFKError(error)

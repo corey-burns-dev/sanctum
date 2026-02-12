@@ -18,6 +18,7 @@ export const sanctumKeys = {
   myMemberships: () => [...sanctumKeys.memberships(), 'me'] as const,
   adminRequests: (status: AdminSanctumRequestStatus) =>
     [...sanctumKeys.requests(), 'admin', status] as const,
+  admins: (slug: string) => [...sanctumKeys.all, 'admins', slug] as const,
 }
 
 export function useSanctums() {
@@ -54,10 +55,11 @@ export function useMySanctumRequests() {
   })
 }
 
-export function useMySanctumMemberships() {
+export function useMySanctumMemberships(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: sanctumKeys.myMemberships(),
     queryFn: () => apiClient.getMySanctumMemberships(),
+    enabled: options?.enabled ?? true,
   })
 }
 
@@ -120,6 +122,39 @@ export function useRejectSanctumRequest() {
       apiClient.rejectSanctumRequest(id, review_notes),
     onSuccess: request => {
       invalidateAdminRequestCaches(queryClient, request)
+    },
+  })
+}
+
+export function useSanctumAdmins(
+  slug: string,
+  options?: { enabled?: boolean }
+) {
+  return useQuery({
+    queryKey: sanctumKeys.admins(slug),
+    queryFn: () => apiClient.getSanctumAdmins(slug),
+    enabled: (options?.enabled ?? true) && Boolean(slug),
+  })
+}
+
+export function usePromoteSanctumAdmin(slug: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (userId: number) => apiClient.promoteSanctumAdmin(slug, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: sanctumKeys.admins(slug) })
+    },
+  })
+}
+
+export function useDemoteSanctumAdmin(slug: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (userId: number) => apiClient.demoteSanctumAdmin(slug, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: sanctumKeys.admins(slug) })
     },
   })
 }

@@ -110,6 +110,8 @@ Sanctum is a Reddit-style social platform focused on creativity, hobbies, and sh
 - `make admin-bootstrap-me email=<email>` — Make exactly one admin (you)
 
 Admin guide: `docs/features/admin-role.md`
+Hierarchical moderation implementation: `docs/features/hierarchical-moderation-implementation.md`
+Hierarchical moderation usage guide: `docs/guides/hierarchical-moderation-guide.md`
 
 Signup onboarding flow and backend endpoint contract:
 `docs/features/onboarding-flow.md`

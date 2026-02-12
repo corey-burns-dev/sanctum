@@ -1,16 +1,42 @@
+import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { SanctumNav } from '@/components/SanctumNav'
 import { Button } from '@/components/ui/button'
-import { useSanctum, useSanctums } from '@/hooks/useSanctums'
+import { Input } from '@/components/ui/input'
+import { getCurrentUser } from '@/hooks'
+import {
+  useDemoteSanctumAdmin,
+  useMySanctumMemberships,
+  usePromoteSanctumAdmin,
+  useSanctum,
+  useSanctumAdmins,
+  useSanctums,
+} from '@/hooks/useSanctums'
 import { buildSanctumSections } from '@/lib/sanctums'
 
 export default function SanctumDetail() {
   const navigate = useNavigate()
   const { slug = '' } = useParams<{ slug: string }>()
+  const [targetUserId, setTargetUserId] = useState('')
   const sanctumsQuery = useSanctums()
   const sanctumQuery = useSanctum(slug)
+  const currentUser = getCurrentUser()
+  const myMembershipsQuery = useMySanctumMemberships({
+    enabled: Boolean(currentUser),
+  })
+  const isSanctumOwner = (myMembershipsQuery.data ?? []).some(
+    membership =>
+      membership.sanctum.slug === slug && membership.role === 'owner'
+  )
+  const canManageAdmins = Boolean(currentUser?.is_admin || isSanctumOwner)
+  const sanctumAdminsQuery = useSanctumAdmins(slug, {
+    enabled: canManageAdmins,
+  })
+  const promoteSanctumAdmin = usePromoteSanctumAdmin(slug)
+  const demoteSanctumAdmin = useDemoteSanctumAdmin(slug)
 
   const sections = buildSanctumSections(sanctumsQuery.data ?? [])
+  const admins = sanctumAdminsQuery.data ?? []
 
   return (
     <div className='mx-auto grid max-w-6xl gap-4 px-4 py-6 lg:grid-cols-[18rem_1fr] lg:py-8'>
@@ -61,6 +87,69 @@ export default function SanctumDetail() {
                 Room ID: {sanctumQuery.data.default_chat_room_id}
               </p>
             </div>
+
+            {canManageAdmins ? (
+              <section className='mt-5 rounded-xl border border-border/60 bg-background/50 p-4'>
+                <h2 className='font-semibold'>Sanctum Admins</h2>
+                <p className='mt-1 text-sm text-muted-foreground'>
+                  Manage sanctum-level admins. Role label: "Sanctum Admin" maps
+                  to backend role `mod`.
+                </p>
+
+                <div className='mt-3 flex gap-2'>
+                  <Input
+                    placeholder='User ID'
+                    value={targetUserId}
+                    onChange={e => setTargetUserId(e.target.value)}
+                  />
+                  <Button
+                    disabled={promoteSanctumAdmin.isPending || !targetUserId}
+                    onClick={() => {
+                      const parsed = Number.parseInt(targetUserId, 10)
+                      if (!Number.isFinite(parsed) || parsed <= 0) return
+                      promoteSanctumAdmin.mutate(parsed)
+                    }}
+                  >
+                    Promote to Sanctum Admin
+                  </Button>
+                </div>
+
+                <div className='mt-4 space-y-2'>
+                  {admins.map(admin => (
+                    <div
+                      key={admin.user_id}
+                      className='flex items-center justify-between rounded-md border border-border/60 px-3 py-2'
+                    >
+                      <div>
+                        <p className='text-sm font-medium'>
+                          {admin.username} (#{admin.user_id})
+                        </p>
+                        <p className='text-xs text-muted-foreground'>
+                          {admin.email} ·{' '}
+                          {admin.role === 'mod' ? 'Sanctum Admin' : 'Owner'}
+                        </p>
+                      </div>
+                      {admin.role === 'mod' ? (
+                        <Button
+                          variant='outline'
+                          onClick={() =>
+                            demoteSanctumAdmin.mutate(admin.user_id)
+                          }
+                        >
+                          Demote
+                        </Button>
+                      ) : null}
+                    </div>
+                  ))}
+                  {sanctumAdminsQuery.isError ? (
+                    <p className='text-xs text-destructive'>
+                      Failed to load sanctum admins:{' '}
+                      {String(sanctumAdminsQuery.error)}
+                    </p>
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
           </>
         )}
       </main>

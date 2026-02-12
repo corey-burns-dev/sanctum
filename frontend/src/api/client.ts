@@ -4,6 +4,7 @@ import type {
   AdminSanctumRequestStatus,
   AuthResponse,
   BulkSanctumMembershipsInput,
+  ChatroomModerator,
   Comment,
   Conversation,
   CreateCommentRequest,
@@ -17,6 +18,7 @@ import type {
   Message,
   PaginationParams,
   Post,
+  SanctumAdmin,
   SanctumDTO,
   SanctumMembership,
   SanctumRequest,
@@ -476,6 +478,30 @@ class ApiClient {
     })
   }
 
+  async getChatroomModerators(
+    chatroomId: number
+  ): Promise<ChatroomModerator[]> {
+    return this.request(`/chatrooms/${chatroomId}/moderators`)
+  }
+
+  async addChatroomModerator(
+    chatroomId: number,
+    userId: number
+  ): Promise<ChatroomModerator> {
+    return this.request(`/chatrooms/${chatroomId}/moderators/${userId}`, {
+      method: 'POST',
+    })
+  }
+
+  async removeChatroomModerator(
+    chatroomId: number,
+    userId: number
+  ): Promise<{ message: string }> {
+    return this.request(`/chatrooms/${chatroomId}/moderators/${userId}`, {
+      method: 'DELETE',
+    })
+  }
+
   // Sanctums
   async getSanctums(): Promise<SanctumDTO[]> {
     return this.request('/sanctums')
@@ -534,6 +560,28 @@ class ApiClient {
     return this.request(`/admin/sanctum-requests/${id}/reject`, {
       method: 'POST',
       body: JSON.stringify({ review_notes }),
+    })
+  }
+
+  async getSanctumAdmins(slug: string): Promise<SanctumAdmin[]> {
+    return this.request(`/sanctums/${slug}/admins`)
+  }
+
+  async promoteSanctumAdmin(
+    slug: string,
+    userId: number
+  ): Promise<SanctumAdmin> {
+    return this.request(`/sanctums/${slug}/admins/${userId}`, {
+      method: 'POST',
+    })
+  }
+
+  async demoteSanctumAdmin(
+    slug: string,
+    userId: number
+  ): Promise<SanctumAdmin> {
+    return this.request(`/sanctums/${slug}/admins/${userId}`, {
+      method: 'DELETE',
     })
   }
 

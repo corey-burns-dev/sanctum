@@ -4,6 +4,7 @@ package server
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"sanctum/internal/models"
@@ -120,6 +121,10 @@ func (s *Server) DemoteFromAdmin(c *fiber.Ctx) error {
 	targetID, err := s.parseID(c, "id")
 	if err != nil {
 		return nil
+	}
+	if strings.EqualFold(s.config.Env, "development") && targetID == 1 {
+		return models.RespondWithError(c, fiber.StatusBadRequest,
+			models.NewValidationError("cannot demote protected development root admin user"))
 	}
 
 	target, err := s.userSvc().SetAdmin(ctx, targetID, false)

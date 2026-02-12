@@ -3,6 +3,12 @@
 This project supports an admin role (`users.is_admin`) for privileged moderation
 and operational actions.
 
+> Hierarchical moderation has been added.
+> 
+> Use these docs for the current model:
+> - Implementation reference: `docs/features/hierarchical-moderation-implementation.md`
+> - Usage guide: `docs/guides/hierarchical-moderation-guide.md`
+
 ## What admins can do
 
 - Review Sanctum requests at `/admin/sanctum-requests`

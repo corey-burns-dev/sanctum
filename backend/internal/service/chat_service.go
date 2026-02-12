@@ -13,10 +13,11 @@ import (
 )
 
 type ChatService struct {
-	chatRepo repository.ChatRepository
-	userRepo repository.UserRepository
-	db       *gorm.DB
-	isAdmin  func(ctx context.Context, userID uint) (bool, error)
+	chatRepo            repository.ChatRepository
+	userRepo            repository.UserRepository
+	db                  *gorm.DB
+	isAdmin             func(ctx context.Context, userID uint) (bool, error)
+	canModerateChatroom func(ctx context.Context, userID, roomID uint) (bool, error)
 }
 
 type CreateConversationInput struct {
@@ -39,12 +40,14 @@ func NewChatService(
 	userRepo repository.UserRepository,
 	db *gorm.DB,
 	isAdmin func(ctx context.Context, userID uint) (bool, error),
+	canModerateChatroom func(ctx context.Context, userID, roomID uint) (bool, error),
 ) *ChatService {
 	return &ChatService{
-		chatRepo: chatRepo,
-		userRepo: userRepo,
-		db:       db,
-		isAdmin:  isAdmin,
+		chatRepo:            chatRepo,
+		userRepo:            userRepo,
+		db:                  db,
+		isAdmin:             isAdmin,
+		canModerateChatroom: canModerateChatroom,
 	}
 }
 
@@ -291,17 +294,27 @@ func (s *ChatService) RemoveParticipant(ctx context.Context, roomID, actorUserID
 		return "", err
 	}
 
-	admin := false
-	if s.isAdmin != nil {
+	authorized := false
+	if s.canModerateChatroom != nil {
 		var err error
-		admin, err = s.isAdmin(ctx, actorUserID)
+		authorized, err = s.canModerateChatroom(ctx, actorUserID, roomID)
 		if err != nil {
 			return "", err
 		}
+	} else {
+		admin := false
+		if s.isAdmin != nil {
+			var err error
+			admin, err = s.isAdmin(ctx, actorUserID)
+			if err != nil {
+				return "", err
+			}
+		}
+		authorized = admin || conv.CreatedBy == actorUserID
 	}
 
-	if !admin && conv.CreatedBy != actorUserID {
-		return "", models.NewUnauthorizedError("Only admins or room creator can remove participants")
+	if !authorized {
+		return "", models.NewUnauthorizedError("You do not have permission to moderate this chatroom")
 	}
 
 	if err := s.db.WithContext(ctx).

@@ -35,6 +35,11 @@ type Config struct {
 	TURNURL                       string `mapstructure:"TURN_URL"`
 	TURNUsername                  string `mapstructure:"TURN_USERNAME"`
 	TURNPassword                  string `mapstructure:"TURN_PASSWORD"`
+	DevBootstrapRoot              bool   `mapstructure:"DEV_BOOTSTRAP_ROOT"`
+	DevRootUsername               string `mapstructure:"DEV_ROOT_USERNAME"`
+	DevRootEmail                  string `mapstructure:"DEV_ROOT_EMAIL"`
+	DevRootPassword               string `mapstructure:"DEV_ROOT_PASSWORD"`
+	DevRootForceCredentials       bool   `mapstructure:"DEV_ROOT_FORCE_CREDENTIALS"`
 }
 
 // LoadConfig loads application configuration from file and environment variables.
@@ -84,6 +89,11 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("DB_AUTOMIGRATE_ALLOW_DESTRUCTIVE", false)
 	viper.SetDefault("IMAGE_UPLOAD_DIR", "/tmp/sanctum/uploads/images")
 	viper.SetDefault("IMAGE_MAX_UPLOAD_SIZE_MB", 10)
+	viper.SetDefault("DEV_BOOTSTRAP_ROOT", true)
+	viper.SetDefault("DEV_ROOT_USERNAME", "sanctum_root")
+	viper.SetDefault("DEV_ROOT_EMAIL", "root@sanctum.local")
+	viper.SetDefault("DEV_ROOT_PASSWORD", "DevRoot123!")
+	viper.SetDefault("DEV_ROOT_FORCE_CREDENTIALS", true)
 
 	var config Config
 	if err := viper.Unmarshal(&config); err != nil {

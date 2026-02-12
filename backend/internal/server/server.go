@@ -115,7 +115,13 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	server.postService = service.NewPostService(server.postRepo, server.pollRepo, server.isAdminByUserID)
 	server.imageService = service.NewImageService(server.imageRepo, cfg)
 	server.commentService = service.NewCommentService(server.commentRepo, server.postRepo, server.isAdminByUserID)
-	server.chatService = service.NewChatService(server.chatRepo, server.userRepo, server.db, server.isAdminByUserID)
+	server.chatService = service.NewChatService(
+		server.chatRepo,
+		server.userRepo,
+		server.db,
+		server.isAdminByUserID,
+		server.canModerateChatroomByUserID,
+	)
 	server.userService = service.NewUserService(server.userRepo)
 	// NOTE: built-in sanctum seeding is intentionally NOT performed here.
 	// Seeding should be explicit during runtime bootstrap (cmd) or test setup.
@@ -168,7 +174,13 @@ func NewServerWithDeps(cfg *config.Config, db *gorm.DB, redisClient *redis.Clien
 	server.postService = service.NewPostService(server.postRepo, server.pollRepo, server.isAdminByUserID)
 	server.imageService = service.NewImageService(server.imageRepo, cfg)
 	server.commentService = service.NewCommentService(server.commentRepo, server.postRepo, server.isAdminByUserID)
-	server.chatService = service.NewChatService(server.chatRepo, server.userRepo, server.db, server.isAdminByUserID)
+	server.chatService = service.NewChatService(
+		server.chatRepo,
+		server.userRepo,
+		server.db,
+		server.isAdminByUserID,
+		server.canModerateChatroomByUserID,
+	)
 	server.userService = service.NewUserService(server.userRepo)
 
 	// Initialize notifier and hub if Redis is available
@@ -297,6 +309,10 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	sanctumRequests := protected.Group("/sanctums/requests")
 	sanctumRequests.Post("/", s.CreateSanctumRequest)
 	sanctumRequests.Get("/me", s.GetMySanctumRequests)
+	sanctumAdmins := protected.Group("/sanctums/:slug/admins")
+	sanctumAdmins.Get("/", s.GetSanctumAdmins)
+	sanctumAdmins.Post("/:userId", s.PromoteSanctumAdmin)
+	sanctumAdmins.Delete("/:userId", s.DemoteSanctumAdmin)
 	sanctumMemberships := protected.Group("/sanctums/memberships")
 	sanctumMemberships.Get("/me", s.GetMySanctumMemberships)
 	sanctumMemberships.Post("/bulk", s.UpsertMySanctumMemberships)
@@ -368,6 +384,9 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	chatrooms.Get("/joined", s.GetJoinedChatrooms)                            // Get rooms user has joined
 	chatrooms.Post("/:id/join", s.JoinChatroom)                               // Join a chatroom
 	chatrooms.Delete("/:id/participants/:participantId", s.RemoveParticipant) // Remove participant (admin/creator only)
+	chatrooms.Get("/:id/moderators", s.GetChatroomModerators)
+	chatrooms.Post("/:id/moderators/:userId", s.AddChatroomModerator)
+	chatrooms.Delete("/:id/moderators/:userId", s.RemoveChatroomModerator)
 
 	// Game routes
 	games := protected.Group("/games")

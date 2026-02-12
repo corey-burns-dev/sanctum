@@ -1,3 +1,17 @@
+import { useQueryClient } from '@tanstack/react-query'
+import {
+  Hash,
+  MessageCircle,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+  Send,
+  Users,
+  X,
+} from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import type { Conversation, Message, User } from '@/api/types'
 import { MessageList } from '@/components/chat/MessageList'
 import { ParticipantsList } from '@/components/chat/ParticipantsList'
@@ -27,20 +41,6 @@ import {
 import { cn } from '@/lib/utils'
 import { useChatContext } from '@/providers/ChatProvider'
 import { useChatDockStore } from '@/stores/useChatDockStore'
-import { useQueryClient } from '@tanstack/react-query'
-import {
-  Hash,
-  MessageCircle,
-  PanelLeftClose,
-  PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
-  Send,
-  Users,
-  X,
-} from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
 
 export default function Chat() {
   const { id: urlChatId } = useParams<{ id: string }>()
@@ -807,7 +807,7 @@ export default function Chat() {
       ).length,
     [participants, onlineUserIds]
   )
-  const getRoomOnlineCount = useCallback(
+  const _getRoomOnlineCount = useCallback(
     (room: Conversation) => {
       // Use per-room online IDs from chatroom_presence events (authoritative)
       const roomOnline = roomOnlineIds[room.id]
@@ -1057,6 +1057,10 @@ export default function Chat() {
                       : isSelectedDirectOtherUserOnline
                         ? 'Online'
                         : 'Offline'}
+                    {isCurrentConversationGroup &&
+                    currentConversation.capabilities?.can_moderate
+                      ? ' · Moderator'
+                      : ''}
                   </p>
                 </div>
               ) : (

@@ -169,6 +169,19 @@ export interface Conversation {
   participants?: User[]
   unread_count?: number
   is_joined?: boolean
+  capabilities?: ChatroomCapabilities
+}
+
+export interface ChatroomCapabilities {
+  can_moderate: boolean
+  can_manage_moderators: boolean
+}
+
+export interface ChatroomModerator {
+  conversation_id: number
+  user_id: number
+  granted_by_user_id: number
+  created_at: string
 }
 
 export interface Message {
@@ -262,6 +275,15 @@ export interface SanctumMembership {
   created_at: string
   updated_at: string
   sanctum: SanctumDTO
+}
+
+export interface SanctumAdmin {
+  user_id: number
+  username: string
+  email: string
+  role: 'owner' | 'mod' | 'member'
+  created_at: string
+  updated_at: string
 }
 
 export interface BulkSanctumMembershipsInput {

@@ -1,14 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
-import { Gamepad2, Users as UsersIcon } from 'lucide-react'
-import type { ReactNode } from 'react'
-import { lazy, Suspense, useEffect } from 'react'
-import {
-  Link,
-  Route,
-  BrowserRouter as Router,
-  Routes,
-  useLocation,
-} from 'react-router-dom'
 import { BottomBar } from '@/components/BottomBar'
 import { ChatDock } from '@/components/chat/ChatDock'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
@@ -22,11 +11,23 @@ import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications'
 import { cn } from '@/lib/utils'
 import { ChatProvider } from '@/providers/ChatProvider'
 import { routePrefetchMap } from '@/utils/prefetch'
+import { useQueryClient } from '@tanstack/react-query'
+import { Gamepad2, Users as UsersIcon } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
+import {
+    Link,
+    Route,
+    BrowserRouter as Router,
+    Routes,
+    useLocation,
+} from 'react-router-dom'
 
 const Login = lazy(() => import('@/pages/Login'))
 const Signup = lazy(() => import('@/pages/Signup'))
 const Posts = lazy(() => import('@/pages/Posts'))
 const PostDetail = lazy(() => import('@/pages/PostDetail'))
+const PostEdit = lazy(() => import('@/pages/PostEdit'))
 const Profile = lazy(() => import('@/pages/Profile'))
 const Friends = lazy(() => import('@/pages/Friends'))
 const Messages = lazy(() => import('@/pages/Messages'))
@@ -171,6 +172,14 @@ function RoutesWithPrefetch() {
         <Route path='/login' element={<Login />} />
         <Route path='/signup' element={<Signup />} />
         <Route path='/posts' element={<Posts />} />
+        <Route
+          path='/posts/:id/edit'
+          element={
+            <ProtectedRoute>
+              <PostEdit />
+            </ProtectedRoute>
+          }
+        />
         <Route path='/posts/:id' element={<PostDetail />} />
         <Route
           path='/chat'

@@ -4,14 +4,14 @@ import { apiClient } from '@/api/client'
 import { useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
 import {
-    Heart,
-    Image,
-    Link2,
-    Loader2,
-    MessageCircle,
-    Send,
-    Type,
-    Video,
+  Heart,
+  Image,
+  Link2,
+  Loader2,
+  MessageCircle,
+  Send,
+  Type,
+  Video,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -27,10 +27,18 @@ import { YouTubeEmbed } from '@/components/posts/YouTubeEmbed'
 import { UserMenu } from '@/components/UserMenu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 import { Card, CardContent } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 // Hooks
-import { useCreatePost, useInfinitePosts, useLikePost } from '@/hooks/usePosts'
+import { useCreatePost, useDeletePost, useInfinitePosts, useLikePost } from '@/hooks/usePosts'
 import { getCurrentUser, useIsAuthenticated } from '@/hooks/useUsers'
 import { getAvatarUrl } from '@/lib/chat-utils'
 import { handleAuthOrFKError } from '@/lib/handleAuthOrFKError'
@@ -65,9 +73,12 @@ export default function Posts() {
     useInfinitePosts(10)
   const createPostMutation = useCreatePost()
   const likePostMutation = useLikePost()
+  const deletePostMutation = useDeletePost()
+  const [deletingPostId, setDeletingPostId] = useState<number | null>(null)
   const [editingPostId, setEditingPostId] = useState<number | null>(null)
   const [editingPostTitle, setEditingPostTitle] = useState('')
   const [editingPostContent, setEditingPostContent] = useState('')
+  const [openMenuPostId, setOpenMenuPostId] = useState<number | null>(null)
   const queryClient = useQueryClient()
   const debounceRef = useRef<number | null>(null)
   const [likingPostId, setLikingPostId] = useState<number | null>(null)
@@ -136,7 +147,9 @@ export default function Posts() {
     if (!canSubmitNewPost()) return
 
     const title =
-      newPostTitle.trim() || `${currentUser?.username}'s Post`
+      newPostType === 'text'
+        ? newPostTitle.trim() || `${currentUser?.username}'s Post`
+        : currentUser?.username || 'Post'
     let content = newPostContent.trim()
     if (newPostType === 'poll') content = newPollQuestion
 
@@ -226,12 +239,14 @@ export default function Posts() {
   }
 
   const saveEditPost = async (postId: number) => {
-    if (!editingPostTitle.trim() || !editingPostContent.trim()) return
+    if (!editingPostContent.trim()) return
     try {
-      await apiClient.updatePost(postId, {
-        title: editingPostTitle,
+      const updatePayload: any = {
         content: editingPostContent,
-      })
+      }
+      if (editingPostTitle.trim()) updatePayload.title = editingPostTitle
+
+      await apiClient.updatePost(postId, updatePayload)
       await queryClient.invalidateQueries({ queryKey: ['posts'] })
       cancelEditPost()
     } catch (err) {
@@ -295,10 +310,7 @@ export default function Posts() {
                         ))}
                       </div>
 
-                      {(newPostType === 'text' ||
-                        newPostType === 'media' ||
-                        newPostType === 'video' ||
-                        newPostType === 'link') && (
+                      {newPostType === 'text' && (
                         <input
                           type='text'
                           placeholder='Title (optional)...'
@@ -556,17 +568,19 @@ export default function Posts() {
                   )}
                 </div>
                 {currentUser && currentUser.id === post.user_id && (
-                  <div className='flex gap-2'>
+                  <div className='flex gap-2 relative'>
                     <Button
                       size='sm'
                       variant='ghost'
                       className='h-8 w-8 p-0'
                       onClick={event => {
                         event.stopPropagation()
-                        startEditPost(post)
+                        setOpenMenuPostId(prev => (prev === post.id ? null : post.id))
                       }}
+                      aria-expanded={openMenuPostId === post.id}
+                      aria-haspopup='menu'
                     >
-                      <span className='sr-only'>Edit</span>
+                      <span className='sr-only'>Post actions</span>
                       <svg
                         aria-hidden='true'
                         xmlns='http://www.w3.org/2000/svg'
@@ -584,6 +598,35 @@ export default function Posts() {
                         <circle cx='5' cy='12' r='1' />
                       </svg>
                     </Button>
+
+                    {openMenuPostId === post.id && (
+                      <div
+                        role='menu'
+                        className='absolute right-0 top-9 z-20 w-36 bg-card border border-border rounded-md shadow-lg'
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <button
+                          role='menuitem'
+                          className='w-full text-left px-3 py-2 hover:bg-muted'
+                          onClick={() => {
+                            setOpenMenuPostId(null)
+                            navigate(`/posts/${post.id}/edit`)
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          role='menuitem'
+                          className='w-full text-left px-3 py-2 text-destructive hover:bg-muted'
+                          onClick={() => {
+                            setOpenMenuPostId(null)
+                            setDeletingPostId(post.id)
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -592,13 +635,15 @@ export default function Posts() {
               <div className='px-4 pb-3'>
                 {editingPostId === post.id ? (
                   <div className='p-4 bg-muted/30 rounded-xl border border-border/60 space-y-4'>
-                    <input
-                      type='text'
-                      value={editingPostTitle}
-                      onChange={e => setEditingPostTitle(e.target.value)}
-                      className='w-full font-bold bg-transparent border-none focus:ring-0 p-0 text-base'
-                      placeholder='Title'
-                    />
+                    {post.post_type === 'text' && (
+                      <input
+                        type='text'
+                        value={editingPostTitle}
+                        onChange={e => setEditingPostTitle(e.target.value)}
+                        className='w-full font-bold bg-transparent border-none focus:ring-0 p-0 text-base'
+                        placeholder='Title'
+                      />
+                    )}
                     <Textarea
                       value={editingPostContent}
                       onChange={e => setEditingPostContent(e.target.value)}
@@ -662,12 +707,7 @@ export default function Posts() {
                       cropMode={post.image_crop_mode}
                       loading='lazy'
                     />
-                    {post.content ? (
-                      <PostCaption
-                        username={post.user?.username}
-                        content={post.content}
-                      />
-                    ) : null}
+                    {post.content ? <PostCaption content={post.content} /> : null}
                   </div>
                 ) : (
                   <div className='p-4 bg-muted/30 rounded-xl border border-border/60'>
@@ -740,13 +780,7 @@ export default function Posts() {
                   {post.likes_count} likes
                 </div>
 
-                {/* Caption (if image post) */}
-                {post.image_url && (
-                  <PostCaption
-                    username={post.user?.username}
-                    content={post.content}
-                  />
-                )}
+                {/* Caption handled above for media/link/poll/text */}
 
                 {/* Comments Link */}
                 <button
@@ -770,6 +804,35 @@ export default function Posts() {
               </div>
             </Card>
           ))}
+
+          {/* Delete confirmation dialog */}
+          <Dialog open={!!deletingPostId} onOpenChange={open => { if (!open) setDeletingPostId(null) }}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete post?</DialogTitle>
+                <DialogDescription>
+                  This action cannot be undone. Are you sure you want to delete this post?
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant='ghost' onClick={() => setDeletingPostId(null)}>Cancel</Button>
+                <Button
+                  className='text-destructive'
+                  onClick={async () => {
+                    if (!deletingPostId) return
+                    try {
+                      await deletePostMutation.mutateAsync(deletingPostId)
+                      setDeletingPostId(null)
+                    } catch (err) {
+                      console.error('Failed to delete post:', err)
+                    }
+                  }}
+                >
+                  Delete
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Loading indicator for infinite scroll */}
           {isFetchingNextPage && (

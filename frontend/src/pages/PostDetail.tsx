@@ -1,20 +1,20 @@
-import { formatDistanceToNow } from 'date-fns'
-import { ArrowLeft, Heart, Loader2 } from 'lucide-react'
-import { Link, useParams } from 'react-router-dom'
 import { LinkCard } from '@/components/posts/LinkCard'
+import { PollBlock } from '@/components/posts/PollBlock'
 import { PostCaption } from '@/components/posts/PostCaption'
 import { PostComments } from '@/components/posts/PostComments'
-import { PollBlock } from '@/components/posts/PollBlock'
 import { ResponsiveImage } from '@/components/posts/ResponsiveImage'
 import { YouTubeEmbed } from '@/components/posts/YouTubeEmbed'
-import { UserMenu } from '@/components/UserMenu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { UserMenu } from '@/components/UserMenu'
 import { useLikePost, usePost } from '@/hooks/usePosts'
 import { useIsAuthenticated } from '@/hooks/useUsers'
 import { getAvatarUrl } from '@/lib/chat-utils'
 import { cn } from '@/lib/utils'
+import { formatDistanceToNow } from 'date-fns'
+import { ArrowLeft, Heart, Loader2 } from 'lucide-react'
+import { Link, useParams } from 'react-router-dom'
 
 export default function PostDetail() {
   const { id } = useParams()
@@ -128,8 +128,8 @@ export default function PostDetail() {
             ) : null}
 
             <div className='px-5 py-4 space-y-4'>
-              {!post.poll && (post.title || post.content) ? (
-                <PostCaption title={post.title} content={post.content} />
+              {!post.poll ? (
+                <PostCaption username={post.user?.username} content={post.content} />
               ) : null}
 
               <div className='flex items-center gap-4'>

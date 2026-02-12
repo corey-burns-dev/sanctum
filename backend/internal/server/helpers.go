@@ -10,6 +10,7 @@ import (
 	"sanctum/internal/models"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 )
 
 // errResponseWritten is a sentinel indicating the HTTP response was already
@@ -81,10 +82,144 @@ func (s *Server) isAdmin(c *fiber.Ctx, userID uint) (bool, error) {
 	return s.isAdminByUserID(c.Context(), userID)
 }
 
+// isMasterAdminByUserID checks whether the given user has global admin privileges.
+func (s *Server) isMasterAdminByUserID(ctx context.Context, userID uint) (bool, error) {
+	return s.isAdminByUserID(ctx, userID)
+}
+
 func (s *Server) isAdminByUserID(ctx context.Context, userID uint) (bool, error) {
 	var user models.User
 	if err := s.db.WithContext(ctx).Select("is_admin").First(&user, userID).Error; err != nil {
 		return false, err
 	}
 	return user.IsAdmin, nil
+}
+
+func (s *Server) getSanctumRoleByUserID(ctx context.Context, userID, sanctumID uint) (models.SanctumMembershipRole, bool, error) {
+	var membership models.SanctumMembership
+	err := s.db.WithContext(ctx).
+		Select("role").
+		Where("sanctum_id = ? AND user_id = ?", sanctumID, userID).
+		First(&membership).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	return membership.Role, true, nil
+}
+
+func (s *Server) canManageSanctumByUserID(ctx context.Context, userID, sanctumID uint) (bool, error) {
+	master, err := s.isMasterAdminByUserID(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	if master {
+		return true, nil
+	}
+
+	role, found, err := s.getSanctumRoleByUserID(ctx, userID, sanctumID)
+	if err != nil || !found {
+		return false, err
+	}
+
+	return role == models.SanctumMembershipRoleOwner || role == models.SanctumMembershipRoleMod, nil
+}
+
+func (s *Server) canManageSanctumAsOwnerByUserID(ctx context.Context, userID, sanctumID uint) (bool, error) {
+	master, err := s.isMasterAdminByUserID(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	if master {
+		return true, nil
+	}
+
+	role, found, err := s.getSanctumRoleByUserID(ctx, userID, sanctumID)
+	if err != nil || !found {
+		return false, err
+	}
+	return role == models.SanctumMembershipRoleOwner, nil
+}
+
+func (s *Server) isChatroomModeratorByUserID(ctx context.Context, userID, roomID uint) (bool, error) {
+	var count int64
+	if err := s.db.WithContext(ctx).
+		Model(&models.ChatroomModerator{}).
+		Where("conversation_id = ? AND user_id = ?", roomID, userID).
+		Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (s *Server) canManageChatroomModeratorsByUserID(ctx context.Context, userID, roomID uint) (bool, error) {
+	master, err := s.isMasterAdminByUserID(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	if master {
+		return true, nil
+	}
+
+	var conv models.Conversation
+	if err := s.db.WithContext(ctx).
+		Select("id", "sanctum_id").
+		First(&conv, roomID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	if conv.SanctumID == nil {
+		return false, nil
+	}
+
+	return s.canManageSanctumByUserID(ctx, userID, *conv.SanctumID)
+}
+
+func (s *Server) canModerateChatroomByUserID(ctx context.Context, userID, roomID uint) (bool, error) {
+	master, err := s.isMasterAdminByUserID(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	if master {
+		return true, nil
+	}
+
+	var conv models.Conversation
+	if err := s.db.WithContext(ctx).
+		Select("id", "sanctum_id", "created_by").
+		First(&conv, roomID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	if conv.SanctumID != nil {
+		canManage, err := s.canManageSanctumByUserID(ctx, userID, *conv.SanctumID)
+		if err != nil {
+			return false, err
+		}
+		if canManage {
+			return true, nil
+		}
+	}
+
+	isRoomMod, err := s.isChatroomModeratorByUserID(ctx, userID, roomID)
+	if err != nil {
+		return false, err
+	}
+	if isRoomMod {
+		return true, nil
+	}
+
+	// Legacy non-sanctum room creator moderation capability.
+	if conv.SanctumID == nil && conv.CreatedBy == userID {
+		return true, nil
+	}
+
+	return false, nil
 }

@@ -49,7 +49,7 @@ func main() {
 			fmt.Println("Usage: go run ./cmd/admin/main.go demote <user_id>")
 			os.Exit(1)
 		}
-		demoteFromAdmin(db, os.Args[2])
+		demoteFromAdmin(db, cfg, os.Args[2])
 
 	case "list-admins":
 		listAdmins(db)
@@ -84,7 +84,12 @@ func promoteToAdmin(db *gorm.DB, userID string) {
 	fmt.Printf("✅ Successfully promoted %s (ID: %d) to admin\n", user.Username, user.ID)
 }
 
-func demoteFromAdmin(db *gorm.DB, userID string) {
+func demoteFromAdmin(db *gorm.DB, cfg *config.Config, userID string) {
+	if cfg != nil && cfg.Env == "development" && userID == "1" {
+		fmt.Println("Refusing to demote protected development root admin user (ID 1)")
+		os.Exit(1)
+	}
+
 	var user models.User
 	if err := db.First(&user, userID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

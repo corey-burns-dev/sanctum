@@ -2,6 +2,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"time"
@@ -12,7 +13,19 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
+
+type ChatroomCapabilities struct {
+	CanModerate         bool `json:"can_moderate"`
+	CanManageModerators bool `json:"can_manage_moderators"`
+}
+
+type ChatroomResponse struct {
+	*models.Conversation
+	IsJoined     bool                  `json:"is_joined"`
+	Capabilities *ChatroomCapabilities `json:"capabilities,omitempty"`
+}
 
 // CreateConversation handles POST /api/conversations
 func (s *Server) CreateConversation(c *fiber.Ctx) error {
@@ -89,6 +102,17 @@ func (s *Server) GetConversation(c *fiber.Ctx) error {
 
 	if conv.IsGroup {
 		conv.Participants = s.filterOnlineParticipants(conv.Participants)
+		caps, capErr := s.chatroomCapabilities(ctx, userID, conv.ID)
+		if capErr != nil {
+			return models.RespondWithError(c, fiber.StatusInternalServerError, capErr)
+		}
+		return c.JSON(struct {
+			*models.Conversation
+			Capabilities *ChatroomCapabilities `json:"capabilities,omitempty"`
+		}{
+			Conversation: conv,
+			Capabilities: caps,
+		})
 	}
 
 	return c.JSON(conv)
@@ -278,7 +302,13 @@ func (s *Server) LeaveConversation(c *fiber.Ctx) error {
 
 func (s *Server) chatSvc() *service.ChatService {
 	if s.chatService == nil {
-		s.chatService = service.NewChatService(s.chatRepo, s.userRepo, s.db, s.isAdminByUserID)
+		s.chatService = service.NewChatService(
+			s.chatRepo,
+			s.userRepo,
+			s.db,
+			s.isAdminByUserID,
+			s.canModerateChatroomByUserID,
+		)
 	}
 	return s.chatService
 }
@@ -293,17 +323,16 @@ func (s *Server) GetAllChatrooms(c *fiber.Ctx) error {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
 
-	// Add "is_joined" field to each chatroom
-	type ChatroomResponse struct {
-		*models.Conversation
-		IsJoined bool `json:"is_joined"`
-	}
-
 	result := make([]ChatroomResponse, 0, len(chatrooms))
 	for _, room := range chatrooms {
+		caps, err := s.chatroomCapabilities(ctx, userID, room.Conversation.ID)
+		if err != nil {
+			return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+		}
 		result = append(result, ChatroomResponse{
 			Conversation: room.Conversation,
 			IsJoined:     room.IsJoined,
+			Capabilities: caps,
 		})
 	}
 
@@ -320,7 +349,20 @@ func (s *Server) GetJoinedChatrooms(c *fiber.Ctx) error {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
 
-	return c.JSON(chatrooms)
+	result := make([]ChatroomResponse, 0, len(chatrooms))
+	for _, room := range chatrooms {
+		caps, err := s.chatroomCapabilities(ctx, userID, room.ID)
+		if err != nil {
+			return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+		}
+		result = append(result, ChatroomResponse{
+			Conversation: room,
+			IsJoined:     true,
+			Capabilities: caps,
+		})
+	}
+
+	return c.JSON(result)
 }
 
 // JoinChatroom handles POST /api/chatrooms/:id/join - join a chatroom
@@ -387,6 +429,144 @@ func (s *Server) RemoveParticipant(c *fiber.Ctx) error {
 	s.broadcastChatroomPresenceSnapshot(ctx, roomID, userID, username, "removed_participant")
 
 	return c.JSON(fiber.Map{"message": "Participant removed successfully"})
+}
+
+func (s *Server) chatroomCapabilities(ctx context.Context, userID, roomID uint) (*ChatroomCapabilities, error) {
+	canModerate, err := s.canModerateChatroomByUserID(ctx, userID, roomID)
+	if err != nil {
+		return nil, err
+	}
+	canManageModerators, err := s.canManageChatroomModeratorsByUserID(ctx, userID, roomID)
+	if err != nil {
+		return nil, err
+	}
+	return &ChatroomCapabilities{
+		CanModerate:         canModerate,
+		CanManageModerators: canManageModerators,
+	}, nil
+}
+
+// GetChatroomModerators handles GET /api/chatrooms/:id/moderators.
+func (s *Server) GetChatroomModerators(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	actorUserID := c.Locals("userID").(uint)
+	roomID, err := s.parseID(c, "id")
+	if err != nil {
+		return nil
+	}
+
+	authorized, err := s.canManageChatroomModeratorsByUserID(ctx, actorUserID, roomID)
+	if err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+	if !authorized {
+		return models.RespondWithError(c, fiber.StatusForbidden,
+			models.NewUnauthorizedError("Chatroom moderator management access required"))
+	}
+
+	var moderators []models.ChatroomModerator
+	if err := s.db.WithContext(ctx).
+		Where("conversation_id = ?", roomID).
+		Order("created_at ASC").
+		Find(&moderators).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	type ChatroomModeratorDTO struct {
+		ConversationID  uint   `json:"conversation_id"`
+		UserID          uint   `json:"user_id"`
+		GrantedByUserID uint   `json:"granted_by_user_id"`
+		CreatedAt       string `json:"created_at"`
+	}
+	resp := make([]ChatroomModeratorDTO, 0, len(moderators))
+	for _, mod := range moderators {
+		resp = append(resp, ChatroomModeratorDTO{
+			ConversationID:  mod.ConversationID,
+			UserID:          mod.UserID,
+			GrantedByUserID: mod.GrantedByUserID,
+			CreatedAt:       mod.CreatedAt.UTC().Format(time.RFC3339Nano),
+		})
+	}
+
+	return c.JSON(resp)
+}
+
+// AddChatroomModerator handles POST /api/chatrooms/:id/moderators/:userId.
+func (s *Server) AddChatroomModerator(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	actorUserID := c.Locals("userID").(uint)
+	roomID, err := s.parseID(c, "id")
+	if err != nil {
+		return nil
+	}
+	targetUserID, err := s.parseID(c, "userId")
+	if err != nil {
+		return nil
+	}
+
+	authorized, err := s.canManageChatroomModeratorsByUserID(ctx, actorUserID, roomID)
+	if err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+	if !authorized {
+		return models.RespondWithError(c, fiber.StatusForbidden,
+			models.NewUnauthorizedError("Chatroom moderator management access required"))
+	}
+
+	var user models.User
+	if err := s.db.WithContext(ctx).Select("id").First(&user, targetUserID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.RespondWithError(c, fiber.StatusNotFound, models.NewNotFoundError("User", targetUserID))
+		}
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	moderator := models.ChatroomModerator{
+		ConversationID:  roomID,
+		UserID:          targetUserID,
+		GrantedByUserID: actorUserID,
+	}
+	if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&moderator).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+	if err := s.db.WithContext(ctx).
+		Where("conversation_id = ? AND user_id = ?", roomID, targetUserID).
+		First(&moderator).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	return c.JSON(moderator)
+}
+
+// RemoveChatroomModerator handles DELETE /api/chatrooms/:id/moderators/:userId.
+func (s *Server) RemoveChatroomModerator(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	actorUserID := c.Locals("userID").(uint)
+	roomID, err := s.parseID(c, "id")
+	if err != nil {
+		return nil
+	}
+	targetUserID, err := s.parseID(c, "userId")
+	if err != nil {
+		return nil
+	}
+
+	authorized, err := s.canManageChatroomModeratorsByUserID(ctx, actorUserID, roomID)
+	if err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+	if !authorized {
+		return models.RespondWithError(c, fiber.StatusForbidden,
+			models.NewUnauthorizedError("Chatroom moderator management access required"))
+	}
+
+	if err := s.db.WithContext(ctx).
+		Where("conversation_id = ? AND user_id = ?", roomID, targetUserID).
+		Delete(&models.ChatroomModerator{}).Error; err != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	}
+
+	return c.JSON(fiber.Map{"message": "Chatroom moderator removed successfully"})
 }
 
 func (s *Server) filterOnlineParticipants(participants []models.User) []models.User {

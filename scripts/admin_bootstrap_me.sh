@@ -19,6 +19,7 @@ DB_PORT="${DB_PORT:-5432}"
 DB_USER="${DB_USER:-${POSTGRES_USER:-sanctum_user}}"
 DB_PASSWORD="${DB_PASSWORD:-${POSTGRES_PASSWORD:-sanctum_password}}"
 DB_NAME="${DB_NAME:-${POSTGRES_DB:-sanctum}}"
+APP_ENV="${APP_ENV:-development}"
 
 if ! command -v psql >/dev/null 2>&1; then
   echo "psql is required but not found in PATH"
@@ -32,9 +33,15 @@ if ! PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d
 fi
 
 echo "Promoting $EMAIL as the only admin in database '$DB_NAME'..."
+if [ "$APP_ENV" = "development" ]; then
+  DEMOTE_SQL="UPDATE users SET is_admin = FALSE WHERE is_admin = TRUE AND id <> 1;"
+else
+  DEMOTE_SQL="UPDATE users SET is_admin = FALSE WHERE is_admin = TRUE;"
+fi
+
 PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" <<SQL
 BEGIN;
-UPDATE users SET is_admin = FALSE WHERE is_admin = TRUE;
+${DEMOTE_SQL}
 UPDATE users SET is_admin = TRUE WHERE email = '${EMAIL}';
 COMMIT;
 SQL

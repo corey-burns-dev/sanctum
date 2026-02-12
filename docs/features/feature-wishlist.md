@@ -176,6 +176,19 @@ This document contains both production-ready feature ideas and experimental/lear
 
 ### Role-Based Access Control
 
+- [x] **Implement Hierarchical Moderation Foundation**
+  - Added role hierarchy:
+    - Master Admin (`users.is_admin`)
+    - Sanctum Admin (`sanctum_memberships.role` = `owner|mod`)
+    - Chat Moderator (`chatroom_moderators`)
+  - Added centralized authz checks for sanctum/chat moderation paths.
+  - Added sanctum-admin and chat-moderator management endpoints.
+  - Added chatroom `capabilities` flags for frontend gating.
+  - Added development root bootstrap (`user_id=1`) + dev safety guards.
+  - Docs:
+    - Implementation: `docs/features/hierarchical-moderation-implementation.md`
+    - Usage: `docs/guides/hierarchical-moderation-guide.md`
+
 - [ ] **Expand RBAC Beyond IsAdmin**
   - Create Role model (id, name, permissions)
   - Create UserRole junction table
