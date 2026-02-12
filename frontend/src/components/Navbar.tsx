@@ -1,19 +1,19 @@
-import { LogOut, Settings, User } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { ModeToggle } from '@/components/mode-toggle'
 import { topRouteNav, topServiceNav } from '@/components/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { getCurrentUser, useIsAuthenticated, useLogout } from '@/hooks'
 import { getInitials } from '@/lib/chat-utils'
+import { LogOut, Settings, User } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 const navLinks = [...topRouteNav, ...topServiceNav]
 
@@ -29,6 +29,8 @@ export function Navbar() {
           <Link to='/' className='text-2xl font-bold text-primary'>
             Sanctum
           </Link>
+        </div>
+        <div className='flex-1 flex justify-center'>
           <div className='hidden md:flex gap-6'>
             {navLinks.map(link => (
               <Link
