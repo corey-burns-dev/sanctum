@@ -285,8 +285,8 @@ test-soak:
 
 observability-verify:
 	@echo "$(BLUE)Verifying observability stack health...$(NC)"
-	@curl -s http://localhost:9090/-/healthy | grep -q "Prometheus is Healthy" || (echo "$(RED)Prometheus unhealthy$(NC)"; exit 1)
-	@curl -s http://localhost:3000/api/health | grep -q '"database":"ok"' || (echo "$(RED)Grafana unhealthy$(NC)"; exit 1)
+	@curl -s http://localhost:9090/-/healthy | grep -q "Healthy" || (echo "$(RED)Prometheus unhealthy$(NC)"; exit 1)
+	@curl -s http://localhost:3000/api/health | grep -q '"database":\s*"ok"' || (echo "$(RED)Grafana unhealthy$(NC)"; exit 1)
 	@echo "$(GREEN)✓ Observability stack is healthy$(NC)"
 
 test-api:
