@@ -6,21 +6,21 @@ This document describes how to run and write tests for the Sanctum frontend.
 
 From the `frontend/` directory (or repo root via Make):
 
-| Command | Description |
-|---------|-------------|
-| `bun run test` | Run unit tests in watch mode |
-| `bun run test:run` | Run unit tests once |
-| `bun run test:coverage` | Run unit tests with coverage report |
-| `bun run test:e2e` | Run Playwright E2E tests |
-| `bun run test:e2e:smoke` | Run only @smoke E2E tests |
-| `make test-frontend` | Run unit tests from repo root |
+| Command                  | Description                         |
+| ------------------------ | ----------------------------------- |
+| `bun run test`           | Run unit tests in watch mode        |
+| `bun run test:run`       | Run unit tests once                 |
+| `bun run test:coverage`  | Run unit tests with coverage report |
+| `bun run test:e2e`       | Run Playwright E2E tests            |
+| `bun run test:e2e:smoke` | Run only @smoke E2E tests           |
+| `make test-frontend`     | Run unit tests from repo root       |
 
 **Prerequisites for E2E:** Backend and frontend must be running, and Playwright browsers installed (`bun run test:e2e:install`).
 
 ## Test structure
 
 - **Unit tests**: Vitest + React Testing Library. Live next to source or in `src/**/*.test.{ts,tsx}` or `*.spec.tsx`.
-- **E2E tests**: Playwright in `tests/e2e/*.spec.ts`.
+- **E2E tests**: Playwright in `test/tests/e2e/*.spec.ts`.
 - **Setup**: `src/test/setup.ts` runs before unit tests (jest-dom, matchMedia, ResizeObserver, IntersectionObserver mocks).
 - **Utilities**: `src/test/test-utils.tsx` provides custom `render`, `renderHook`, `createTestQueryClient`, mock factories (`buildUser`, `buildMessage`, etc.), and `createLocalStorageMock()`.
 
@@ -77,7 +77,7 @@ await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
 ## E2E
 
-- **Global setup** (`tests/e2e/global-setup.ts`): Creates authenticated user and admin storage states under `tests/e2e/.auth/`.
+- **Global setup** (`test/tests/e2e/global-setup.ts`): Creates authenticated user and admin storage states under `test/tests/e2e/.auth/`.
 - **Auth**: Use `test.use({ storageState: USER_STATE_PATH })` or `ADMIN_STATE_PATH` for authenticated tests.
 - **Base URL**: `PLAYWRIGHT_BASE_URL` (default `http://localhost:5173`). API: `PLAYWRIGHT_API_URL` (default `http://localhost:8375/api`).
 

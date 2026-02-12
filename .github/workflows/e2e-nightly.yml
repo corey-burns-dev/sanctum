@@ -110,8 +110,8 @@ jobs:
         with:
           name: playwright-report-nightly
           path: |
-            frontend/playwright-report
-            frontend/test-results
+            frontend/reports/playwright-report
+            frontend/reports/test-results
 
       - name: Dump service logs on failure
         if: failure()

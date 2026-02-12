@@ -31,9 +31,9 @@
     "**/*.spec.ts",
     "**/*.test.*",
     "**/*.spec.*",
-    "playwright-report",
-    "playwright-report/**",
-    "tests",
-    "tests/**"
+    "reports/playwright-report",
+    "reports/playwright-report/**",
+    "test",
+    "test/**"
   ]
 }

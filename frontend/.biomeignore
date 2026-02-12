@@ -5,10 +5,10 @@ dist/**
 dist/*
 node_modules
 .DS_Store
-playwright-report
-test-results
-/playwright-report
-/playwright-report/**
-/playwright-report/*
-/coverage
-/coverage/**
+reports/playwright-report
+reports/test-results
+/reports/playwright-report
+/reports/playwright-report/**
+/reports/playwright-report/*
+/reports/coverage
+/reports/coverage/**

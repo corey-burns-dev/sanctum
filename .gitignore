@@ -41,7 +41,7 @@ dist/
 frontend/dist/
 
 # Playwright generated report (do not commit)
-frontend/playwright-report/
+frontend/reports/playwright-report/
 
 # Go modules (don't ignore go.sum/go.mod)
 
