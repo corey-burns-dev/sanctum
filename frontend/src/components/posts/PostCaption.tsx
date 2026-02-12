@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { MarkdownContent } from './MarkdownContent'
 
 export function PostCaption({
   title,
@@ -12,6 +13,7 @@ export function PostCaption({
   const [isExpanded, setIsExpanded] = useState(false)
   const maxLength = 120
   const shouldTruncate = content.length > maxLength
+  const showTruncated = shouldTruncate && !isExpanded
 
   return (
     <div className='space-y-1 text-sm'>
@@ -23,11 +25,11 @@ export function PostCaption({
 
       {title && <span className='font-bold mr-2'>{title}</span>}
 
-      <span>
-        {shouldTruncate && !isExpanded
-          ? `${content.slice(0, maxLength)}...`
-          : content}
-      </span>
+      {showTruncated ? (
+        <span>{content.slice(0, maxLength)}...</span>
+      ) : (
+        <MarkdownContent content={content} className='text-sm' />
+      )}
 
       {shouldTruncate && (
         <button

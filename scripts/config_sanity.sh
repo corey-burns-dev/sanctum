@@ -27,7 +27,7 @@ APP_ENV="${APP_ENV:-development}"
 JWT_SECRET="${JWT_SECRET:-$(get_cfg JWT_SECRET)}"
 DB_PASSWORD="${DB_PASSWORD:-$(get_cfg DB_PASSWORD)}"
 DB_SCHEMA_MODE="${DB_SCHEMA_MODE:-$(get_cfg DB_SCHEMA_MODE)}"
-DB_SCHEMA_MODE="${DB_SCHEMA_MODE:-hybrid}"
+DB_SCHEMA_MODE="${DB_SCHEMA_MODE:-sql}"
 
 case "$DB_SCHEMA_MODE" in
   hybrid|sql|auto) ;;

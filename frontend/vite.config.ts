@@ -26,6 +26,10 @@ export default defineConfig({
           })
         },
       },
+      '/media': {
+        target: 'http://app:8375',
+        changeOrigin: true,
+      },
       '/live': {
         target: 'http://media-server:80',
         changeOrigin: true,

@@ -3,6 +3,8 @@ FROM golang:${GO_VERSION}
 
 WORKDIR /app/backend
 
+RUN apk add --no-cache build-base libwebp-dev
+
 # Install air for hot reloading
 RUN go install github.com/air-verse/air@latest
 

@@ -7,6 +7,7 @@ require (
 	github.com/alicebob/miniredis/v2 v2.36.1
 	github.com/ansrivas/fiberprometheus/v2 v2.16.0
 	github.com/brianvoe/gofakeit/v6 v6.28.0
+	github.com/chai2010/webp v1.4.0
 	github.com/gofiber/fiber/v2 v2.52.11
 	github.com/gofiber/swagger v1.1.1
 	github.com/gofiber/websocket/v2 v2.2.1
@@ -24,6 +25,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.40.0
 	go.opentelemetry.io/otel/trace v1.40.0
 	golang.org/x/crypto v0.48.0
+	golang.org/x/image v0.36.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/driver/sqlite v1.6.0

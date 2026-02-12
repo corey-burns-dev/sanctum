@@ -35,7 +35,7 @@ func isProdLikeEnv(env string) bool {
 func normalizedSchemaMode(cfg *config.Config) string {
 	mode := strings.ToLower(strings.TrimSpace(cfg.DBSchemaMode))
 	if mode == "" {
-		return SchemaModeHybrid
+		return SchemaModeSQL
 	}
 	return mode
 }
@@ -109,6 +109,9 @@ func GetSchemaStatus(ctx context.Context, db *gorm.DB, cfg *config.Config) (*Sch
 	store := NewMigrationStore(db)
 	applied, err := store.GetAppliedMigrations(ctx)
 	if err != nil {
+		return nil, err
+	}
+	if err := validateAppliedVersions(applied, GetMigrations()); err != nil {
 		return nil, err
 	}
 	status.AppliedVersions = applied

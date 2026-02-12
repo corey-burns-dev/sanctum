@@ -2,22 +2,36 @@ package service
 
 import (
 	"context"
+	"net/url"
+	"strings"
 
+	"sanctum/internal/cache"
 	"sanctum/internal/models"
 	"sanctum/internal/repository"
 )
 
 type PostService struct {
 	postRepo repository.PostRepository
+	pollRepo repository.PollRepository
 	isAdmin  func(ctx context.Context, userID uint) (bool, error)
 }
 
+// CreatePostPollInput is the poll payload when creating a poll post.
+type CreatePostPollInput struct {
+	Question string   `json:"question"`
+	Options  []string `json:"options"`
+}
+
 type CreatePostInput struct {
-	UserID    uint
-	Title     string
-	Content   string
-	ImageURL  string
-	SanctumID *uint
+	UserID     uint
+	Title      string
+	Content    string
+	ImageURL   string
+	PostType   string
+	LinkURL    string
+	YoutubeURL string
+	SanctumID  *uint
+	Poll       *CreatePostPollInput
 }
 
 type ListPostsInput struct {
@@ -28,11 +42,13 @@ type ListPostsInput struct {
 }
 
 type UpdatePostInput struct {
-	UserID   uint
-	PostID   uint
-	Title    string
-	Content  string
-	ImageURL string
+	UserID     uint
+	PostID     uint
+	Title      string
+	Content    string
+	ImageURL   string
+	LinkURL    string
+	YoutubeURL string
 }
 
 type DeletePostInput struct {
@@ -42,10 +58,12 @@ type DeletePostInput struct {
 
 func NewPostService(
 	postRepo repository.PostRepository,
+	pollRepo repository.PollRepository,
 	isAdmin func(ctx context.Context, userID uint) (bool, error),
 ) *PostService {
 	return &PostService{
 		postRepo: postRepo,
+		pollRepo: pollRepo,
 		isAdmin:  isAdmin,
 	}
 }
@@ -54,41 +72,206 @@ func (s *PostService) SearchPosts(ctx context.Context, query string, limit, offs
 	if query == "" {
 		return nil, models.NewValidationError("Search query is required")
 	}
-	return s.postRepo.Search(ctx, query, limit, offset, currentUserID)
+	posts, err := s.postRepo.Search(ctx, query, limit, offset, currentUserID)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range posts {
+		if err := s.enrichPollIfPresent(ctx, p, currentUserID); err != nil {
+			return nil, err
+		}
+	}
+	return posts, nil
 }
 
 func (s *PostService) CreatePost(ctx context.Context, in CreatePostInput) (*models.Post, error) {
-	if in.Title == "" || in.Content == "" {
-		return nil, models.NewValidationError("Title and content are required")
+	postType := in.PostType
+	if postType == "" {
+		postType = models.PostTypeText
+	}
+	switch postType {
+	case models.PostTypeText, models.PostTypeMedia, models.PostTypeVideo, models.PostTypeLink, models.PostTypePoll:
+		// valid
+	default:
+		return nil, models.NewValidationError("Invalid post_type")
+	}
+
+	if in.Title == "" {
+		return nil, models.NewValidationError("Title is required")
+	}
+	// Content required for text posts.
+	if postType == models.PostTypeText {
+		if in.Content == "" {
+			return nil, models.NewValidationError("Content is required")
+		}
+	}
+
+	switch postType {
+	case models.PostTypeMedia:
+		if strings.TrimSpace(in.ImageURL) == "" {
+			return nil, models.NewValidationError("image_url is required for media posts")
+		}
+	case models.PostTypeVideo:
+		if in.YoutubeURL == "" {
+			return nil, models.NewValidationError("youtube_url is required for video posts")
+		}
+		if !isYouTubeURL(in.YoutubeURL) {
+			return nil, models.NewValidationError("youtube_url must be a valid YouTube URL")
+		}
+	case models.PostTypeLink:
+		if in.LinkURL == "" {
+			return nil, models.NewValidationError("link_url is required for link posts")
+		}
+		if _, err := url.ParseRequestURI(in.LinkURL); err != nil {
+			return nil, models.NewValidationError("link_url must be a valid URL")
+		}
+	case models.PostTypePoll:
+		if in.Poll == nil || in.Poll.Question == "" {
+			return nil, models.NewValidationError("Poll question is required")
+		}
+		if len(in.Poll.Options) < 2 {
+			return nil, models.NewValidationError("Poll must have at least two options")
+		}
+		// trim empty options
+		var opts []string
+		for _, o := range in.Poll.Options {
+			if strings.TrimSpace(o) != "" {
+				opts = append(opts, strings.TrimSpace(o))
+			}
+		}
+		if len(opts) < 2 {
+			return nil, models.NewValidationError("Poll must have at least two non-empty options")
+		}
+		in.Poll.Options = opts
+	}
+
+	content := in.Content
+	if postType == models.PostTypePoll {
+		content = in.Poll.Question
 	}
 
 	post := &models.Post{
-		Title:     in.Title,
-		Content:   in.Content,
-		ImageURL:  in.ImageURL,
-		UserID:    in.UserID,
-		SanctumID: in.SanctumID,
+		Title:      in.Title,
+		Content:    content,
+		ImageURL:   in.ImageURL,
+		ImageHash:  extractImageHash(in.ImageURL),
+		PostType:   postType,
+		LinkURL:    in.LinkURL,
+		YoutubeURL: in.YoutubeURL,
+		UserID:     in.UserID,
+		SanctumID:  in.SanctumID,
 	}
 	if err := s.postRepo.Create(ctx, post); err != nil {
 		return nil, err
 	}
 
-	return s.postRepo.GetByID(ctx, post.ID, in.UserID)
+	if postType == models.PostTypePoll && s.pollRepo != nil {
+		if _, err := s.pollRepo.Create(ctx, post.ID, in.Poll.Question, in.Poll.Options); err != nil {
+			return nil, err
+		}
+	}
+
+	return s.getPostWithPollEnriched(ctx, post.ID, in.UserID)
 }
 
 func (s *PostService) ListPosts(ctx context.Context, in ListPostsInput) ([]*models.Post, error) {
+	var posts []*models.Post
+	var err error
 	if in.SanctumID != nil {
-		return s.postRepo.GetBySanctumID(ctx, *in.SanctumID, in.Limit, in.Offset, in.CurrentUserID)
+		posts, err = s.postRepo.GetBySanctumID(ctx, *in.SanctumID, in.Limit, in.Offset, in.CurrentUserID)
+	} else {
+		posts, err = s.postRepo.List(ctx, in.Limit, in.Offset, in.CurrentUserID)
 	}
-	return s.postRepo.List(ctx, in.Limit, in.Offset, in.CurrentUserID)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range posts {
+		if err := s.enrichPollIfPresent(ctx, p, in.CurrentUserID); err != nil {
+			return nil, err
+		}
+	}
+	return posts, nil
 }
 
 func (s *PostService) GetPost(ctx context.Context, id uint, currentUserID uint) (*models.Post, error) {
-	return s.postRepo.GetByID(ctx, id, currentUserID)
+	post, err := s.postRepo.GetByID(ctx, id, currentUserID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.enrichPollIfPresent(ctx, post, currentUserID); err != nil {
+		return nil, err
+	}
+	return post, nil
+}
+
+func (s *PostService) getPostWithPollEnriched(ctx context.Context, postID, currentUserID uint) (*models.Post, error) {
+	post, err := s.postRepo.GetByID(ctx, postID, currentUserID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.enrichPollIfPresent(ctx, post, currentUserID); err != nil {
+		return nil, err
+	}
+	return post, nil
+}
+
+func (s *PostService) enrichPollIfPresent(ctx context.Context, post *models.Post, currentUserID uint) error {
+	if post.Poll != nil && s.pollRepo != nil {
+		return s.pollRepo.EnrichWithResults(ctx, post.Poll, currentUserID)
+	}
+	return nil
+}
+
+// isYouTubeURL returns true if u is a YouTube watch or embed URL.
+func isYouTubeURL(u string) bool {
+	parsed, err := url.Parse(u)
+	if err != nil {
+		return false
+	}
+	host := strings.ToLower(parsed.Hostname())
+	return strings.Contains(host, "youtube.com") || strings.Contains(host, "youtu.be")
+}
+
+// VotePoll records or updates the current user's vote on a poll.
+func (s *PostService) VotePoll(ctx context.Context, userID, postID, pollOptionID uint) (*models.Post, error) {
+	post, err := s.postRepo.GetByID(ctx, postID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if post.PostType != models.PostTypePoll || post.Poll == nil {
+		return nil, models.NewValidationError("Post is not a poll")
+	}
+	var optionBelongs bool
+	for _, opt := range post.Poll.Options {
+		if opt.ID == pollOptionID {
+			optionBelongs = true
+			break
+		}
+	}
+	if !optionBelongs {
+		return nil, models.NewValidationError("Invalid poll option")
+	}
+	if s.pollRepo == nil {
+		return nil, models.NewValidationError("Poll voting is not available")
+	}
+	if err := s.pollRepo.Vote(ctx, userID, post.Poll.ID, pollOptionID); err != nil {
+		return nil, err
+	}
+	cache.Invalidate(ctx, cache.PostKey(postID))
+	return s.getPostWithPollEnriched(ctx, postID, userID)
 }
 
 func (s *PostService) GetUserPosts(ctx context.Context, userID uint, limit, offset int, currentUserID uint) ([]*models.Post, error) {
-	return s.postRepo.GetByUserID(ctx, userID, limit, offset, currentUserID)
+	posts, err := s.postRepo.GetByUserID(ctx, userID, limit, offset, currentUserID)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range posts {
+		if err := s.enrichPollIfPresent(ctx, p, currentUserID); err != nil {
+			return nil, err
+		}
+	}
+	return posts, nil
 }
 
 func (s *PostService) UpdatePost(ctx context.Context, in UpdatePostInput) (*models.Post, error) {
@@ -109,6 +292,13 @@ func (s *PostService) UpdatePost(ctx context.Context, in UpdatePostInput) (*mode
 	}
 	if in.ImageURL != "" {
 		post.ImageURL = in.ImageURL
+		post.ImageHash = extractImageHash(in.ImageURL)
+	}
+	if in.LinkURL != "" {
+		post.LinkURL = in.LinkURL
+	}
+	if in.YoutubeURL != "" {
+		post.YoutubeURL = in.YoutubeURL
 	}
 
 	if err := s.postRepo.Update(ctx, post); err != nil {
@@ -155,12 +345,51 @@ func (s *PostService) ToggleLike(ctx context.Context, userID, postID uint) (*mod
 		}
 	}
 
-	return s.postRepo.GetByID(ctx, postID, userID)
+	return s.getPostWithPollEnriched(ctx, postID, userID)
 }
 
 func (s *PostService) UnlikePost(ctx context.Context, userID, postID uint) (*models.Post, error) {
 	if err := s.postRepo.Unlike(ctx, userID, postID); err != nil {
 		return nil, err
 	}
-	return s.postRepo.GetByID(ctx, postID, userID)
+	return s.getPostWithPollEnriched(ctx, postID, userID)
+}
+
+func extractImageHash(rawURL string) string {
+	trimmed := strings.TrimSpace(rawURL)
+	if trimmed == "" {
+		return ""
+	}
+
+	path := trimmed
+	if parsed, err := url.Parse(trimmed); err == nil && parsed.Path != "" {
+		path = parsed.Path
+	}
+
+	if strings.HasPrefix(path, "/media/i/") {
+		parts := strings.Split(strings.TrimPrefix(path, "/media/i/"), "/")
+		if len(parts) > 0 && isLikelySHA256(parts[0]) {
+			return parts[0]
+		}
+	}
+	if strings.HasPrefix(path, "/api/images/") {
+		rest := strings.TrimPrefix(path, "/api/images/")
+		parts := strings.Split(rest, "/")
+		if len(parts) > 0 && isLikelySHA256(parts[0]) {
+			return parts[0]
+		}
+	}
+	return ""
+}
+
+func isLikelySHA256(v string) bool {
+	if len(v) != 64 {
+		return false
+	}
+	for _, r := range v {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+	return true
 }

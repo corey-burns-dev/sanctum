@@ -11,6 +11,40 @@ definitions:
       request_id:
         type: string
     type: object
+  models.Poll:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      options:
+        items:
+          $ref: '#/definitions/models.PollOption'
+        type: array
+      post_id:
+        type: integer
+      question:
+        type: string
+      updated_at:
+        type: string
+      user_vote_option_id:
+        description: filled when loading for current user
+        type: integer
+    type: object
+  models.PollOption:
+    properties:
+      display_order:
+        type: integer
+      id:
+        type: integer
+      option_text:
+        type: string
+      poll_id:
+        type: integer
+      votes_count:
+        description: VotesCount is computed when loading for display
+        type: integer
+    type: object
   models.Post:
     properties:
       comments_count:
@@ -22,8 +56,14 @@ definitions:
         type: string
       id:
         type: integer
+      image_crop_mode:
+        type: string
       image_url:
         type: string
+      image_variants:
+        additionalProperties:
+          type: string
+        type: object
       liked:
         description: Liked indicates whether the current requesting user liked this
           post (computed)
@@ -31,6 +71,12 @@ definitions:
       likes_count:
         description: LikesCount is not persisted; computed at query time
         type: integer
+      link_url:
+        type: string
+      poll:
+        $ref: '#/definitions/models.Poll'
+      post_type:
+        type: string
       sanctum:
         $ref: '#/definitions/models.Sanctum'
       sanctum_id:
@@ -43,6 +89,8 @@ definitions:
         $ref: '#/definitions/models.User'
       user_id:
         type: integer
+      youtube_url:
+        type: string
     type: object
   models.Sanctum:
     properties:

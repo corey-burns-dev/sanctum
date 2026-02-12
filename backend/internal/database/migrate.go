@@ -30,10 +30,14 @@ func init() {
 }
 
 func RegisterMigrations(efs embed.FS) error {
+	migrations = nil
+
 	entries, err := efs.ReadDir("migrations")
 	if err != nil {
 		return fmt.Errorf("failed to read migrations directory: %w", err)
 	}
+
+	seenVersions := make(map[int]string)
 
 	for _, entry := range entries {
 		if entry.IsDir() {
@@ -57,6 +61,10 @@ func RegisterMigrations(efs embed.FS) error {
 			middleware.Logger.Warn("Skipping migration with invalid version", slog.String("file", name), slog.String("version", parts[0]))
 			continue
 		}
+		if existing, ok := seenVersions[version]; ok {
+			return fmt.Errorf("duplicate migration version %06d: %s and %s", version, existing, name)
+		}
+		seenVersions[version] = name
 
 		upBytes, err := efs.ReadFile(filepath.Join("migrations", name))
 		if err != nil {
@@ -66,7 +74,7 @@ func RegisterMigrations(efs embed.FS) error {
 		downName := base + ".down.sql"
 		downBytes, err := efs.ReadFile(filepath.Join("migrations", downName))
 		if err != nil {
-			return fmt.Errorf("failed to read down migration %s: %w", downName, err)
+			return fmt.Errorf("missing required down migration for %s: %w", name, err)
 		}
 
 		migrations = append(migrations, Migration{

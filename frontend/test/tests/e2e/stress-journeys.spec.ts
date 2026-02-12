@@ -10,12 +10,13 @@ test.describe('Stress Journeys @preprod', () => {
 
     await expect(page).toHaveURL('/')
 
-    // 2. Create Post
+    // 2. Create Post (expand composer, then fill text and submit)
+    await page.click('button:has-text("What\'s on your mind")')
     await page.fill(
-      'textarea[placeholder*="What\'s on your mind"]',
+      'textarea[placeholder*="Write your post"]',
       'Stress test post from Playwright'
     )
-    await page.click('button:has-text("Post")')
+    await page.click('button:has-text("Post"):not(:has-text("Comment"))')
 
     // 3. Verify post appeared (simplified)
     await expect(

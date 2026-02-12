@@ -1,17 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
-import {
-  Hash,
-  MessageCircle,
-  PanelLeftClose,
-  PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
-  Send,
-  Users,
-  X,
-} from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
 import type { Conversation, Message, User } from '@/api/types'
 import { MessageList } from '@/components/chat/MessageList'
 import { ParticipantsList } from '@/components/chat/ParticipantsList'
@@ -41,6 +27,20 @@ import {
 import { cn } from '@/lib/utils'
 import { useChatContext } from '@/providers/ChatProvider'
 import { useChatDockStore } from '@/stores/useChatDockStore'
+import { useQueryClient } from '@tanstack/react-query'
+import {
+  Hash,
+  MessageCircle,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+  Send,
+  Users,
+  X,
+} from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 
 export default function Chat() {
   const { id: urlChatId } = useParams<{ id: string }>()
@@ -903,7 +903,7 @@ export default function Chat() {
               </div>
 
               <ScrollArea className='min-h-0 flex-1'>
-                <div className='grid grid-cols-2 gap-1.5 p-2'>
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-1.5 p-2'>
                   {allLoading ? (
                     <div className='col-span-2 p-4 text-center text-xs text-muted-foreground'>
                       Loading chatrooms...
@@ -930,7 +930,7 @@ export default function Chat() {
                           )}
                         >
                           <div className='flex items-center justify-between gap-2'>
-                            <p className='truncate text-[13px] font-semibold text-foreground'>
+                            <p className='text-[13px] font-semibold text-foreground wrap-break-word whitespace-normal'>
                               {room.name || `Room ${room.id}`}
                             </p>
                             {!joined && (
@@ -939,14 +939,15 @@ export default function Chat() {
                               </span>
                             )}
                           </div>
-                          <p className='mt-0.5 truncate text-[11px] text-muted-foreground'>
-                            {room.participants?.length || 0} members
-                            {getRoomOnlineCount(room) > 0 && (
-                              <span className='text-emerald-500'>
-                                {' '}
-                                · {getRoomOnlineCount(room)} online
-                              </span>
+                          <p
+                            className={cn(
+                              'mt-0.5 text-[11px] wrap-break-word',
+                              (room.participants?.length || 0) > 0
+                                ? 'text-emerald-500'
+                                : 'text-muted-foreground'
                             )}
+                          >
+                            {room.participants?.length || 0} members
                           </p>
                         </button>
                       )

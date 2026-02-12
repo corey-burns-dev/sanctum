@@ -42,6 +42,15 @@ func TestCheckRateLimit(t *testing.T) {
 			env:           "test",
 		},
 		{
+			name:          "Development Environment Bypass",
+			resource:      "test",
+			id:            "1",
+			limit:         1,
+			window:        time.Minute,
+			expectedAllow: true,
+			env:           "development",
+		},
+		{
 			name:          "Nil Redis Fail-Open",
 			resource:      "test",
 			id:            "1",

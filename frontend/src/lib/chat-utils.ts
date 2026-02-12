@@ -81,9 +81,10 @@ export function deduplicateDMConversations(
   return deduped
 }
 
-/** Build the WebSocket base URL from the current page location or VITE_API_URL */
+/** Build the WebSocket base URL from VITE_API_URL when absolute, else same-origin */
 export function getWsBaseUrl(): string {
-  // If VITE_API_URL is an absolute URL, derive WS from it
+  // Prefer explicit API host when configured with an absolute URL.
+  // This keeps WS routing aligned with API routing in all environments.
   const apiUrl = import.meta.env.VITE_API_URL
   if (apiUrl?.startsWith('http')) {
     const url = new URL(apiUrl)
@@ -91,8 +92,8 @@ export function getWsBaseUrl(): string {
     return `${protocol}//${url.host}`
   }
 
-  // Fallback to same-origin
+  // Fallback to same-origin (supports relative /api and proxy-based setups)
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const host = window.location.host // includes port if present
+  const host = window.location.host
   return `${protocol}//${host}`
 }

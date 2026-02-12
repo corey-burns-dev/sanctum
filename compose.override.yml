@@ -8,6 +8,7 @@ services:
       - "${GO_PORT:-8375}:${GO_PORT:-8375}"
     volumes:
       - .:/app
+      - ./tmp/uploads:/var/sanctum/uploads
     command: air -c .air.toml
     env_file:
       - .env
@@ -31,6 +32,7 @@ services:
       - VITE_API_URL=http://localhost:${GO_PORT:-8375}/api
     volumes:
       - ./frontend:/app
+      - ./tmp/uploads:/var/sanctum/uploads:ro
 
   # Test services are dev-only
   postgres_test:

@@ -108,7 +108,17 @@ func TestMigrationsApplyFreshDB(t *testing.T) {
 	runMigrations(t, cfg, dbName)
 	db := openEphemeralGorm(t, cfg, dbName)
 
-	tables := []string{"sanctums", "sanctum_requests", "sanctum_memberships"}
+	tables := []string{
+		"users",
+		"posts",
+		"polls",
+		"poll_options",
+		"poll_votes",
+		"images",
+		"sanctums",
+		"sanctum_requests",
+		"sanctum_memberships",
+	}
 	for _, table := range tables {
 		var exists bool
 		if err := db.Raw(`SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name = ?)`, table).Scan(&exists).Error; err != nil {
@@ -169,6 +179,65 @@ WHERE table_schema='public' AND table_name='game_rooms' AND column_name='opponen
 	}
 	if nullable != "YES" {
 		t.Fatalf("expected game_rooms.opponent_id to be nullable, got %q", nullable)
+	}
+
+	// Verify post polymorphic fields and post_type constraint.
+	postColumns := []string{"post_type", "link_url", "youtube_url"}
+	for _, column := range postColumns {
+		var exists bool
+		if err := db.Raw(`
+SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='posts' AND column_name = ?
+)`, column).Scan(&exists).Error; err != nil {
+			t.Fatalf("check posts.%s column: %v", column, err)
+		}
+		if !exists {
+			t.Fatalf("expected posts.%s to exist", column)
+		}
+	}
+
+	var postTypeCheckExists bool
+	if err := db.Raw(`
+SELECT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'chk_posts_post_type'
+)`).Scan(&postTypeCheckExists).Error; err != nil {
+		t.Fatalf("check post_type constraint: %v", err)
+	}
+	if !postTypeCheckExists {
+		t.Fatal("expected chk_posts_post_type constraint to exist")
+	}
+
+	// Verify poll vote uniqueness and image lookup indexes.
+	var pollVoteUniqueExists bool
+	if err := db.Raw(`
+SELECT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'uq_poll_votes_user_poll'
+)`).Scan(&pollVoteUniqueExists).Error; err != nil {
+		t.Fatalf("check poll vote unique constraint: %v", err)
+	}
+	if !pollVoteUniqueExists {
+		t.Fatal("expected uq_poll_votes_user_poll constraint to exist")
+	}
+
+	for _, idx := range []string{"uq_images_hash", "idx_images_user", "idx_images_user_uploaded_at", "idx_images_uploaded_at"} {
+		var exists bool
+		if err := db.Raw(`
+	SELECT EXISTS (
+    SELECT 1
+    FROM pg_indexes
+    WHERE tablename = 'images' AND indexname = ?
+)`, idx).Scan(&exists).Error; err != nil {
+			t.Fatalf("check %s index: %v", idx, err)
+		}
+		if !exists {
+			t.Fatalf("expected %s index to exist", idx)
+		}
 	}
 }
 

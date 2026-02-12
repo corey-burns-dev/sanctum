@@ -6,16 +6,23 @@ import { formatDistanceToNow } from 'date-fns'
 import {
     Heart,
     Image,
+    Link2,
     Loader2,
     MessageCircle,
     Send,
-    Smile,
+    Type,
+    Video,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 // Types
-import type { Post } from '@/api/types'
+import type { Post, PostType } from '@/api/types'
+import { LinkCard } from '@/components/posts/LinkCard'
+import { PollBlock } from '@/components/posts/PollBlock'
 import { PostCaption } from '@/components/posts/PostCaption'
+import { PostComposerEditor } from '@/components/posts/PostComposerEditor'
+import { ResponsiveImage } from '@/components/posts/ResponsiveImage'
+import { YouTubeEmbed } from '@/components/posts/YouTubeEmbed'
 // Components
 import { UserMenu } from '@/components/UserMenu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -27,13 +34,29 @@ import { useCreatePost, useInfinitePosts, useLikePost } from '@/hooks/usePosts'
 import { getCurrentUser, useIsAuthenticated } from '@/hooks/useUsers'
 import { getAvatarUrl } from '@/lib/chat-utils'
 import { handleAuthOrFKError } from '@/lib/handleAuthOrFKError'
+import { normalizeImageURL } from '@/lib/mediaUrl'
 import { cn } from '@/lib/utils'
 
+const POST_TYPES: { type: PostType; label: string; icon: typeof Type }[] = [
+  { type: 'text', label: 'Text', icon: Type },
+  { type: 'media', label: 'Media', icon: Image },
+  { type: 'video', label: 'Video', icon: Video },
+  { type: 'link', label: 'Link', icon: Link2 },
+  { type: 'poll', label: 'Poll', icon: MessageCircle },
+]
+
 export default function Posts() {
+  const [newPostType, setNewPostType] = useState<PostType>('text')
   const [newPostTitle, setNewPostTitle] = useState('')
   const [newPostContent, setNewPostContent] = useState('')
-  const [newPostImage, setNewPostImage] = useState('')
+  const [newPostImageFile, setNewPostImageFile] = useState<File | null>(null)
+  const [newPostImagePreview, setNewPostImagePreview] = useState('')
+  const [newPostLinkUrl, setNewPostLinkUrl] = useState('')
+  const [newPostYoutubeUrl, setNewPostYoutubeUrl] = useState('')
+  const [newPollQuestion, setNewPollQuestion] = useState('')
+  const [newPollOptions, setNewPollOptions] = useState<string[]>(['', ''])
   const [isExpandingPost, setIsExpandingPost] = useState(false)
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
 
   const isAuthenticated = useIsAuthenticated()
   const currentUser = getCurrentUser()
@@ -79,31 +102,99 @@ export default function Posts() {
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
-  const handleNewPost = () => {
-    if (!newPostContent.trim()) return
+  useEffect(() => {
+    if (!newPostImageFile) {
+      setNewPostImagePreview('')
+      return
+    }
+    const objectURL = URL.createObjectURL(newPostImageFile)
+    setNewPostImagePreview(objectURL)
+    return () => {
+      URL.revokeObjectURL(objectURL)
+    }
+  }, [newPostImageFile])
 
-    createPostMutation.mutate(
-      {
-        title: newPostTitle.trim() || `${currentUser?.username}'s Post`,
-        content: newPostContent,
-        image_url: newPostImage.trim() || undefined,
-      },
-      {
-        onSuccess: () => {
-          setNewPostTitle('')
-          setNewPostContent('')
-          setNewPostImage('')
-          setIsExpandingPost(false)
-          // Invalidate posts query to refresh the list
-          queryClient.invalidateQueries({ queryKey: ['posts'] })
-        },
-        onError: error => {
-          if (!handleAuthOrFKError(error)) {
-            console.error('Failed to create post:', error)
-          }
-        },
+  const canSubmitNewPost = () => {
+    switch (newPostType) {
+      case 'media':
+        return Boolean(newPostImageFile)
+      case 'video':
+        return Boolean(newPostYoutubeUrl.trim())
+      case 'link':
+        return Boolean(newPostLinkUrl.trim())
+      case 'poll':
+        return (
+          Boolean(newPollQuestion.trim()) &&
+          newPollOptions.filter(o => o.trim()).length >= 2
+        )
+      default:
+        return Boolean(newPostContent.trim())
+    }
+  }
+
+  const handleNewPost = async () => {
+    if (!canSubmitNewPost()) return
+
+    const title =
+      newPostTitle.trim() || `${currentUser?.username}'s Post`
+    let content = newPostContent.trim()
+    if (newPostType === 'poll') content = newPollQuestion
+
+    let uploadedImageURL: string | undefined
+    if (newPostType === 'media' && newPostImageFile) {
+      try {
+        setIsUploadingImage(true)
+        const uploaded = await apiClient.uploadImage(newPostImageFile)
+        uploadedImageURL = normalizeImageURL(uploaded.url)
+      } catch (error) {
+        setIsUploadingImage(false)
+        if (!handleAuthOrFKError(error)) {
+          console.error('Failed to upload image:', error)
+        }
+        return
       }
-    )
+      setIsUploadingImage(false)
+    }
+
+    const payload = {
+      title,
+      content: content || '',
+      post_type: newPostType,
+      image_url: uploadedImageURL,
+      link_url:
+        newPostType === 'link' && newPostLinkUrl.trim()
+          ? newPostLinkUrl.trim()
+          : undefined,
+      youtube_url:
+        newPostType === 'video' && newPostYoutubeUrl.trim()
+          ? newPostYoutubeUrl.trim()
+          : undefined,
+      poll:
+        newPostType === 'poll'
+          ? {
+              question: newPollQuestion.trim(),
+              options: newPollOptions.filter(o => o.trim()),
+            }
+          : undefined,
+    }
+
+    try {
+      await createPostMutation.mutateAsync(payload)
+      setNewPostTitle('')
+      setNewPostContent('')
+      setNewPostImageFile(null)
+      setNewPostImagePreview('')
+      setNewPostLinkUrl('')
+      setNewPostYoutubeUrl('')
+      setNewPollQuestion('')
+      setNewPollOptions(['', ''])
+      setIsExpandingPost(false)
+      queryClient.invalidateQueries({ queryKey: ['posts'] })
+    } catch (error) {
+      if (!handleAuthOrFKError(error)) {
+        console.error('Failed to create post:', error)
+      }
+    }
   }
 
   const handleLikeToggle = (post: Post) => {
@@ -176,101 +267,245 @@ export default function Posts() {
                   </AvatarFallback>
                 </Avatar>
                 <div className='flex-1 space-y-3'>
-                  <label
-                    htmlFor='post-content'
-                    className={cn(
-                      'bg-muted px-4 py-2.5 rounded-3xl transition-all cursor-text block',
-                      !isExpandingPost && 'hover:bg-muted/80'
-                    )}
-                  >
-                    <Textarea
-                      id='post-content'
-                      placeholder={`What's on your mind, ${currentUser?.username}?`}
-                      value={newPostContent}
-                      onChange={e => {
-                        setNewPostContent(e.target.value)
-                        if (!isExpandingPost) setIsExpandingPost(true)
-                      }}
-                      onFocus={() => {
-                        if (!isExpandingPost) setIsExpandingPost(true)
-                      }}
-                      className='resize-none bg-transparent border-none focus-visible:ring-0 p-0 text-[15px] min-h-10 placeholder:text-muted-foreground/60 w-full shadow-none focus:ring-0'
-                      rows={isExpandingPost ? 3 : 1}
-                      disabled={createPostMutation.isPending}
-                    />
-                  </label>
-
-                  {isExpandingPost && (
-                    <div className='space-y-3 animate-in fade-in slide-in-from-top-2 duration-300'>
-                      <input
-                        type='text'
-                        placeholder='Post Title (optional)...'
-                        value={newPostTitle}
-                        onChange={e => setNewPostTitle(e.target.value)}
-                        className='w-full text-sm font-semibold bg-muted/30 px-4 py-2 rounded-xl focus:outline-none placeholder:text-muted-foreground/40'
-                      />
-                      <input
-                        type='text'
-                        placeholder='Image URL (optional)...'
-                        value={newPostImage}
-                        onChange={e => setNewPostImage(e.target.value)}
-                        className='w-full text-sm bg-muted/30 px-4 py-2 rounded-xl focus:outline-none placeholder:text-muted-foreground/40'
-                      />
-                      <div className='flex justify-between items-center pt-2'>
-                        <div className='flex gap-1'>
+                  {!isExpandingPost ? (
+                    <button
+                      type='button'
+                      onClick={() => setIsExpandingPost(true)}
+                      className={cn(
+                        'w-full text-left bg-muted px-4 py-2.5 rounded-3xl transition-all hover:bg-muted/80 text-[15px] text-muted-foreground'
+                      )}
+                    >
+                      {`What's on your mind, ${currentUser?.username}?`}
+                    </button>
+                  ) : (
+                    <>
+                      <div className='flex gap-2 flex-wrap'>
+                        {POST_TYPES.map(({ type, label, icon: Icon }) => (
                           <Button
-                            variant='ghost'
-                            size='sm'
+                            key={type}
                             type='button'
-                            onClick={() => setIsExpandingPost(false)}
-                            className='text-xs font-semibold text-muted-foreground'
+                            variant={newPostType === type ? 'secondary' : 'ghost'}
+                            size='sm'
+                            className='gap-1.5'
+                            onClick={() => setNewPostType(type)}
                           >
-                            Cancel
+                            <Icon className='w-4 h-4' />
+                            {label}
                           </Button>
+                        ))}
+                      </div>
+
+                      {(newPostType === 'text' ||
+                        newPostType === 'media' ||
+                        newPostType === 'video' ||
+                        newPostType === 'link') && (
+                        <input
+                          type='text'
+                          placeholder='Title (optional)...'
+                          value={newPostTitle}
+                          onChange={e => setNewPostTitle(e.target.value)}
+                          className='w-full text-sm font-semibold bg-muted/30 px-4 py-2 rounded-xl focus:outline-none placeholder:text-muted-foreground/40'
+                        />
+                      )}
+
+                      {newPostType === 'text' && (
+                        <PostComposerEditor
+                          value={newPostContent}
+                          onChange={setNewPostContent}
+                          placeholder='Write your post...'
+                          disabled={createPostMutation.isPending}
+                          minRows={4}
+                        />
+                      )}
+
+                      {newPostType === 'media' && (
+                        <>
+                          <PostComposerEditor
+                            value={newPostContent}
+                            onChange={setNewPostContent}
+                            placeholder='Caption (optional)...'
+                            disabled={createPostMutation.isPending}
+                            minRows={3}
+                          />
+                          <input
+                            type='file'
+                            accept='image/jpeg,image/png,image/gif,image/webp'
+                            onChange={e =>
+                              setNewPostImageFile(
+                                e.target.files && e.target.files[0]
+                                  ? e.target.files[0]
+                                  : null
+                              )
+                            }
+                            className='w-full text-sm bg-muted/30 px-4 py-2 rounded-xl focus:outline-none file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium'
+                          />
+                          {newPostImagePreview && (
+                            <img
+                              src={newPostImagePreview}
+                              alt='Upload preview'
+                              className='max-h-56 w-auto rounded-xl border border-border object-contain'
+                            />
+                          )}
+                        </>
+                      )}
+
+                      {newPostType === 'video' && (
+                        <>
+                          <input
+                            type='url'
+                            placeholder='YouTube URL (required)...'
+                            value={newPostYoutubeUrl}
+                            onChange={e =>
+                              setNewPostYoutubeUrl(e.target.value)
+                            }
+                            className='w-full text-sm bg-muted/30 px-4 py-2 rounded-xl focus:outline-none placeholder:text-muted-foreground/40'
+                          />
+                          <Textarea
+                            placeholder='Caption (optional)...'
+                            value={newPostContent}
+                            onChange={e => setNewPostContent(e.target.value)}
+                            className='min-h-16 resize-none bg-muted/30'
+                            disabled={createPostMutation.isPending}
+                          />
+                        </>
+                      )}
+
+                      {newPostType === 'link' && (
+                        <>
+                          <input
+                            type='url'
+                            placeholder='Link URL (required)...'
+                            value={newPostLinkUrl}
+                            onChange={e => setNewPostLinkUrl(e.target.value)}
+                            className='w-full text-sm bg-muted/30 px-4 py-2 rounded-xl focus:outline-none placeholder:text-muted-foreground/40'
+                          />
+                          <Textarea
+                            placeholder='Description (optional)...'
+                            value={newPostContent}
+                            onChange={e => setNewPostContent(e.target.value)}
+                            className='min-h-16 resize-none bg-muted/30'
+                            disabled={createPostMutation.isPending}
+                          />
+                        </>
+                      )}
+
+                      {newPostType === 'poll' && (
+                        <div className='space-y-2'>
+                          <input
+                            type='text'
+                            placeholder='Poll question (required)...'
+                            value={newPollQuestion}
+                            onChange={e =>
+                              setNewPollQuestion(e.target.value)
+                            }
+                            className='w-full text-sm font-medium bg-muted/30 px-4 py-2 rounded-xl focus:outline-none placeholder:text-muted-foreground/40'
+                          />
+                          <div className='space-y-1.5'>
+                            {newPollOptions.map((opt, i) => (
+                              <div
+                                key={i}
+                                className='flex gap-2 items-center'
+                              >
+                                <input
+                                  type='text'
+                                  placeholder={`Option ${i + 1}`}
+                                  value={opt}
+                                  onChange={e => {
+                                    const next = [...newPollOptions]
+                                    next[i] = e.target.value
+                                    setNewPollOptions(next)
+                                  }}
+                                  className='flex-1 text-sm bg-muted/30 px-4 py-2 rounded-xl focus:outline-none placeholder:text-muted-foreground/40'
+                                />
+                                <Button
+                                  type='button'
+                                  variant='ghost'
+                                  size='sm'
+                                  className='shrink-0'
+                                  onClick={() => {
+                                    if (newPollOptions.length > 2) {
+                                      setNewPollOptions(
+                                        newPollOptions.filter(
+                                          (_, j) => j !== i
+                                        )
+                                      )
+                                    }
+                                  }}
+                                  disabled={newPollOptions.length <= 2}
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            ))}
+                            <Button
+                              type='button'
+                              variant='outline'
+                              size='sm'
+                              onClick={() =>
+                                setNewPollOptions([
+                                  ...newPollOptions,
+                                  '',
+                                ])
+                              }
+                            >
+                              Add option
+                            </Button>
+                          </div>
                         </div>
+                      )}
+
+                      <div className='flex justify-between items-center pt-2'>
+                        <Button
+                          variant='ghost'
+                          size='sm'
+                          type='button'
+                          onClick={() => setIsExpandingPost(false)}
+                          className='text-xs font-semibold text-muted-foreground'
+                        >
+                          Cancel
+                        </Button>
                         <Button
                           onClick={handleNewPost}
                           size='sm'
                           disabled={
-                            !newPostContent.trim() ||
-                            createPostMutation.isPending
+                            !canSubmitNewPost() ||
+                            createPostMutation.isPending ||
+                            isUploadingImage
                           }
                           className='rounded-full px-6 shadow-sm'
                         >
-                          {createPostMutation.isPending ? (
+                          {createPostMutation.isPending || isUploadingImage ? (
                             <Loader2 className='w-4 h-4 mr-2 animate-spin' />
                           ) : (
                             <Send className='w-4 h-4 mr-2' />
                           )}
-                          Post
+                          {isUploadingImage ? 'Uploading...' : 'Post'}
                         </Button>
                       </div>
-                    </div>
+                    </>
                   )}
                 </div>
               </div>
 
               {!isExpandingPost && (
-                <div className='flex border-t pt-3 justify-around'>
-                  {/* Live/video posting removed in production branch */}
-                  <Button
-                    variant='ghost'
-                    size='sm'
-                    className='gap-2 text-muted-foreground flex-1 hover:bg-muted'
-                    onClick={() => setIsExpandingPost(true)}
-                  >
-                    <Image className='w-4 h-4 text-green-500' />
-                    <span className='text-xs font-semibold'>Media</span>
-                  </Button>
-                  <Button
-                    variant='ghost'
-                    size='sm'
-                    className='gap-2 text-muted-foreground flex-1 hover:bg-muted'
-                    onClick={() => setIsExpandingPost(true)}
-                  >
-                    <Smile className='w-4 h-4 text-yellow-500' />
-                    <span className='text-xs font-semibold'>Feeling</span>
-                  </Button>
+                <div className='flex border-t pt-3 justify-around flex-wrap gap-1'>
+                  {POST_TYPES.map(({ type, label, icon: Icon }) => (
+                    <Button
+                      key={type}
+                      variant='ghost'
+                      size='sm'
+                      className='gap-2 text-muted-foreground flex-1 min-w-0 hover:bg-muted'
+                      onClick={() => {
+                        setNewPostType(type)
+                        setIsExpandingPost(true)
+                      }}
+                    >
+                      <Icon className='w-4 h-4 shrink-0' />
+                      <span className='text-xs font-semibold truncate'>
+                        {label}
+                      </span>
+                    </Button>
+                  ))}
                 </div>
               )}
             </CardContent>
@@ -291,7 +526,7 @@ export default function Posts() {
                   navigate(`/posts/${post.id}`)
                 }
               }}
-              className='border bg-card/95 shadow-sm rounded-2xl overflow-hidden text-sm transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer'
+              className='border bg-card/95 shadow-sm rounded-2xl overflow-hidden text-sm transition-shadow hover:shadow-md cursor-pointer'
             >
               <div className='flex items-center justify-between px-4 py-3'>
                 <div className='flex items-center gap-3'>
@@ -355,63 +590,91 @@ export default function Posts() {
 
               {/* Post Media / Content */}
               <div className='px-4 pb-3'>
-                {post.image_url ? (
-                  <div className='relative aspect-square w-full bg-muted overflow-hidden rounded-xl'>
-                    <img
-                      src={post.image_url}
+                {editingPostId === post.id ? (
+                  <div className='p-4 bg-muted/30 rounded-xl border border-border/60 space-y-4'>
+                    <input
+                      type='text'
+                      value={editingPostTitle}
+                      onChange={e => setEditingPostTitle(e.target.value)}
+                      className='w-full font-bold bg-transparent border-none focus:ring-0 p-0 text-base'
+                      placeholder='Title'
+                    />
+                    <Textarea
+                      value={editingPostContent}
+                      onChange={e => setEditingPostContent(e.target.value)}
+                      className='min-h-25 border-none focus-visible:ring-0 p-0 -ml-1 resize-none'
+                    />
+                    <div className='flex justify-end gap-2 pt-2'>
+                      <Button
+                        size='sm'
+                        variant='ghost'
+                        onClick={cancelEditPost}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size='sm'
+                        onClick={() => saveEditPost(post.id)}
+                      >
+                        Save
+                      </Button>
+                    </div>
+                  </div>
+                ) : post.youtube_url ? (
+                  <div className='space-y-2'>
+                    <YouTubeEmbed url={post.youtube_url} />
+                    {post.content ? (
+                      <div className='p-4 bg-muted/30 rounded-xl border border-border/60'>
+                        <PostCaption content={post.content} />
+                      </div>
+                    ) : null}
+                  </div>
+                ) : post.link_url ? (
+                  <div className='space-y-2'>
+                    <LinkCard
+                      url={post.link_url}
+                      title={post.title}
+                    />
+                    {post.content ? (
+                      <div className='p-4 bg-muted/30 rounded-xl border border-border/60'>
+                        <PostCaption content={post.content} />
+                      </div>
+                    ) : null}
+                  </div>
+                ) : post.poll ? (
+                  <div className='space-y-2'>
+                    <PollBlock
+                      poll={post.poll}
+                      postId={post.id}
+                      onVoteClick={e => {
+                        e.stopPropagation()
+                        navigate(`/posts/${post.id}`)
+                      }}
+                    />
+                  </div>
+                ) : post.image_url ? (
+                  <div className='space-y-2'>
+                    <ResponsiveImage
+                      variants={post.image_variants}
+                      fallbackUrl={post.image_url}
                       alt={`Post by ${post.user?.username}`}
-                      className='w-full h-full object-cover'
+                      sizes='(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 640px'
+                      cropMode={post.image_crop_mode}
                       loading='lazy'
                     />
+                    {post.content ? (
+                      <PostCaption
+                        username={post.user?.username}
+                        content={post.content}
+                      />
+                    ) : null}
                   </div>
                 ) : (
                   <div className='p-4 bg-muted/30 rounded-xl border border-border/60'>
-                    {editingPostId === post.id ? (
-                      <div className='space-y-4'>
-                        <input
-                          type='text'
-                          value={editingPostTitle}
-                          onChange={e => setEditingPostTitle(e.target.value)}
-                          className='w-full font-bold bg-transparent border-none focus:ring-0 p-0 text-base'
-                          placeholder='Title'
-                          onClick={event => event.stopPropagation()}
-                        />
-                        <Textarea
-                          value={editingPostContent}
-                          onChange={e => setEditingPostContent(e.target.value)}
-                          className='min-h-25 border-none focus-visible:ring-0 p-0 -ml-1 resize-none'
-                          onClick={event => event.stopPropagation()}
-                        />
-                        <div className='flex justify-end gap-2 pt-2'>
-                          <Button
-                            size='sm'
-                            variant='ghost'
-                            onClick={event => {
-                              event.stopPropagation()
-                              cancelEditPost()
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            size='sm'
-                            onClick={event => {
-                              event.stopPropagation()
-                              saveEditPost(post.id)
-                            }}
-                          >
-                            Save
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className='space-y-2'>
-                        <PostCaption
-                          title={post.title}
-                          content={post.content}
-                        />
-                      </div>
-                    )}
+                    <PostCaption
+                      title={post.title}
+                      content={post.content}
+                    />
                   </div>
                 )}
               </div>

@@ -19,7 +19,7 @@ GREEN := \033[1;32m
 YELLOW := \033[1;33m
 NC := \033[0m # No Color
 
-.PHONY: help dev dev-backend dev-frontend dev-both build build-backend build-frontend up down recreate recreate-frontend recreate-backend logs logs-backend logs-frontend logs-all fmt fmt-frontend lint lint-frontend install env restart check-versions versions-check clean test test-api test-backend-integration test-frontend test-up test-down test-backend seed db-migrate db-migrate-auto db-schema-status deps-update deps-update-backend deps-update-frontend deps-tidy deps-check deps-vuln deps-audit deps-freshness monitor-up monitor-down monitor-logs monitor-config monitor-lite-up monitor-lite-down config-sanity
+.PHONY: help dev dev-backend dev-frontend dev-both build build-backend build-frontend up down recreate recreate-frontend recreate-backend logs logs-backend logs-frontend logs-all fmt fmt-frontend lint lint-frontend install env restart check-versions versions-check clean test test-api test-backend-integration test-frontend test-up test-down test-backend seed db-migrate db-migrate-up db-migrate-auto db-schema-status db-reset-dev deps-update deps-update-backend deps-update-frontend deps-tidy deps-check deps-vuln deps-audit deps-freshness monitor-up monitor-down monitor-logs monitor-config monitor-lite-up monitor-lite-down config-sanity
 
 # Default target
 help:
@@ -73,9 +73,10 @@ help:
 	@echo ""
 	@echo "$(GREEN)Database:$(NC)"
 	@echo "  make seed               - 🌱 Seed database with test data"
-	@echo "  make db-migrate         - 🧭 Apply SQL migrations"
+	@echo "  make db-migrate         - 🧭 Apply SQL migrations (Docker)"
 	@echo "  make db-migrate-auto    - 🧭 Run AutoMigrate mode (explicit)"
-	@echo "  make db-schema-status   - 🧭 Show schema mode and migration status"
+	@echo "  make db-schema-status   - 🧭 Show schema mode and migration status (Docker)"
+	@echo "  make db-reset-dev       - 🧹 Reset dev DB volumes and reapply migrations"
 	@echo ""
 	@echo "$(GREEN)Utilities:$(NC)"
 	@echo "  make env                - ⚙️  Initialize .env file"
@@ -328,18 +329,31 @@ seed:
 	@echo "$(YELLOW)📧 Test users password: password123$(NC)"
 
 db-migrate:
-	@echo "$(BLUE)Applying SQL migrations...$(NC)"
-	cd backend && $(GO) run ./cmd/migrate/main.go up
+	@echo "$(BLUE)Applying SQL migrations inside Docker app container...$(NC)"
+	$(DOCKER_COMPOSE) $(COMPOSE_FILES) up -d postgres redis
+	$(DOCKER_COMPOSE) $(COMPOSE_FILES) run --rm --no-deps app sh -c "cd /app/backend && go run ./cmd/migrate/main.go up"
 	@echo "$(GREEN)✓ SQL migrations applied$(NC)"
 
+# Alias for db-migrate
+db-migrate-up: db-migrate
+
 db-migrate-auto:
-	@echo "$(BLUE)Running explicit automigrations...$(NC)"
-	cd backend && DB_SCHEMA_MODE=auto $(GO) run ./cmd/migrate/main.go auto
+	@echo "$(BLUE)Running explicit automigrations inside Docker app container...$(NC)"
+	$(DOCKER_COMPOSE) $(COMPOSE_FILES) up -d postgres redis
+	$(DOCKER_COMPOSE) $(COMPOSE_FILES) run --rm --no-deps app sh -c "cd /app/backend && DB_SCHEMA_MODE=auto go run ./cmd/migrate/main.go auto"
 	@echo "$(GREEN)✓ Automigrations completed$(NC)"
 
 db-schema-status:
-	@echo "$(BLUE)Schema status...$(NC)"
-	cd backend && $(GO) run ./cmd/migrate/main.go status
+	@echo "$(BLUE)Schema status (inside Docker app container)...$(NC)"
+	$(DOCKER_COMPOSE) $(COMPOSE_FILES) up -d postgres redis
+	$(DOCKER_COMPOSE) $(COMPOSE_FILES) run --rm --no-deps app sh -c "cd /app/backend && go run ./cmd/migrate/main.go status"
+
+db-reset-dev:
+	@echo "$(BLUE)Resetting dev stack volumes and migration state...$(NC)"
+	$(DOCKER_COMPOSE) $(COMPOSE_FILES) down -v --remove-orphans
+	$(DOCKER_COMPOSE) $(COMPOSE_FILES) up -d postgres redis
+	$(MAKE) db-migrate
+	@echo "$(GREEN)✓ Dev DB reset complete$(NC)"
 
 # Dependency Management
 deps-install-backend:

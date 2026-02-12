@@ -1,8 +1,12 @@
 import { formatDistanceToNow } from 'date-fns'
 import { ArrowLeft, Heart, Loader2 } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
+import { LinkCard } from '@/components/posts/LinkCard'
 import { PostCaption } from '@/components/posts/PostCaption'
 import { PostComments } from '@/components/posts/PostComments'
+import { PollBlock } from '@/components/posts/PollBlock'
+import { ResponsiveImage } from '@/components/posts/ResponsiveImage'
+import { YouTubeEmbed } from '@/components/posts/YouTubeEmbed'
 import { UserMenu } from '@/components/UserMenu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -97,19 +101,36 @@ export default function PostDetail() {
               )}
             </div>
 
-            {post.image_url ? (
-              <div className='relative w-full bg-muted overflow-hidden'>
-                <img
-                  src={post.image_url}
-                  alt={`Post by ${post.user?.username}`}
-                  className='w-full max-h-130 object-cover'
-                  loading='lazy'
-                />
+            {post.youtube_url ? (
+              <div className='px-5 pt-4'>
+                <YouTubeEmbed url={post.youtube_url} />
               </div>
+            ) : null}
+            {post.link_url ? (
+              <div className='px-5 pt-4'>
+                <LinkCard url={post.link_url} title={post.title} />
+              </div>
+            ) : null}
+            {post.poll ? (
+              <div className='px-5 pt-4'>
+                <PollBlock poll={post.poll} postId={post.id} />
+              </div>
+            ) : null}
+            {post.image_url ? (
+              <ResponsiveImage
+                variants={post.image_variants}
+                fallbackUrl={post.image_url}
+                alt={`Post by ${post.user?.username}`}
+                sizes='(max-width: 1024px) 100vw, 1080px'
+                cropMode={post.image_crop_mode}
+                loading='lazy'
+              />
             ) : null}
 
             <div className='px-5 py-4 space-y-4'>
-              <PostCaption title={post.title} content={post.content} />
+              {!post.poll && (post.title || post.content) ? (
+                <PostCaption title={post.title} content={post.content} />
+              ) : null}
 
               <div className='flex items-center gap-4'>
                 <button

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 	"time"
 
@@ -94,6 +95,9 @@ CREATE INDEX IF NOT EXISTS idx_migration_logs_applied_at ON migration_logs (appl
 	if err != nil {
 		return err
 	}
+	if err := validateAppliedVersions(applied, migrations); err != nil {
+		return err
+	}
 
 	appliedSet := make(map[int]bool)
 	for _, v := range applied {
@@ -113,6 +117,36 @@ CREATE INDEX IF NOT EXISTS idx_migration_logs_applied_at ON migration_logs (appl
 	}
 
 	return nil
+}
+
+func validateAppliedVersions(applied []int, registered []Migration) error {
+	if len(applied) == 0 {
+		return nil
+	}
+	known := make(map[int]struct{}, len(registered))
+	for _, m := range registered {
+		known[m.Version] = struct{}{}
+	}
+
+	var unknown []int
+	for _, version := range applied {
+		if _, ok := known[version]; !ok {
+			unknown = append(unknown, version)
+		}
+	}
+	if len(unknown) == 0 {
+		return nil
+	}
+
+	sort.Ints(unknown)
+	parts := make([]string, 0, len(unknown))
+	for _, version := range unknown {
+		parts = append(parts, fmt.Sprintf("%06d", version))
+	}
+	return fmt.Errorf(
+		"migration_logs contains unknown versions not present in code: %s (run make db-reset-dev in development to rebuild)",
+		strings.Join(parts, ", "),
+	)
 }
 
 func RollbackMigration(ctx context.Context, db *gorm.DB, version int) error {

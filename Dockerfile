@@ -1,20 +1,27 @@
 ARG GO_VERSION=1.25.7-alpine3.23
 FROM golang:${GO_VERSION} AS builder
 
+RUN apk add --no-cache build-base libwebp-dev
+
 WORKDIR /app
 
 COPY backend/go.mod backend/go.sum* ./
 RUN go mod download
 
 COPY backend/ .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o main ./cmd/server
+RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-w -s" -o main ./cmd/server && \
+    mkdir -p /tmp/sanctum/uploads && \
+    chmod -R 0775 /tmp/sanctum
 
-ARG DISTROLESS_IMAGE=gcr.io/distroless/static-debian12@sha256:cd64bec9cec257044ce3a8dd3620cf83b387920100332f2b041f19c4d2febf93
-FROM ${DISTROLESS_IMAGE}
+FROM alpine:3.23
+
+RUN apk add --no-cache libwebp ca-certificates && \
+    adduser -D -u 65534 nonroot
 
 WORKDIR /
 
 COPY --from=builder /app/main .
+COPY --from=builder --chown=nonroot:nonroot /tmp/sanctum /tmp/sanctum
 
 USER nonroot:nonroot
 

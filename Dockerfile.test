@@ -6,7 +6,7 @@ ENV PATH="/usr/local/go/bin:${PATH}"
 WORKDIR /app
 
 # Install dependencies for testing
-RUN apk add --no-cache postgresql-client bash build-base
+RUN apk add --no-cache postgresql-client bash build-base libwebp-dev
 
 # Enable CGO for race detection
 ENV CGO_ENABLED=1

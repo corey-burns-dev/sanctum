@@ -53,6 +53,8 @@ type Server struct {
 	shutdownFn     context.CancelFunc
 	userRepo       repository.UserRepository
 	postRepo       repository.PostRepository
+	pollRepo       repository.PollRepository
+	imageRepo      repository.ImageRepository
 	commentRepo    repository.CommentRepository
 	chatRepo       repository.ChatRepository
 	friendRepo     repository.FriendRepository
@@ -64,6 +66,7 @@ type Server struct {
 	hubs           []wireableHub // all hubs for wiring/shutdown iteration
 	featureFlags   *featureflags.Manager
 	postService    *service.PostService
+	imageService   *service.ImageService
 	commentService *service.CommentService
 	chatService    *service.ChatService
 	userService    *service.UserService
@@ -84,6 +87,8 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db)
 	postRepo := repository.NewPostRepository(db)
+	pollRepo := repository.NewPollRepository(db)
+	imageRepo := repository.NewImageRepository(db)
 	commentRepo := repository.NewCommentRepository(db)
 	chatRepo := repository.NewChatRepository(db)
 	friendRepo := repository.NewFriendRepository(db)
@@ -99,13 +104,16 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		promMiddleware: prom,
 		userRepo:       userRepo,
 		postRepo:       postRepo,
+		pollRepo:       pollRepo,
+		imageRepo:      imageRepo,
 		commentRepo:    commentRepo,
 		chatRepo:       chatRepo,
 		friendRepo:     friendRepo,
 		gameRepo:       gameRepo,
 		featureFlags:   featureflags.NewManager(cfg.FeatureFlags),
 	}
-	server.postService = service.NewPostService(server.postRepo, server.isAdminByUserID)
+	server.postService = service.NewPostService(server.postRepo, server.pollRepo, server.isAdminByUserID)
+	server.imageService = service.NewImageService(server.imageRepo, cfg)
 	server.commentService = service.NewCommentService(server.commentRepo, server.postRepo, server.isAdminByUserID)
 	server.chatService = service.NewChatService(server.chatRepo, server.userRepo, server.db, server.isAdminByUserID)
 	server.userService = service.NewUserService(server.userRepo)
@@ -131,6 +139,8 @@ func NewServerWithDeps(cfg *config.Config, db *gorm.DB, redisClient *redis.Clien
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db)
 	postRepo := repository.NewPostRepository(db)
+	pollRepo := repository.NewPollRepository(db)
+	imageRepo := repository.NewImageRepository(db)
 	commentRepo := repository.NewCommentRepository(db)
 	chatRepo := repository.NewChatRepository(db)
 	friendRepo := repository.NewFriendRepository(db)
@@ -146,6 +156,8 @@ func NewServerWithDeps(cfg *config.Config, db *gorm.DB, redisClient *redis.Clien
 		promMiddleware: prom,
 		userRepo:       userRepo,
 		postRepo:       postRepo,
+		pollRepo:       pollRepo,
+		imageRepo:      imageRepo,
 		commentRepo:    commentRepo,
 		chatRepo:       chatRepo,
 		friendRepo:     friendRepo,
@@ -153,7 +165,8 @@ func NewServerWithDeps(cfg *config.Config, db *gorm.DB, redisClient *redis.Clien
 		featureFlags:   featureflags.NewManager(cfg.FeatureFlags),
 	}
 
-	server.postService = service.NewPostService(server.postRepo, server.isAdminByUserID)
+	server.postService = service.NewPostService(server.postRepo, server.pollRepo, server.isAdminByUserID)
+	server.imageService = service.NewImageService(server.imageRepo, cfg)
 	server.commentService = service.NewCommentService(server.commentRepo, server.postRepo, server.isAdminByUserID)
 	server.chatService = service.NewChatService(server.chatRepo, server.userRepo, server.db, server.isAdminByUserID)
 	server.userService = service.NewUserService(server.userRepo)
@@ -206,27 +219,32 @@ func (s *Server) SetupMiddleware(app *fiber.App) {
 		MaxAge:           86400, // 24 hours
 	}))
 
-	// Global rate limiting (100 requests per minute per IP)
-	app.Use(limiter.New(limiter.Config{
-		Max:        100,
-		Expiration: 1 * time.Minute,
-		// Never rate-limit preflight requests; they should be handled by CORS.
-		Next: func(c *fiber.Ctx) bool {
-			return c.Method() == fiber.MethodOptions
-		},
-		KeyGenerator: func(c *fiber.Ctx) string {
-			return c.IP()
-		},
-		LimitReached: func(c *fiber.Ctx) error {
-			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
-				"error": "Too many requests, please try again later.",
-			})
-		},
-	}))
+	// Global rate limiting (100 requests per minute per IP); disabled in development so dev workflows are not throttled.
+	if s.config.Env != "development" {
+		app.Use(limiter.New(limiter.Config{
+			Max:        100,
+			Expiration: 1 * time.Minute,
+			// Never rate-limit preflight requests; they should be handled by CORS.
+			Next: func(c *fiber.Ctx) bool {
+				return c.Method() == fiber.MethodOptions
+			},
+			KeyGenerator: func(c *fiber.Ctx) string {
+				return c.IP()
+			},
+			LimitReached: func(c *fiber.Ctx) error {
+				return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+					"error": "Too many requests, please try again later.",
+				})
+			},
+		}))
+	}
 }
 
 // SetupRoutes configures all routes for the application
 func (s *Server) SetupRoutes(app *fiber.App) {
+	// Development fallback for direct media URLs; production is served by nginx.
+	app.Static("/media/i", s.config.ImageUploadDir)
+
 	api := app.Group("/api")
 
 	// Health checks
@@ -263,6 +281,9 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 		s.redis, 10, time.Minute, "search"), s.SearchPosts)
 	publicPosts.Get("/:id/comments", s.GetComments)
 	publicPosts.Get("/:id", s.GetPost)
+	images := api.Group("/images")
+	images.Get("/:hash", s.ServeImage)
+	images.Get("/:hash/status", s.GetImageStatus)
 
 	// Public sanctum routes
 	sanctums := api.Group("/sanctums")
@@ -288,6 +309,7 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 
 	// WebSocket ticket issuance
 	api.Post("/ws/ticket", s.AuthRequired(), s.IssueWSTicket)
+	protected.Post("/images/upload", s.UploadImage)
 
 	// Define specific /:id/:resource routes BEFORE generic /:id route
 	users.Get("/:id/cached", s.GetUserCached)
@@ -314,7 +336,7 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	// Protected post routes
 	posts := protected.Group("/posts")
 	posts.Post("/", middleware.RateLimit(
-		s.redis, 1, 5*time.Minute, "create_post"), s.CreatePost)
+		s.redis, 10, 5*time.Minute, "create_post"), s.CreatePost)
 	// Define specific /:id/:resource routes BEFORE generic /:id route
 	posts.Post("/:id/like", s.LikePost)
 	posts.Delete("/:id/like", s.UnlikePost)
@@ -322,6 +344,7 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 		s.redis, 1, time.Minute, "create_comment"), s.CreateComment)
 	posts.Put("/:id/comments/:commentId", s.UpdateComment)
 	posts.Delete("/:id/comments/:commentId", s.DeleteComment)
+	posts.Post("/:id/poll/vote", s.VotePoll)
 	// Generic /:id routes (for item detail, update, delete)
 	posts.Put("/:id", s.UpdatePost)
 	posts.Delete("/:id", s.DeletePost)
@@ -619,6 +642,7 @@ func (s *Server) Start() error {
 
 	s.SetupMiddleware(app)
 	s.SetupRoutes(app)
+	s.imageSvc().StartBackgroundWorker(s.shutdownCtx)
 
 	// Wire all hubs to Redis subscriber if available
 	if s.notifier != nil {

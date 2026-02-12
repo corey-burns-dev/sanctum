@@ -38,12 +38,14 @@ REDIS_URL="$(extract_cfg REDIS_URL)"
 cat > .env <<EOF
 APP_ENV=development
 DB_AUTOMIGRATE_ALLOW_DESTRUCTIVE=false
-DB_SCHEMA_MODE=hybrid
+DB_SCHEMA_MODE=sql
 GO_PORT=${GO_PORT:-8375}
 POSTGRES_DB=${POSTGRES_DB:-sanctum}
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
 POSTGRES_USER=${POSTGRES_USER:-user}
 REDIS_URL=${REDIS_URL:-localhost:6379}
+IMAGE_UPLOAD_DIR=/var/sanctum/uploads/images
+IMAGE_MAX_UPLOAD_SIZE_MB=10
 EOF
 
 echo "✓ .env generated (edit .env if needed)"

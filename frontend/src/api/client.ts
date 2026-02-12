@@ -26,6 +26,7 @@ import type {
   UpdateCommentRequest,
   UpdatePostRequest,
   UpdateProfileRequest,
+  UploadedImage,
   User,
 } from './types'
 
@@ -62,11 +63,13 @@ class ApiClient {
     const url = `${this.baseUrl}${endpoint}`
     const token = this.getAuthToken()
     const method = options.method || 'GET'
+    const isFormDataBody = options.body instanceof FormData
 
     logger.debug(`API Request: ${method} ${endpoint}`)
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+    const headers: Record<string, string> = {}
+    if (!isFormDataBody) {
+      headers['Content-Type'] = 'application/json'
     }
 
     if (options.headers) {
@@ -78,6 +81,10 @@ class ApiClient {
 
     if (token && !headers.Authorization) {
       headers.Authorization = `Bearer ${token}`
+    }
+    if (isFormDataBody) {
+      // Let the browser set multipart boundaries automatically.
+      delete headers['Content-Type']
     }
 
     try {
@@ -230,10 +237,26 @@ class ApiClient {
     })
   }
 
+  async uploadImage(file: File): Promise<UploadedImage> {
+    const formData = new FormData()
+    formData.append('image', file)
+    return this.request('/images/upload', {
+      method: 'POST',
+      body: formData,
+    })
+  }
+
   async updatePost(id: number, data: UpdatePostRequest): Promise<Post> {
     return this.request(`/posts/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    })
+  }
+
+  async votePoll(postId: number, pollOptionId: number): Promise<Post> {
+    return this.request(`/posts/${postId}/poll/vote`, {
+      method: 'POST',
+      body: JSON.stringify({ poll_option_id: pollOptionId }),
     })
   }
 

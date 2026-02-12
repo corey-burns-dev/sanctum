@@ -63,9 +63,13 @@ func main() {
 	}
 
 	// Initialize Fiber app
+	bodyLimitBytes := cfg.ImageMaxUploadSizeMB * 1024 * 1024
+	if bodyLimitBytes <= 0 {
+		bodyLimitBytes = 10 * 1024 * 1024
+	}
 	app := fiber.New(fiber.Config{
 		AppName:   "Social Media API",
-		BodyLimit: 10 * 1024 * 1024, // 10MB limit
+		BodyLimit: bodyLimitBytes,
 	})
 
 	// Setup middleware and routes

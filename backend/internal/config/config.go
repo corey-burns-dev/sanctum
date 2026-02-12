@@ -30,6 +30,8 @@ type Config struct {
 	Env                           string `mapstructure:"APP_ENV"`
 	DBSchemaMode                  string `mapstructure:"DB_SCHEMA_MODE"`
 	DBAutoMigrateAllowDestructive bool   `mapstructure:"DB_AUTOMIGRATE_ALLOW_DESTRUCTIVE"`
+	ImageUploadDir                string `mapstructure:"IMAGE_UPLOAD_DIR"`
+	ImageMaxUploadSizeMB          int    `mapstructure:"IMAGE_MAX_UPLOAD_SIZE_MB"`
 	TURNURL                       string `mapstructure:"TURN_URL"`
 	TURNUsername                  string `mapstructure:"TURN_USERNAME"`
 	TURNPassword                  string `mapstructure:"TURN_PASSWORD"`
@@ -80,6 +82,8 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("DB_SSLMODE", "disable")
 	viper.SetDefault("DB_SCHEMA_MODE", "sql")
 	viper.SetDefault("DB_AUTOMIGRATE_ALLOW_DESTRUCTIVE", false)
+	viper.SetDefault("IMAGE_UPLOAD_DIR", "/tmp/sanctum/uploads/images")
+	viper.SetDefault("IMAGE_MAX_UPLOAD_SIZE_MB", 10)
 
 	var config Config
 	if err := viper.Unmarshal(&config); err != nil {
@@ -111,6 +115,12 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("DB_SCHEMA_MODE must be one of hybrid|sql|auto, got %q", c.DBSchemaMode)
 	}
 	c.DBSchemaMode = mode
+	if c.ImageUploadDir == "" {
+		c.ImageUploadDir = "/tmp/sanctum/uploads/images"
+	}
+	if c.ImageMaxUploadSizeMB <= 0 {
+		return errors.New("IMAGE_MAX_UPLOAD_SIZE_MB must be greater than 0")
+	}
 
 	isProduction := c.Env == "production" || c.Env == "prod"
 

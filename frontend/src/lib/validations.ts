@@ -32,21 +32,87 @@ export const signupSchema = z
   })
 
 // Post schemas
-export const createPostSchema = z.object({
-  title: z
-    .string()
-    .min(1, 'Title is required')
-    .max(100, 'Title must be less than 100 characters'),
-  content: z
-    .string()
-    .min(1, 'Content is required')
-    .max(5000, 'Content must be less than 5000 characters'),
-  image_url: z
-    .string()
-    .url('Please enter a valid URL')
-    .optional()
-    .or(z.literal('')),
+const postTypeEnum = z.enum(['text', 'media', 'video', 'link', 'poll'])
+
+const createPostPollSchema = z.object({
+  question: z.string().min(1, 'Poll question is required'),
+  options: z
+    .array(z.string().min(1, 'Option cannot be empty'))
+    .min(2, 'Poll must have at least two options'),
 })
+
+export const createPostSchema = z
+  .object({
+    title: z
+      .string()
+      .min(1, 'Title is required')
+      .max(255, 'Title must be less than 255 characters'),
+    content: z.string().max(5000).optional(),
+    image_url: z
+      .string()
+      .url('Please enter a valid URL')
+      .optional()
+      .or(z.literal('')),
+    post_type: postTypeEnum.optional().default('text'),
+    link_url: z.string().url().optional().or(z.literal('')),
+    youtube_url: z.string().optional(),
+    poll: createPostPollSchema.optional(),
+  })
+  .superRefine((data, ctx) => {
+    const type = data.post_type ?? 'text'
+    if (type === 'text') {
+      if (!data.content?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Content is required',
+          path: ['content'],
+        })
+      }
+    }
+    if (type === 'media') {
+      if (!data.image_url?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Image is required for media posts',
+          path: ['image_url'],
+        })
+      }
+    }
+    if (type === 'video') {
+      if (!data.youtube_url?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'YouTube URL is required for video posts',
+          path: ['youtube_url'],
+        })
+      }
+    }
+    if (type === 'link') {
+      if (!data.link_url?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Link URL is required for link posts',
+          path: ['link_url'],
+        })
+      }
+    }
+    if (type === 'poll') {
+      if (!data.poll?.question?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Poll question is required',
+          path: ['poll', 'question'],
+        })
+      }
+      if (!data.poll?.options?.length || data.poll.options.filter(Boolean).length < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Poll must have at least two options',
+          path: ['poll', 'options'],
+        })
+      }
+    }
+  })
 
 // Comment schemas
 export const createCommentSchema = z.object({

@@ -78,6 +78,29 @@ func (m *MockPostRepository) Unlike(ctx context.Context, userID, postID uint) er
 	return args.Error(0)
 }
 
+// MockPollRepository is a mock of the PollRepository interface
+type MockPollRepository struct {
+	mock.Mock
+}
+
+func (m *MockPollRepository) Create(ctx context.Context, postID uint, question string, options []string) (*models.Poll, error) {
+	args := m.Called(ctx, postID, question, options)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Poll), args.Error(1)
+}
+
+func (m *MockPollRepository) Vote(ctx context.Context, userID, pollID, pollOptionID uint) error {
+	args := m.Called(ctx, userID, pollID, pollOptionID)
+	return args.Error(0)
+}
+
+func (m *MockPollRepository) EnrichWithResults(ctx context.Context, poll *models.Poll, currentUserID uint) error {
+	args := m.Called(ctx, poll, currentUserID)
+	return args.Error(0)
+}
+
 func TestCreatePost(t *testing.T) {
 	app := fiber.New()
 	mockRepo := new(MockPostRepository)
@@ -129,4 +152,25 @@ func TestCreatePost(t *testing.T) {
 			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
 		})
 	}
+}
+
+func TestVotePoll_MissingOptionID(t *testing.T) {
+	app := fiber.New()
+	mockPostRepo := new(MockPostRepository)
+	mockPollRepo := new(MockPollRepository)
+	s := &Server{postRepo: mockPostRepo, pollRepo: mockPollRepo}
+
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals("userID", uint(1))
+		return c.Next()
+	})
+	app.Post("/posts/:id/poll/vote", s.VotePoll)
+
+	body, _ := json.Marshal(map[string]interface{}{})
+	req := httptest.NewRequest(http.MethodPost, "/posts/1/poll/vote", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, _ := app.Test(req)
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }

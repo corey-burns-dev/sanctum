@@ -13,8 +13,10 @@ import (
 
 // CheckRateLimit checks if a resource has exceeded its rate limit.
 // Returns true if allowed, false if limit exceeded.
+// Rate limiting is disabled when APP_ENV is "test" or "development" so dev workflows are not throttled.
 func CheckRateLimit(ctx context.Context, rdb *redis.Client, resource, id string, limit int, window time.Duration) (bool, error) {
-	if os.Getenv("APP_ENV") == "test" {
+	switch os.Getenv("APP_ENV") {
+	case "test", "development":
 		return true, nil
 	}
 

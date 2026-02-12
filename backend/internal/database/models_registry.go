@@ -7,6 +7,11 @@ func PersistentModels() []interface{} {
 	return []interface{}{
 		&models.User{},
 		&models.Post{},
+		&models.Poll{},
+		&models.PollOption{},
+		&models.PollVote{},
+		&models.Image{},
+		&models.ImageVariant{},
 		&models.Comment{},
 		&models.Like{},
 		&models.Conversation{},

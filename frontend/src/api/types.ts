@@ -12,11 +12,48 @@ export interface User {
   updated_at: string
 }
 
+export type PostType = 'text' | 'media' | 'video' | 'link' | 'poll'
+
+export interface PollOption {
+  id: number
+  poll_id: number
+  option_text: string
+  display_order: number
+  votes_count?: number
+}
+
+export interface Poll {
+  id: number
+  post_id: number
+  question: string
+  options: PollOption[]
+  user_vote_option_id?: number
+}
+
+export interface UploadedImage {
+  id: number
+  hash: string
+  status: 'queued' | 'processing' | 'ready' | 'failed'
+  crop_mode: 'square' | 'portrait' | 'landscape' | 'free'
+  url: string
+  variants: Record<string, string>
+  width: number
+  height: number
+  size_bytes: number
+  mime_type: string
+}
+
 export interface Post {
   id: number
   title: string
   content: string
   image_url?: string
+  image_variants?: Record<string, string>
+  image_crop_mode?: string
+  post_type?: PostType
+  link_url?: string
+  youtube_url?: string
+  poll?: Poll
   likes_count: number
   liked?: boolean
   comments_count?: number
@@ -69,16 +106,27 @@ export interface AuthResponse {
   user: User
 }
 
+export interface CreatePostPollInput {
+  question: string
+  options: string[]
+}
+
 export interface CreatePostRequest {
   title: string
   content: string
   image_url?: string
+  post_type?: PostType
+  link_url?: string
+  youtube_url?: string
+  poll?: CreatePostPollInput
 }
 
 export interface UpdatePostRequest {
   title?: string
   content?: string
   image_url?: string
+  link_url?: string
+  youtube_url?: string
 }
 
 export interface CreateCommentRequest {

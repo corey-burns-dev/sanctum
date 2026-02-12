@@ -18,3 +18,7 @@ DB_NAME: "sanctum_prod"
 # Schema behavior for production: SQL migrations only
 DB_SCHEMA_MODE: "sql"
 DB_AUTOMIGRATE_ALLOW_DESTRUCTIVE: false
+
+# Local image uploads (filesystem)
+IMAGE_UPLOAD_DIR: "/var/sanctum/uploads/images"
+IMAGE_MAX_UPLOAD_SIZE_MB: 10

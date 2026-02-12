@@ -3,6 +3,8 @@ package repository
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"sanctum/internal/cache"
 	"sanctum/internal/models"
@@ -44,7 +46,11 @@ func (r *postRepository) GetByID(ctx context.Context, id uint, currentUserID uin
 	key := cache.PostKey(id)
 
 	err := cache.Aside(ctx, key, &post, cache.PostTTL, func() error {
-		return r.applyPostDetails(r.db.WithContext(ctx), 0).Preload("User").First(&post, id).Error
+		return r.applyPostDetails(r.db.WithContext(ctx), 0).
+			Preload("User").
+			Preload("Poll").
+			Preload("Poll.Options").
+			First(&post, id).Error
 	})
 
 	if err != nil {
@@ -57,6 +63,9 @@ func (r *postRepository) GetByID(ctx context.Context, id uint, currentUserID uin
 		r.db.WithContext(ctx).Model(&models.Like{}).Where("post_id = ? AND user_id = ?", post.ID, currentUserID).Count(&count)
 		post.Liked = count > 0
 	}
+	if err := r.enrichImageMetadata(ctx, []*models.Post{&post}); err != nil {
+		return nil, err
+	}
 
 	return &post, nil
 }
@@ -65,11 +74,19 @@ func (r *postRepository) GetByUserID(ctx context.Context, userID uint, limit, of
 	var posts []*models.Post
 	err := r.applyPostDetails(r.db.WithContext(ctx), currentUserID).
 		Preload("User").
+		Preload("Poll").
+		Preload("Poll.Options").
 		Where("user_id = ?", userID).
 		Order("created_at DESC").
 		Limit(limit).
 		Offset(offset).
 		Find(&posts).Error
+	if err != nil {
+		return nil, err
+	}
+	if err := r.enrichImageMetadata(ctx, posts); err != nil {
+		return nil, err
+	}
 	return posts, err
 }
 
@@ -77,23 +94,39 @@ func (r *postRepository) GetBySanctumID(ctx context.Context, sanctumID uint, lim
 	var posts []*models.Post
 	err := r.applyPostDetails(r.db.WithContext(ctx), currentUserID).
 		Preload("User").
+		Preload("Poll").
+		Preload("Poll.Options").
 		Where("sanctum_id = ?", sanctumID).
 		Order("created_at DESC").
 		Limit(limit).
 		Offset(offset).
 		Find(&posts).Error
-	return posts, err
+	if err != nil {
+		return nil, err
+	}
+	if err := r.enrichImageMetadata(ctx, posts); err != nil {
+		return nil, err
+	}
+	return posts, nil
 }
 
 func (r *postRepository) List(ctx context.Context, limit, offset int, currentUserID uint) ([]*models.Post, error) {
 	var posts []*models.Post
 	err := r.applyPostDetails(r.db.WithContext(ctx), currentUserID).
 		Preload("User").
+		Preload("Poll").
+		Preload("Poll.Options").
 		Order("created_at DESC").
 		Limit(limit).
 		Offset(offset).
 		Find(&posts).Error
-	return posts, err
+	if err != nil {
+		return nil, err
+	}
+	if err := r.enrichImageMetadata(ctx, posts); err != nil {
+		return nil, err
+	}
+	return posts, nil
 }
 
 func (r *postRepository) Search(ctx context.Context, query string, limit, offset int, currentUserID uint) ([]*models.Post, error) {
@@ -101,12 +134,20 @@ func (r *postRepository) Search(ctx context.Context, query string, limit, offset
 	like := "%" + query + "%"
 	err := r.applyPostDetails(r.db.WithContext(ctx), currentUserID).
 		Preload("User").
+		Preload("Poll").
+		Preload("Poll.Options").
 		Where("title ILIKE ? OR content ILIKE ?", like, like).
 		Order("created_at DESC").
 		Limit(limit).
 		Offset(offset).
 		Find(&posts).Error
-	return posts, err
+	if err != nil {
+		return nil, err
+	}
+	if err := r.enrichImageMetadata(ctx, posts); err != nil {
+		return nil, err
+	}
+	return posts, nil
 }
 
 // applyPostDetails adds subqueries to fetch counts and liked status in a single query.
@@ -120,6 +161,60 @@ func (r *postRepository) applyPostDetails(db *gorm.DB, currentUserID uint) *gorm
 	}
 
 	return db.Select(selectQuery + ", false as liked")
+}
+
+func (r *postRepository) enrichImageMetadata(ctx context.Context, posts []*models.Post) error {
+	if len(posts) == 0 {
+		return nil
+	}
+
+	hashes := make([]string, 0, len(posts))
+	seen := map[string]struct{}{}
+	for _, p := range posts {
+		h := strings.TrimSpace(p.ImageHash)
+		if h == "" {
+			continue
+		}
+		if _, exists := seen[h]; exists {
+			continue
+		}
+		seen[h] = struct{}{}
+		hashes = append(hashes, h)
+	}
+	if len(hashes) == 0 {
+		return nil
+	}
+
+	var images []models.Image
+	if err := r.db.WithContext(ctx).
+		Preload("Variants").
+		Where("hash IN ?", hashes).
+		Find(&images).Error; err != nil {
+		return err
+	}
+
+	byHash := make(map[string]*models.Image, len(images))
+	for i := range images {
+		byHash[images[i].Hash] = &images[i]
+	}
+
+	for _, p := range posts {
+		img := byHash[p.ImageHash]
+		if img == nil {
+			continue
+		}
+		p.ImageCropMode = img.CropMode
+		if len(img.Variants) == 0 {
+			continue
+		}
+		variants := make(map[string]string, len(img.Variants))
+		for _, v := range img.Variants {
+			key := fmt.Sprintf("%d_%s", v.SizePx, v.Format)
+			variants[key] = fmt.Sprintf("/media/i/%s/%d.%s", img.Hash, v.SizePx, v.Format)
+		}
+		p.ImageVariants = variants
+	}
+	return nil
 }
 
 // populatePostDetails fetches counts for comments and likes, and checks if the post is liked by the current user.

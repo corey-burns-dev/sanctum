@@ -1,0 +1,34 @@
+ALTER TABLE images
+  ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'ready',
+  ADD COLUMN IF NOT EXISTS blurhash VARCHAR(83),
+  ADD COLUMN IF NOT EXISTS error TEXT,
+  ADD COLUMN IF NOT EXISTS crop_mode VARCHAR(20) NOT NULL DEFAULT 'free',
+  ADD COLUMN IF NOT EXISTS crop_x INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS crop_y INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS crop_w INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS crop_h INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS processing_started_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS processing_attempts INT NOT NULL DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS idx_images_status ON images(status);
+
+CREATE TABLE IF NOT EXISTS image_variants (
+  id         BIGSERIAL PRIMARY KEY,
+  image_id   BIGINT NOT NULL REFERENCES images(id) ON DELETE CASCADE,
+  size_name  VARCHAR(20) NOT NULL,
+  size_px    INT NOT NULL,
+  format     VARCHAR(10) NOT NULL,
+  path       VARCHAR(512) NOT NULL,
+  width      INT NOT NULL,
+  height     INT NOT NULL,
+  bytes      BIGINT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_variant UNIQUE (image_id, size_px, format)
+);
+
+CREATE INDEX IF NOT EXISTS idx_image_variants_image_id ON image_variants(image_id);
+
+ALTER TABLE posts
+  ADD COLUMN IF NOT EXISTS image_hash VARCHAR(64);
+
+CREATE INDEX IF NOT EXISTS idx_posts_image_hash ON posts(image_hash);

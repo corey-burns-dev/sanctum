@@ -197,6 +197,31 @@ export function useLikePost() {
   })
 }
 
+// Vote on poll
+export function useVotePoll() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      postId,
+      pollOptionId,
+    }: {
+      postId: number
+      pollOptionId: number
+    }) => apiClient.votePoll(postId, pollOptionId),
+    onSuccess: updatedPost => {
+      updatePostInCache(queryClient, updatedPost.id, () => updatedPost)
+      queryClient.invalidateQueries({ queryKey: ['posts', 'infinite'] })
+      queryClient.invalidateQueries({
+        queryKey: postKeys.detail(updatedPost.id),
+      })
+    },
+    onError: error => {
+      handleAuthOrFKError(error)
+    },
+  })
+}
+
 // Unlike post
 export function useUnlikePost() {
   const queryClient = useQueryClient()
