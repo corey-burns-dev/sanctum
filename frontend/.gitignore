@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .env
+coverage/
 playwright-report/
 test-results/
 tests/e2e/.auth/

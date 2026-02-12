@@ -19,7 +19,7 @@ GREEN := \033[1;32m
 YELLOW := \033[1;33m
 NC := \033[0m # No Color
 
-.PHONY: help dev dev-backend dev-frontend dev-both build build-backend build-frontend up down recreate recreate-frontend recreate-backend logs logs-backend logs-frontend logs-all fmt fmt-frontend lint lint-frontend install env restart check-versions clean test test-api test-up test-down test-backend seed deps-update deps-update-backend deps-update-frontend deps-tidy deps-check deps-vuln deps-audit monitor-up monitor-down monitor-logs monitor-config monitor-lite-up monitor-lite-down
+.PHONY: help dev dev-backend dev-frontend dev-both build build-backend build-frontend up down recreate recreate-frontend recreate-backend logs logs-backend logs-frontend logs-all fmt fmt-frontend lint lint-frontend install env restart check-versions clean test test-api test-backend-integration test-frontend test-up test-down test-backend seed deps-update deps-update-backend deps-update-frontend deps-tidy deps-check deps-vuln deps-audit monitor-up monitor-down monitor-logs monitor-config monitor-lite-up monitor-lite-down
 
 # Default target
 help:
@@ -66,6 +66,7 @@ help:
 	@echo "$(GREEN)Testing:$(NC)"
 	@echo "  make test               - 🧪 Run backend tests"
 	@echo "  make test-api           - 🧪 Test all API endpoints"
+	@echo "  make test-frontend      - 🧪 Run frontend unit tests"
 	@echo "  make test-backend-integration - 🧪 Run integration tests (requires DB/Redis)"
 	@echo ""
 	@echo "$(GREEN)Database:$(NC)"
@@ -220,7 +221,7 @@ fmt-frontend:
 
 lint-frontend:
 	@echo "$(BLUE)Linting frontend code with Biome...$(NC)"
-	cd frontend && $(BUN) --bun biome check --write .
+	cd frontend && $(BUN) --bun biome check src
 	@echo "$(GREEN)✓ Frontend linting passed$(NC)"
 
 # Frontend dependencies
@@ -268,7 +269,11 @@ test-backend:
 
 test-api:
 	@echo "$(BLUE)Running API endpoint tests...$(NC)"
-	./test-api.sh
+	./test-routes.sh
+
+test-frontend:
+	@echo "$(BLUE)Running frontend tests...$(NC)"
+	cd frontend && $(BUN) run test:run
 
 test-up:
 	$(DOCKER_COMPOSE) $(COMPOSE_FILES) up -d postgres_test redis

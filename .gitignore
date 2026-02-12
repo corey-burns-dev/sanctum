@@ -32,6 +32,9 @@ backend/config.yml
 # Build artifacts
 /build
 /bin
+coverage/
+*.html
+*.out
 
 # Distribution artifacts
 dist/

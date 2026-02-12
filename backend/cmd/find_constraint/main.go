@@ -23,7 +23,7 @@ func main() {
 		Conname string `gorm:"column:conname"`
 	}
 	db.Raw("SELECT relname, conname FROM pg_constraint c JOIN pg_class r ON c.conrelid = r.oid WHERE conname = 'fk_sanctum_memberships_sanctum'").Scan(&result)
-	
+
 	fmt.Println("Tables with constraint fk_sanctum_memberships_sanctum:")
 	for _, r := range result {
 		fmt.Printf(" - %s\n", r.Relname)

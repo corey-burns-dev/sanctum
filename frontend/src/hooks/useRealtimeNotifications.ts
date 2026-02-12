@@ -171,7 +171,11 @@ export function useRealtimeNotifications(enabled = true) {
             // Debug: log incoming realtime event types for visibility
             try {
               // eslint-disable-next-line no-console
-              console.debug('[realtime] event received', data.type, data.payload)
+              console.debug(
+                '[realtime] event received',
+                data.type,
+                data.payload
+              )
             } catch {}
 
             const payload = data.payload ?? {}

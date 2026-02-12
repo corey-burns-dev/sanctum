@@ -141,8 +141,8 @@ func runAutoMigrate(t *testing.T, db *gorm.DB) {
 
 func TestMigrationsApplyFreshDB(t *testing.T) {
 	cfg, dbName := createEphemeralDB(t)
+	runMigrations(t, cfg, dbName)
 	db := openEphemeralGorm(t, cfg, dbName)
-	runAutoMigrate(t, db)
 
 	tables := []string{"sanctums", "sanctum_requests", "sanctum_memberships"}
 	for _, table := range tables {
@@ -153,6 +153,38 @@ func TestMigrationsApplyFreshDB(t *testing.T) {
 		if !exists {
 			t.Fatalf("expected table %s to exist", table)
 		}
+	}
+
+	// Verify Foreign Key constraint: fk_conversations_sanctum
+	var fkExists bool
+	fkQuery := `
+		SELECT EXISTS (
+			SELECT 1 
+			FROM information_schema.table_constraints 
+			WHERE constraint_name = 'fk_conversations_sanctum' 
+			AND table_name = 'conversations'
+		)`
+	if err := db.Raw(fkQuery).Scan(&fkExists).Error; err != nil {
+		t.Fatalf("check FK fk_conversations_sanctum: %v", err)
+	}
+	if !fkExists {
+		t.Error("expected foreign key constraint 'fk_conversations_sanctum' to exist")
+	}
+
+	// Verify Unique Index: idx_conversations_sanctum_id_unique
+	var indexExists bool
+	indexQuery := `
+		SELECT EXISTS (
+			SELECT 1 
+			FROM pg_indexes 
+			WHERE indexname = 'idx_conversations_sanctum_id_unique' 
+			AND tablename = 'conversations'
+		)`
+	if err := db.Raw(indexQuery).Scan(&indexExists).Error; err != nil {
+		t.Fatalf("check unique index idx_conversations_sanctum_id_unique: %v", err)
+	}
+	if !indexExists {
+		t.Error("expected unique index 'idx_conversations_sanctum_id_unique' to exist")
 	}
 }
 

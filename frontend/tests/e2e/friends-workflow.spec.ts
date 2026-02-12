@@ -7,7 +7,9 @@ test.describe('Friends workflow', () => {
   test('friends page loads and shows find people or list', async ({ page }) => {
     await page.goto('/friends')
     await expect(
-      page.getByRole('heading', { name: /friends/i }).or(page.getByText(/friend/i))
+      page
+        .getByRole('heading', { name: /friends/i })
+        .or(page.getByText(/friend/i))
     ).toBeVisible({ timeout: 10000 })
   })
 })
