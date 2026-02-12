@@ -114,9 +114,9 @@ jobs:
           cache: true
           cache-dependency-path: backend/go.sum
 
-      - name: Install golangci-lint
+      - name: Install golangci-lint (build with runner Go)
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.61.0
+          GO111MODULE=on go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
       - name: Run Format Check
@@ -268,8 +268,8 @@ jobs:
         with:
           name: playwright-report-smoke
           path: |
-            frontend/playwright-report
-            frontend/test-results
+            frontend/reports/playwright-report
+            frontend/reports/test-results
 
       - name: Dump service logs on failure
         if: failure()
