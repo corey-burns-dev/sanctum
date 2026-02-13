@@ -1,3 +1,5 @@
+import { getCurrentUser } from '@/hooks/useUsers'
+import { cn } from '@/lib/utils'
 import {
   BellRing,
   Flag,
@@ -14,8 +16,6 @@ import {
 } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { getCurrentUser } from '@/hooks/useUsers'
-import { cn } from '@/lib/utils'
 
 interface AdminNavItem {
   label: string
@@ -60,7 +60,7 @@ export default function AdminLayout() {
 
   return (
     <div className='flex h-full min-h-0 flex-1 overflow-hidden bg-background'>
-      <aside className='hidden w-72 shrink-0 border-r border-border/70 bg-card/45 md:flex md:flex-col'>
+      <aside className='hidden md:flex md:flex-col shrink-0 border-r border-border/70 bg-card/45'>
         <div className='border-b border-border/70 px-4 py-3'>
           <p className='text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground'>
             Admin Console

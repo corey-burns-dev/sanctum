@@ -35,6 +35,12 @@ func (s *Server) WebSocketChatHandler() fiber.Handler {
 		}
 		userID := userIDVal.(uint)
 
+		// Consume the ticket now that we've successfully upgraded and have a userID
+		ticket := conn.Query("ticket")
+		if ticket != "" && s.redis != nil {
+			s.redis.Del(ctx, "ws_ticket:"+ticket)
+		}
+
 		// Get user info for username
 		user, err := s.userRepo.GetByID(ctx, userID)
 		if err != nil {

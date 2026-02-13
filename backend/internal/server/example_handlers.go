@@ -53,6 +53,12 @@ func (s *Server) WebsocketHandler() fiber.Handler {
 			return
 		}
 
+		// Consume the ticket
+		ticket := conn.Query("ticket")
+		if ticket != "" && s.redis != nil {
+			s.redis.Del(context.Background(), "ws_ticket:"+ticket)
+		}
+
 		if s.hub == nil {
 			_ = conn.Close()
 			return

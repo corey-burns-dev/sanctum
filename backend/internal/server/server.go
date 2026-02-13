@@ -411,7 +411,7 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 
 	// Websocket endpoints - protected by AuthRequired
 	ws := api.Group("/ws", s.AuthRequired())
-	ws.Get("/", s.WebsocketHandler())         // General notifications
+	ws.Get("", s.WebsocketHandler())          // General notifications
 	ws.Get("/chat", s.WebSocketChatHandler()) // Real-time chat
 	ws.Get("/game", s.WebSocketGameHandler()) // Multiplayer games
 
@@ -520,8 +520,11 @@ func (s *Server) AuthRequired() fiber.Handler {
 				// Valid ticket!
 				userID, parseErr := strconv.ParseUint(userIDStr, 10, 32)
 				if parseErr == nil {
-					// Delete ticket immediately (single-use)
-					s.redis.Del(c.Context(), key)
+					// For WebSocket paths, we defer ticket deletion to the handler
+					// to avoid issues with redirects or multi-pass middleware.
+					if !isWSPath {
+						s.redis.Del(c.Context(), key)
+					}
 
 					// Store user ID in context
 					c.Locals("userID", uint(userID))
