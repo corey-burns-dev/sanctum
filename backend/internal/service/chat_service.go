@@ -337,6 +337,8 @@ func (s *ChatService) JoinChatroom(ctx context.Context, roomID, userID uint) (*m
 		return nil, err
 	}
 
+	cache.InvalidateRoom(ctx, roomID)
+
 	return &conv, nil
 }
 

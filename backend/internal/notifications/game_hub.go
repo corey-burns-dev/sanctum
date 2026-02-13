@@ -361,7 +361,7 @@ func (h *GameHub) handleMove(userID uint, action GameAction) {
 		} else if room.CreatorID != nil {
 			room.NextTurnID = *room.CreatorID
 		} else {
-			// Creator deleted during game, and it was their turn? 
+			// Creator deleted during game, and it was their turn?
 			// Or creator deleted and it's now their turn.
 			// If creator is nil, we can't really continue easily if it's their turn.
 			// But the logic above should ideally handle it.

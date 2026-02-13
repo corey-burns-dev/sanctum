@@ -67,7 +67,7 @@ func TestFriendRepository_Integration(t *testing.T) {
 		for i := 0; i < 1005; i++ {
 			friend := &models.User{Username: fmt.Sprintf("friend_%d", i), Email: fmt.Sprintf("friend_%d@e.com", i)}
 			testDB.Create(friend)
-			
+
 			status := models.FriendshipStatusAccepted
 			f := &models.Friendship{
 				RequesterID: mainUser.ID,
@@ -75,8 +75,8 @@ func TestFriendRepository_Integration(t *testing.T) {
 				Status:      status,
 			}
 			testDB.Create(f)
-			
-			// Manually update created_at to ensure deterministic ordering for testing if needed, 
+
+			// Manually update created_at to ensure deterministic ordering for testing if needed,
 			// but default DB behavior with sleep or just sequential creation should work.
 			// Actually, let's just use the default and verify we get 1000.
 		}

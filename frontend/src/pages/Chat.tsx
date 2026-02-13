@@ -123,17 +123,20 @@ export default function Chat() {
     if (!selectedListedConversation) return false
     if (!selectedListedConversation.is_group) return true
     if (
-      typeof (selectedListedConversation as { is_joined?: boolean })
-        .is_joined === 'boolean'
-    ) {
-      return Boolean(
-        (selectedListedConversation as { is_joined?: boolean }).is_joined
-      )
-    }
-    return activeRooms.some(
-      joined => joined.id === selectedListedConversation.id
+      (selectedListedConversation as { is_joined?: boolean }).is_joined === true
     )
-  }, [selectedListedConversation, activeRooms])
+      return true
+    if (activeRooms.some(joined => joined.id === selectedListedConversation.id))
+      return true
+    if (
+      currentUser &&
+      selectedListedConversation.participants?.some(
+        p => p.id === currentUser.id
+      )
+    )
+      return true
+    return false
+  }, [selectedListedConversation, activeRooms, currentUser])
 
   const { data: selectedConversation } = useConversation(selectedChatId || 0, {
     enabled: canAccessSelectedConversation,
@@ -218,26 +221,28 @@ export default function Chat() {
   const userIsJoined = useMemo(() => {
     if (!currentConversation) return false
     if (!currentConversation.is_group) return true
+    if (isJoinedViaList) return true
+    if (
+      currentUser &&
+      currentConversation.participants?.some(p => p.id === currentUser.id)
+    )
+      return true
     const fromChatrooms = (
       currentConversation as Conversation & { is_joined?: boolean }
     ).is_joined
     if (typeof fromChatrooms === 'boolean') return fromChatrooms
-    if (!currentUser) return isJoinedViaList
-    return (
-      currentConversation.participants?.some(p => p.id === currentUser.id) ||
-      isJoinedViaList ||
-      false
-    )
+    return false
   }, [currentConversation, currentUser, isJoinedViaList])
 
   const isRoomJoined = useCallback(
     (room: Conversation & { is_joined?: boolean }) => {
-      if (typeof room.is_joined === 'boolean') {
-        return room.is_joined
-      }
-      return activeRooms.some(joined => joined.id === room.id)
+      if (room.is_joined === true) return true
+      if (activeRooms.some(joined => joined.id === room.id)) return true
+      if (currentUser && room.participants?.some(p => p.id === currentUser.id))
+        return true
+      return false
     },
-    [activeRooms]
+    [activeRooms, currentUser]
   )
 
   const [participants, setParticipants] = useState<
@@ -248,29 +253,24 @@ export default function Chat() {
   >({})
   const setRoomParticipantsInCache = useCallback(
     (conversationId: number, nextParticipants: User[]) => {
+      const isJoined = currentUser
+        ? nextParticipants.some(p => p.id === currentUser.id)
+        : undefined
+      const updateRoom = (room: Conversation & { is_joined?: boolean }) =>
+        room.id === conversationId
+          ? {
+              ...room,
+              participants: nextParticipants,
+              ...(typeof isJoined === 'boolean' && { is_joined: isJoined }),
+            }
+          : room
       queryClient.setQueryData<Conversation[] | undefined>(
         ['chat', 'chatrooms', 'all'],
-        oldRooms =>
-          oldRooms?.map(room =>
-            room.id === conversationId
-              ? {
-                  ...room,
-                  participants: nextParticipants,
-                }
-              : room
-          )
+        oldRooms => oldRooms?.map(updateRoom)
       )
       queryClient.setQueryData<Conversation[] | undefined>(
         ['chat', 'chatrooms', 'joined'],
-        oldRooms =>
-          oldRooms?.map(room =>
-            room.id === conversationId
-              ? {
-                  ...room,
-                  participants: nextParticipants,
-                }
-              : room
-          )
+        oldRooms => oldRooms?.map(updateRoom)
       )
       queryClient.setQueryData<Conversation | undefined>(
         ['chat', 'conversation', conversationId],
@@ -279,11 +279,14 @@ export default function Chat() {
             ? {
                 ...oldConversation,
                 participants: nextParticipants,
+                ...(typeof isJoined === 'boolean' && {
+                  is_joined: isJoined,
+                }),
               }
             : oldConversation
       )
     },
-    [queryClient]
+    [queryClient, currentUser]
   )
 
   useEffect(() => {
@@ -791,13 +794,66 @@ export default function Chat() {
     (id: number) => {
       joinChatroom.mutate(id, {
         onSuccess: () => {
+          // Optimistically update is_joined + participants in cache
+          queryClient.setQueryData<Conversation[]>(
+            ['chat', 'chatrooms', 'all'],
+            old =>
+              old?.map(room =>
+                room.id === id
+                  ? {
+                      ...room,
+                      is_joined: true,
+                      participants:
+                        currentUser &&
+                        !room.participants?.some(p => p.id === currentUser.id)
+                          ? [
+                              ...(room.participants || []),
+                              {
+                                id: currentUser.id,
+                                username: currentUser.username,
+                              } as User,
+                            ]
+                          : room.participants,
+                    }
+                  : room
+              )
+          )
+          queryClient.setQueryData<Conversation[]>(
+            ['chat', 'chatrooms', 'joined'],
+            old => {
+              const list = old ?? []
+              if (list.some(r => r.id === id)) return list
+              const room = queryClient
+                .getQueryData<Conversation[]>(['chat', 'chatrooms', 'all'])
+                ?.find(r => r.id === id)
+              const updated =
+                room &&
+                currentUser &&
+                !room.participants?.some(p => p.id === currentUser.id)
+                  ? {
+                      ...room,
+                      is_joined: true,
+                      participants: [
+                        ...(room.participants || []),
+                        {
+                          id: currentUser.id,
+                          username: currentUser.username,
+                        } as User,
+                      ],
+                    }
+                  : room
+                    ? { ...room, is_joined: true }
+                    : null
+              return updated ? [...list, updated] : list
+            }
+          )
           setLeftSidebarMode('rooms')
           setOpenRoomTabs(prev => (prev.includes(id) ? prev : [...prev, id]))
           navigate(`/chat/${id}`)
         },
       })
     },
-    [joinChatroom, navigate]
+    [joinChatroom, navigate, queryClient, currentUser]
   )
 
   const handleSelectConversation = useCallback(

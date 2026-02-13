@@ -55,9 +55,9 @@ func TestLoadConfig_SSLModeNormalization(t *testing.T) {
 
 	os.Setenv("APP_ENV", "development")
 	os.Setenv("DB_SSLMODE", "  DISABLE  ")
-	
-	// Since LoadConfig reads from files, we might need a more controlled way 
-	// to test normalization if it doesn't pick up environment variables easily 
+
+	// Since LoadConfig reads from files, we might need a more controlled way
+	// to test normalization if it doesn't pick up environment variables easily
 	// with default setup. But viper.AutomaticEnv() is called in LoadConfig.
 
 	c, err := LoadConfig()

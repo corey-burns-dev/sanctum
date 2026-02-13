@@ -1,72 +1,112 @@
-ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=ec0963c340b1ed3b5be0ab4e2e2c80a2611ae4a6778adfe80ca92135f9a29748' failed: 
-createTicketedWS @ ws-utils.ts:78
-ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=02c3849d178739fa43522be8537b4b7fe477ddb50f2b12017762df99e1bb69e1' failed: 
-createTicketedWS @ ws-utils.ts:78
-installHook.js:1 WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+:8375/api/auth/login:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+installHook.js:1 [2026-02-13T04:01:03.903Z] [ERROR] API Error: POST /auth/login Object
 overrideMethod @ installHook.js:1
-onError @ ChatProvider.tsx:703
-ChatProvider.tsx:714 WebSocket disconnected. Reconnecting in 1063.5011762999472ms (attempt 1)
-ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=6d2d8624f796a6b43593a9c67930b485212adb1f10b892376408b22c8d1402f9' failed: 
-createTicketedWS @ ws-utils.ts:78
-ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=9f3cd1fcdcba6fc78b20ba6730e573984ffab126197c97db91c9b7f98f4b5db3' failed: 
-createTicketedWS @ ws-utils.ts:78
-installHook.js:1 WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+installHook.js:1 Login error: ApiError: Invalid credentials
+    at ApiClient.request (client.ts:164:15)
+    at async ApiClient.login (client.ts:239:18)
 overrideMethod @ installHook.js:1
-onError @ ChatProvider.tsx:703
-ChatProvider.tsx:714 WebSocket disconnected. Reconnecting in 2001.4408385770128ms (attempt 2)
-ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=e3490d874d0e4fcbaafedf295304ac7a770a8fb72739e7bf39b533f3ba9dbc09' failed: 
-createTicketedWS @ ws-utils.ts:78
-ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=8d9b124740847a90e87701e9cea3075bc1078519ae4aaf5dc051cf4554275048' failed: 
-createTicketedWS @ ws-utils.ts:78
-installHook.js:1 WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+:8375/api/auth/login:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+installHook.js:1 [2026-02-13T04:01:09.819Z] [ERROR] API Error: POST /auth/login Object
 overrideMethod @ installHook.js:1
-onError @ ChatProvider.tsx:703
-ChatProvider.tsx:714 WebSocket disconnected. Reconnecting in 4170.266860444326ms (attempt 3)
-ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=fd517b011ba9f19d80ce691b3a08937adf14157be335c01e1f88c315a5a6fcb2' failed: 
-createTicketedWS @ ws-utils.ts:78
-ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=1792a44c6a2f9d1975965d874a09cf28d59ac94a473489c0d8cec2b1eaef17ca' failed: 
-createTicketedWS @ ws-utils.ts:78
-installHook.js:1 WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+installHook.js:1 Login error: ApiError: Invalid credentials
+    at ApiClient.request (client.ts:164:15)
+    at async ApiClient.login (client.ts:239:18)
 overrideMethod @ installHook.js:1
-onError @ ChatProvider.tsx:703
-ChatProvider.tsx:714 WebSocket disconnected. Reconnecting in 8371.280777493133ms (attempt 4)
-ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=4c7ab74edd8dc3cb53905608a761d60d11b56dbe95d1d58d4cc5c0202c580a92' failed: 
-createTicketedWS @ ws-utils.ts:78
-ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=d347a24f4030ac26d1cf4b3f914d0eead4b83d73aa5e9ab7c289ba013a748374' failed: 
-createTicketedWS @ ws-utils.ts:78
-installHook.js:1 WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+:8375/api/auth/login:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+installHook.js:1 [2026-02-13T04:01:25.293Z] [ERROR] API Error: POST /auth/login Object
 overrideMethod @ installHook.js:1
-onError @ ChatProvider.tsx:703
-ChatProvider.tsx:714 WebSocket disconnected. Reconnecting in 17480.191236015507ms (attempt 5)
-ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=fbff2109c78ccd08e7015f9e2341953101f9c592b6004495519ee05ce1cbaf97' failed: 
-createTicketedWS @ ws-utils.ts:78
-ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=c502a196c99dcffc13b1363264e0f78024e21f2c2c05c15d26a6be57cbd770d0' failed: 
-createTicketedWS @ ws-utils.ts:78
-installHook.js:1 WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+installHook.js:1 Login error: ApiError: Invalid credentials
+    at ApiClient.request (client.ts:164:15)
+    at async ApiClient.login (client.ts:239:18)
 overrideMethod @ installHook.js:1
-onError @ ChatProvider.tsx:703
-ChatProvider.tsx:714 WebSocket disconnected. Reconnecting in 32305.850116515165ms (attempt 6)
-ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=d6c441456dd984dad96b1fea0b5176e45a028793956a62f0a81943af5b434dd8' failed: 
-createTicketedWS @ ws-utils.ts:78
-ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=17892d618e4402968f66e8373ee3136daf53c3a1ba10b6a8b7cce6f3180a2bf7' failed: 
-createTicketedWS @ ws-utils.ts:78
-installHook.js:1 WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+:8375/api/auth/login:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+installHook.js:1 [2026-02-13T04:01:28.617Z] [ERROR] API Error: POST /auth/login Object
 overrideMethod @ installHook.js:1
-onError @ ChatProvider.tsx:703
-ChatProvider.tsx:714 WebSocket disconnected. Reconnecting in 31057.86931363847ms (attempt 7)
-ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=e56ac111a530e8ca6dec6f4f3a3a6bca1788245105bb849c8fc6edd43ad1e05d' failed: 
-createTicketedWS @ ws-utils.ts:78
-ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=7887b7888cf7fe62627e3a88a027b288c52b68dd48dd9397dabca2a15ec970be' failed: 
-createTicketedWS @ ws-utils.ts:78
-installHook.js:1 WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+installHook.js:1 Login error: ApiError: Invalid credentials
+    at ApiClient.request (client.ts:164:15)
+    at async ApiClient.login (client.ts:239:18)
 overrideMethod @ installHook.js:1
-onError @ ChatProvider.tsx:703
-ChatProvider.tsx:714 WebSocket disconnected. Reconnecting in 32282.044499735268ms (attempt 8)
-ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=e8fee93ff24ab8ae3d1824b60c553e220e8ba76410affc66efa26abd7c8e6002' failed: 
-createTicketedWS @ ws-utils.ts:78
-ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=e1ab6432a19ce9a1b835e9b937b93ca3b35f30128af3a4f284e3664bcf0907f0' failed: 
-createTicketedWS @ ws-utils.ts:78
-installHook.js:1 WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+:8375/api/auth/signup:1  Failed to load resource: the server responded with a status of 409 (Conflict)
+installHook.js:1 [2026-02-13T04:01:50.248Z] [ERROR] API Error: POST /auth/signup Object
 overrideMethod @ installHook.js:1
-onError @ ChatProvider.tsx:703
-ChatProvider.tsx:714 WebSocket disconnected. Reconnecting in 31997.282707595612ms (attempt 9)
+installHook.js:1 Signup error: ApiError: User already exists
+    at ApiClient.request (client.ts:164:15)
+    at async ApiClient.signup (client.ts:228:18)
+overrideMethod @ installHook.js:1
+:8375/api/auth/signup:1  Failed to load resource: the server responded with a status of 409 (Conflict)
+installHook.js:1 [2026-02-13T04:01:55.823Z] [ERROR] API Error: POST /auth/signup Object
+overrideMethod @ installHook.js:1
+installHook.js:1 Signup error: ApiError: User already exists
+    at ApiClient.request (client.ts:164:15)
+    at async ApiClient.signup (client.ts:228:18)
+overrideMethod @ installHook.js:1
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=9ab96ff057388130b021213828eed68c4e65c0b83e347522f064faf032fb75a5' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=e3ed91018dd35ab09a2484a0cb69412f4d219b06e3459d6eec4bfd388d9f2405' failed: 
+createTicketedWS @ ws-utils.ts:78
+installHook.js:1 [2026-02-13T04:02:02.839Z] [ERROR] WebSocket error: Event
+overrideMethod @ installHook.js:1
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=5726caafb6d91755dafcedf6bf64cf0deca28ab31834ceebfc64ee9894910f9d' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=8f297a9829aac304480833f2e656582a51bc718c943d100686530399621178d8' failed: 
+createTicketedWS @ ws-utils.ts:78
+installHook.js:1 [2026-02-13T04:02:03.940Z] [ERROR] WebSocket error: Event
+overrideMethod @ installHook.js:1
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=40863d78aa7d9e75b151982070829ae5b58f501c42c04281e901930b3b7723cb' failed: 
+createTicketedWS @ ws-utils.ts:78
+installHook.js:1 [2026-02-13T04:02:06.040Z] [ERROR] WebSocket error: Event
+overrideMethod @ installHook.js:1
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=bb1e783faf19a2caf9695622a1182123722a911a946cf7fdec6838d371194000' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=6cde493557366a9e47421b85dc8fe6046e52dce6a67efada6c9347749b312df1' failed: 
+createTicketedWS @ ws-utils.ts:78
+installHook.js:1 [2026-02-13T04:02:10.170Z] [ERROR] WebSocket error: Event
+overrideMethod @ installHook.js:1
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=485cedb4fe876f9fc311027547f9138f1f66f63030839e42d473b3871c304e38' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=e45fdeda98cd811b707ce9eab331d1d532143acc76a22bec448b0bead48511d4' failed: 
+createTicketedWS @ ws-utils.ts:78
+installHook.js:1 [2026-02-13T04:02:18.645Z] [ERROR] WebSocket error: Event
+overrideMethod @ installHook.js:1
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=b1cc03b2b9926df3d95b1c163d5e53473282156999800fd0653e155b00550d06' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=fdddc670ee3394af4933f5405aa355f982996c13dedd3db2aa3081dc43af8344' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=6b4f041d393df0963ec7355190bfcd46e1a9e9650c4121ba2a84a4ffc1e47c12' failed: 
+createTicketedWS @ ws-utils.ts:78
+installHook.js:1 [2026-02-13T04:02:36.122Z] [ERROR] WebSocket error: Event
+overrideMethod @ installHook.js:1
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/game?room_id=3&ticket=f493bfd03667612c7614d9bc5543f4ad95bb9d860d1b6dc26e9d1d7726c33da7' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/game?room_id=3&ticket=1202b85e0d5bed262706c56519b717fa2f5f1526f195be406196142e39ec0001' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/game?room_id=3&ticket=7c25f7e6dfc5165a9a8c88b1b84dea444181e5f08c92832e57920d12d7390e26' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/game?room_id=3&ticket=b0d2e57025f13f5e6f94624625a811701611147c4fe54f1d3d0c23be3bae5550' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/game?room_id=3&ticket=38c7f6ee48bc0b6b79abc61b14f5bea53ec2ec7b351a4cf771f4163375f50b13' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=20f1c4ee2089982988476de06bf7c2dccf7ea6e9540a532e5ab91543d55e7d7f' failed: 
+createTicketedWS @ ws-utils.ts:78
+installHook.js:1 [2026-02-13T04:03:07.296Z] [ERROR] WebSocket error: Event
+overrideMethod @ installHook.js:1
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=b3456539f4c93408c83cdf98e2183e967eaeac146f035ddd1a1d55b4f3ac2dac' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/game?room_id=3&ticket=3b9decaba915af860fb49ce72b7979d9f180ce65332b38710525b742ed0e421b' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/game?room_id=3&ticket=4d889d0854845fc1f30909cd60fe5b21a9a2d8dc7dcd8e1249a64d44b1e02c9d' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=f99eab573eecdf30e88a1cf0ba2224a8b5ae24f761f8f21eb6fec58444c6a1a2' failed: 
+createTicketedWS @ ws-utils.ts:78
+installHook.js:1 [2026-02-13T04:03:37.676Z] [ERROR] WebSocket error: Event
+overrideMethod @ installHook.js:1
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=5756eb1d0de3299cf75867327bd5d1fe6c69993e5ca39e12039b32a651a2f114' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/game?room_id=3&ticket=38e0b74faec9d1808dd608cdd01f5903aadf52bbaca51df35b9ebc53cf81aad5' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=28c402c6ad1de0bae869a9e727811aaa9a88b5e7645b6b07710830d32e4e2e23' failed: 
+createTicketedWS @ ws-utils.ts:78
+installHook.js:1 [2026-02-13T04:04:10.570Z] [ERROR] WebSocket error: Event
+overrideMethod @ installHook.js:1
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=79f7a6e4e64379bbd93fc8a7f10f2e72567be543149f574418c92e76956b53b7' failed: 
+createTicketedWS @ ws-utils.ts:78

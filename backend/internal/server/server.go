@@ -44,30 +44,30 @@ type wireableHub interface {
 
 // Server holds all dependencies and provides handlers
 type Server struct {
-	config         *config.Config
-	db             *gorm.DB
-	redis          *redis.Client
-	app            *fiber.App
-	promMiddleware *fiberprometheus.FiberPrometheus
-	shutdownCtx    context.Context
-	shutdownFn     context.CancelFunc
-	userRepo       repository.UserRepository
-	postRepo       repository.PostRepository
-	pollRepo       repository.PollRepository
-	imageRepo      repository.ImageRepository
-	commentRepo    repository.CommentRepository
-	chatRepo       repository.ChatRepository
-	friendRepo     repository.FriendRepository
-	gameRepo       repository.GameRepository
-	notifier       *notifications.Notifier
-	hub            *notifications.Hub
-	chatHub        *notifications.ChatHub
-	gameHub        *notifications.GameHub
-	hubs           []wireableHub // all hubs for wiring/shutdown iteration
-	featureFlags   *featureflags.Manager
-	postService    *service.PostService
-	imageService   *service.ImageService
-	commentService *service.CommentService
+	config            *config.Config
+	db                *gorm.DB
+	redis             *redis.Client
+	app               *fiber.App
+	promMiddleware    *fiberprometheus.FiberPrometheus
+	shutdownCtx       context.Context
+	shutdownFn        context.CancelFunc
+	userRepo          repository.UserRepository
+	postRepo          repository.PostRepository
+	pollRepo          repository.PollRepository
+	imageRepo         repository.ImageRepository
+	commentRepo       repository.CommentRepository
+	chatRepo          repository.ChatRepository
+	friendRepo        repository.FriendRepository
+	gameRepo          repository.GameRepository
+	notifier          *notifications.Notifier
+	hub               *notifications.Hub
+	chatHub           *notifications.ChatHub
+	gameHub           *notifications.GameHub
+	hubs              []wireableHub // all hubs for wiring/shutdown iteration
+	featureFlags      *featureflags.Manager
+	postService       *service.PostService
+	imageService      *service.ImageService
+	commentService    *service.CommentService
 	chatService       *service.ChatService
 	userService       *service.UserService
 	moderationService *service.ModerationService

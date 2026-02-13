@@ -20,13 +20,13 @@ import (
 var Tracer trace.Tracer = otel.Tracer("sanctum-api")
 
 type TracingConfig struct {
-	ServiceName     string
-	ServiceVersion  string
-	Environment     string
-	Enabled         bool
-	Exporter        string // "stdout" or "otlp"
-	OTLPEndpoint    string
-	SamplerRatio    float64
+	ServiceName    string
+	ServiceVersion string
+	Environment    string
+	Enabled        bool
+	Exporter       string // "stdout" or "otlp"
+	OTLPEndpoint   string
+	SamplerRatio   float64
 }
 
 // InitTracing initializes the OpenTelemetry tracer provider.

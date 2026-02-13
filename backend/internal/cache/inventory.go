@@ -7,16 +7,16 @@ import (
 )
 
 const (
-	UserKeyPrefix            = "user:%d"
-	UserConversationsPrefix  = "user:%d:conversations"
-	PostKeyPrefix            = "post:%d"
-	PostsListGlobalPrefix    = "posts:list:global"
-	PostsListVersionKey      = "posts:list:version"
-	SanctumKeyPrefix         = "sanctum:%s"
-	RoomKeyPrefix            = "room:%d"
-	ChatroomsAllKey          = "chatrooms:all"
-	ChatroomsVersionKey      = "chatrooms:version"
-	MessageHistoryPrefix     = "room:%d:messages"
+	UserKeyPrefix           = "user:%d"
+	UserConversationsPrefix = "user:%d:conversations"
+	PostKeyPrefix           = "post:%d"
+	PostsListGlobalPrefix   = "posts:list:global"
+	PostsListVersionKey     = "posts:list:version"
+	SanctumKeyPrefix        = "sanctum:%s"
+	RoomKeyPrefix           = "room:%d"
+	ChatroomsAllKey         = "chatrooms:all"
+	ChatroomsVersionKey     = "chatrooms:version"
+	MessageHistoryPrefix    = "room:%d:messages"
 )
 
 const (
@@ -99,4 +99,3 @@ func InvalidatePostsList(ctx context.Context) {
 func InvalidateSanctum(ctx context.Context, slug string) {
 	Invalidate(ctx, SanctumKey(slug))
 }
-

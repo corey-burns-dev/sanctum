@@ -214,21 +214,23 @@ export default function ConnectFour() {
           setGameState(payload as unknown as GameState)
           break
         case 'game_started':
-          setGameState(prev =>
-            prev
-              ? {
-                  ...prev,
-                  status:
-                    typeof payload.status === 'string'
-                      ? (payload.status as GameState['status'])
-                      : prev.status,
-                  next_turn:
-                    typeof payload.next_turn === 'number'
-                      ? payload.next_turn
-                      : prev.next_turn,
-                }
-              : null
-          )
+          setGameState(prev => ({
+            board:
+              prev?.board ??
+              Array(6)
+                .fill(null)
+                .map(() => Array(7).fill('')),
+            status:
+              typeof payload.status === 'string'
+                ? (payload.status as GameState['status'])
+                : prev?.status ?? 'active',
+            winner_id: prev?.winner_id ?? null,
+            next_turn:
+              typeof payload.next_turn === 'number'
+                ? payload.next_turn
+                : prev?.next_turn ?? 0,
+            is_draw: prev?.is_draw ?? false,
+          }))
           void queryClient.invalidateQueries({ queryKey: ['gameRoom', id] })
           if (!didShowGameStartedToastRef.current) {
             didShowGameStartedToastRef.current = true
@@ -424,7 +426,8 @@ export default function ConnectFour() {
   const isCreator = currentUser?.id === room.creator_id
   const isOpponent = currentUser?.id === room.opponent_id
   const isPlayer = isCreator || isOpponent
-  const canJoin = !isPlayer && room.status === 'pending'
+  const canJoin =
+    !isPlayer && room.status === 'pending' && gameState.status === 'pending'
   const isMyTurn =
     gameState.status === 'active' && gameState.next_turn === currentUser?.id
   const playerOneName = room.creator?.username ?? 'Deleted User'
@@ -553,15 +556,25 @@ export default function ConnectFour() {
                   </div>
                 </div>
                 <div className='flex md:justify-end md:justify-self-end'>
-                  <div
-                    className={`shrink-0 rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tight ${
-                      isMyTurn
-                        ? 'bg-blue-500 text-white animate-pulse'
-                        : 'bg-slate-700 text-slate-100'
-                    }`}
-                  >
-                    {isMyTurn ? 'Your Turn' : "Opponent's Turn"}
-                  </div>
+                  {gameState.status === 'active' ? (
+                    <div
+                      className={`shrink-0 rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tight ${
+                        isMyTurn
+                          ? 'bg-blue-500 text-white animate-pulse'
+                          : 'bg-slate-700 text-slate-100'
+                      }`}
+                    >
+                      {isMyTurn ? 'Your Turn' : "Opponent's Turn"}
+                    </div>
+                  ) : gameState.status === 'pending' ? (
+                    <div className='shrink-0 rounded-lg bg-amber-600/20 px-3 py-1 text-[10px] font-black uppercase tracking-tight text-amber-300'>
+                      Waiting...
+                    </div>
+                  ) : gameState.status === 'finished' ? (
+                    <div className='shrink-0 rounded-lg bg-slate-700 px-3 py-1 text-[10px] font-black uppercase tracking-tight text-slate-100'>
+                      Game Over
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </CardHeader>
@@ -648,6 +661,14 @@ export default function ConnectFour() {
                   >
                     {isSocketReady ? 'Join Match' : 'Connecting...'}
                   </Button>
+                </div>
+              )}
+
+              {gameState.status === 'pending' && isCreator && (
+                <div className='mt-6 text-center'>
+                  <p className='text-muted-foreground font-medium'>
+                    Waiting for an opponent to join...
+                  </p>
                 </div>
               )}
 
