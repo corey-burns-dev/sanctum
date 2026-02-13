@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from '@/api/client'
 import { getAuthToken, useLogin, useLogout, useSignup } from '@/hooks/useAuth'
+import { useAuthSessionStore } from '@/stores/useAuthSessionStore'
 
 const navigateMock = vi.fn()
 
@@ -20,7 +21,10 @@ vi.mock('@/api/client', () => ({
   apiClient: {
     signup: vi.fn(),
     login: vi.fn(),
-    logout: vi.fn().mockResolvedValue(undefined),
+    logout: vi.fn().mockImplementation(async () => {
+      useAuthSessionStore.getState().clear()
+      localStorage.removeItem('user')
+    }),
   },
 }))
 
@@ -63,17 +67,22 @@ describe('useSignup onboarding behavior', () => {
     vi.clearAllMocks()
     localStorage?.removeItem?.('token')
     localStorage?.removeItem?.('user')
+    useAuthSessionStore.getState().clear()
   })
 
   it('redirects to /onboarding/sanctums after successful signup', async () => {
-    vi.mocked(apiClient.signup).mockResolvedValue({
-      token: 'token-123',
-      user: {
-        id: 1,
-        username: 'tester',
-        email: 'tester@example.com',
-        is_admin: false,
-      },
+    vi.mocked(apiClient.signup).mockImplementation(async () => {
+      const data = {
+        token: 'token-123',
+        user: {
+          id: 1,
+          username: 'tester',
+          email: 'tester@example.com',
+          is_admin: false,
+        },
+      }
+      useAuthSessionStore.getState().setAccessToken(data.token)
+      return data
     })
 
     const { result } = renderHook(() => useSignup(), {
@@ -88,7 +97,7 @@ describe('useSignup onboarding behavior', () => {
       })
     })
 
-    expect(localStorage.getItem('token')).toBe('token-123')
+    expect(getAuthToken()).toBe('token-123')
     expect(navigateMock).toHaveBeenCalledWith('/onboarding/sanctums')
   })
 })
@@ -98,17 +107,22 @@ describe('useLogin', () => {
     vi.clearAllMocks()
     localStorage?.removeItem?.('token')
     localStorage?.removeItem?.('user')
+    useAuthSessionStore.getState().clear()
   })
 
   it('stores token and user then navigates to /posts on success', async () => {
-    vi.mocked(apiClient.login).mockResolvedValue({
-      token: 'login-token',
-      user: {
-        id: 2,
-        username: 'logintest',
-        email: 'login@example.com',
-        is_admin: false,
-      },
+    vi.mocked(apiClient.login).mockImplementation(async () => {
+      const data = {
+        token: 'login-token',
+        user: {
+          id: 2,
+          username: 'logintest',
+          email: 'login@example.com',
+          is_admin: false,
+        },
+      }
+      useAuthSessionStore.getState().setAccessToken(data.token)
+      return data
     })
 
     const { result } = renderHook(() => useLogin(), {
@@ -122,7 +136,7 @@ describe('useLogin', () => {
       })
     })
 
-    expect(localStorage.getItem('token')).toBe('login-token')
+    expect(getAuthToken()).toBe('login-token')
     expect(navigateMock).toHaveBeenCalledWith('/posts')
   })
 })
@@ -130,7 +144,7 @@ describe('useLogin', () => {
 describe('useLogout', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    localStorage?.setItem?.('token', 'some-token')
+    useAuthSessionStore.getState().setAccessToken('some-token')
     localStorage?.setItem?.('user', JSON.stringify({ id: 1, username: 'u' }))
   })
 
@@ -143,21 +157,21 @@ describe('useLogout', () => {
       await result.current()
     })
 
-    expect(localStorage.getItem('token')).toBeNull()
+    expect(getAuthToken()).toBeNull()
     expect(localStorage.getItem('user')).toBeNull()
     expect(navigateMock).toHaveBeenCalledWith('/login')
   })
 })
 
 describe('getAuthToken', () => {
-  it('returns token from localStorage', () => {
-    localStorage?.setItem?.('token', 'stored-token')
+  it('returns token from store', () => {
+    useAuthSessionStore.getState().setAccessToken('stored-token')
     expect(getAuthToken()).toBe('stored-token')
-    localStorage?.removeItem?.('token')
+    useAuthSessionStore.getState().clear()
   })
 
   it('returns null when no token', () => {
-    localStorage?.removeItem?.('token')
+    useAuthSessionStore.getState().clear()
     expect(getAuthToken()).toBeNull()
   })
 })

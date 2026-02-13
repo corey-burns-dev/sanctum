@@ -15,9 +15,12 @@ var Logger *slog.Logger
 type contextKey string
 
 const (
+	// RequestIDKey is the context key for the unique request identifier.
 	RequestIDKey contextKey = "request_id"
-	UserIDKey    contextKey = "user_id"
-	TraceIDKey   contextKey = "trace_id"
+	// UserIDKey is the context key for the authenticated user identifier.
+	UserIDKey contextKey = "user_id"
+	// TraceIDKey is the context key for the distributed tracing identifier.
+	TraceIDKey contextKey = "trace_id"
 )
 
 // ctxHandler is a slog.Handler that adds context values to the log record.

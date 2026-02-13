@@ -16,7 +16,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-var Tracer trace.Tracer
+// Tracer is the global tracer used for the application.
+var Tracer trace.Tracer = otel.Tracer("sanctum-api")
 
 type TracingConfig struct {
 	ServiceName     string

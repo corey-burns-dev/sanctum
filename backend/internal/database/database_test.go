@@ -2,7 +2,6 @@ package database
 
 import (
 	"testing"
-	"time"
 
 	"sanctum/internal/config"
 
@@ -24,12 +23,6 @@ func TestConfigurePool(t *testing.T) {
 	err = configurePool(db, cfg)
 	assert.NoError(t, err)
 
-	sqlDB, err := db.DB()
+	_, err = db.DB()
 	assert.NoError(t, err)
-
-	stats := sqlDB.Stats()
-	// stats don't easily show max settings until they are used,
-	// but we can check if the methods don't panic and we can assume they work.
-	// Actually, we can't easily inspect MaxOpenConns from sql.DB without more work.
-	// But we've verified the code change.
 }

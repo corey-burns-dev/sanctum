@@ -28,12 +28,13 @@ func TestConfig_ValidateSSLMode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Config{
-				Env:                  tt.env,
-				DBSSLMode:            tt.sslMode,
-				JWTSecret:            "secure-secret-at-least-32-chars-long",
-				DBPassword:           "secure-password",
-				Port:                 "8080",
-				ImageMaxUploadSizeMB: 10,
+				Env:                      tt.env,
+				DBSSLMode:                tt.sslMode,
+				JWTSecret:                "secure-secret-at-least-32-chars-long",
+				DBPassword:               "secure-password",
+				Port:                     "8080",
+				ImageMaxUploadSizeMB:     10,
+				DBConnMaxLifetimeMinutes: 1,
 			}
 
 			err := c.Validate()

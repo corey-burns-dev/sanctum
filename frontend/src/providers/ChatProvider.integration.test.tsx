@@ -7,12 +7,14 @@ import { act, render, waitFor } from '@testing-library/react'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChatProvider, useChatContext } from './ChatProvider'
+import { useAuthSessionStore } from '@/stores/useAuthSessionStore'
 
 vi.mock('@/api/client', () => ({
   apiClient: {
     issueWSTicket: vi
       .fn()
       .mockResolvedValue({ ticket: 'test-ticket', expires_in: 60 }),
+    getMyBlocks: vi.fn().mockResolvedValue([]),
   },
 }))
 
@@ -87,7 +89,8 @@ describe('ChatProvider integration', () => {
     qc = new QueryClient()
     const jwt = { exp: Math.floor(Date.now() / 1000) + 3600 }
     const base = btoa(JSON.stringify(jwt))
-    localStorage.setItem('token', `a.${base}.c`)
+    const token = `a.${base}.c`
+    useAuthSessionStore.getState().setAccessToken(token)
     localStorage.setItem('user', JSON.stringify({ id: 1, username: 'u' }))
   })
 
@@ -95,6 +98,7 @@ describe('ChatProvider integration', () => {
     ;(global as GlobalWithMocks).WebSocket =
       originalWS as GlobalWithMocks['WebSocket']
     MockWS.instances = []
+    useAuthSessionStore.getState().clear()
     qc.clear()
   })
 

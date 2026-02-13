@@ -18,6 +18,7 @@ import {
   useValidateToken,
 } from '@/hooks/useUsers'
 import { createTestQueryClient } from '@/test/test-utils'
+import { useAuthSessionStore } from '@/stores/useAuthSessionStore'
 
 vi.mock('@/api/client', () => ({
   ApiError: class ApiError extends Error {
@@ -64,11 +65,13 @@ describe('useUsers hooks', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    useAuthSessionStore.getState().clear()
   })
 
   afterEach(() => {
     localStorage.removeItem('user')
     localStorage.removeItem('token')
+    useAuthSessionStore.getState().clear()
   })
 
   describe('getCurrentUser', () => {
@@ -133,7 +136,7 @@ describe('useUsers hooks', () => {
 
   describe('useValidateToken', () => {
     it('returns true when authenticated endpoint succeeds', async () => {
-      localStorage.setItem('token', 'some-token')
+      useAuthSessionStore.getState().setAccessToken('some-token')
       vi.mocked(apiClient).getCurrentUser.mockResolvedValue({} as never)
 
       const { result } = renderHook(() => useValidateToken(), {

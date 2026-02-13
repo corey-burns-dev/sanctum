@@ -3,6 +3,7 @@ import { act, render, waitFor } from '@testing-library/react'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChatProvider, useChatContext } from './ChatProvider'
+import { useAuthSessionStore } from '@/stores/useAuthSessionStore'
 
 // Mock apiClient
 vi.mock('@/api/client', () => ({
@@ -10,6 +11,7 @@ vi.mock('@/api/client', () => ({
     issueWSTicket: vi
       .fn()
       .mockResolvedValue({ ticket: 'test-ticket', expires_in: 60 }),
+    getMyBlocks: vi.fn().mockResolvedValue([]),
   },
 }))
 
@@ -104,7 +106,8 @@ describe('ChatProvider websocket behavior', () => {
       typeof Buffer !== 'undefined'
         ? Buffer.from(JSON.stringify(jwtPayload)).toString('base64')
         : btoa(JSON.stringify(jwtPayload))
-    localStorage.setItem('token', `a.${base}.c`)
+    const token = `a.${base}.c`
+    useAuthSessionStore.getState().setAccessToken(token)
     localStorage.setItem('user', JSON.stringify({ id: 42, username: 'alice' }))
   })
 
@@ -113,6 +116,7 @@ describe('ChatProvider websocket behavior', () => {
       originalWS as GlobalWithMocks['WebSocket']
     MockWebSocket.instances = []
     delete (global as GlobalWithMocks).localStorage
+    useAuthSessionStore.getState().clear()
     qc.clear()
     vi.useRealTimers()
   })
