@@ -19,7 +19,8 @@
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:smoke": "playwright test --grep @smoke",
     "test:e2e:install": "playwright install chromium",
-    "test:e2e:install:system": "playwright install --with-deps chromium"
+    "test:e2e:install:system": "playwright install --with-deps chromium",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

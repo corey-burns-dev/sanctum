@@ -344,7 +344,10 @@ export function useChatWebSocket({
           // Only reconnect if this is the ACTIVE socket
           if (ws !== wsRef.current) return
 
-          logger.debug('WebSocket disconnected:', event.code, event.reason)
+          logger.debug('WebSocket disconnected:', {
+            code: event.code,
+            reason: event.reason,
+          })
           wsRef.current = null
           setIsConnected(false)
           joinedRoomsRef.current.clear()

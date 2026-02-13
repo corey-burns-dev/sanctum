@@ -45,3 +45,4 @@ Run from `frontend/`:
 - `bun run test`
 - `bun run lint`
 - `bun run format`
+- `bun run type-check`

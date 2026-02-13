@@ -148,7 +148,7 @@ export default function PostEdit() {
               <Button variant='ghost' onClick={() => navigate(-1)}>
                 Cancel
               </Button>
-              <Button onClick={handleSave} disabled={updatePost.isLoading}>
+              <Button onClick={handleSave} disabled={updatePost.isPending}>
                 Save
               </Button>
             </div>

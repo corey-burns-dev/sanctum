@@ -29,7 +29,7 @@ For full repo rules, see `/AI.md`. For frontend-specific rules, see `/frontend/A
 ### Frontend
 
 - Run Bun commands from `frontend/` (or via Make targets).
-- Prefer: `make test-frontend`, `make fmt-frontend`, `make lint-frontend`.
+- Prefer: `make test-frontend`, `make fmt-frontend`, `make lint-frontend`, `bun run type-check`.
 
 ## Workflow expectations
 

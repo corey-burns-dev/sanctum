@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "target": "ESNext",
+    "incremental": true,
     "useDefineForClassFields": true,
     "lib": ["DOM", "ESNext"],
     "jsx": "react-jsx",

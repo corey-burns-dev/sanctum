@@ -1,8 +1,8 @@
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { cn } from '@/lib/utils'
 
-const markdownComponents = {
+const markdownComponents: Components = {
   p: ({ children }) => <p className='my-1'>{children}</p>,
   strong: ({ children }) => <strong className='font-bold'>{children}</strong>,
   em: ({ children }) => <em className='italic'>{children}</em>,
