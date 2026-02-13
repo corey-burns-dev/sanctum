@@ -45,7 +45,7 @@ export function useUserActions(user: User) {
       { participant_ids: [user.id] },
       {
         onSuccess: conv => {
-          navigate(`/messages/${conv.id}`)
+          navigate(`/chat/${conv.id}`)
         },
       }
     )

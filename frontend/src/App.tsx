@@ -4,10 +4,12 @@ import type { ReactNode } from 'react'
 import { lazy, Suspense, useEffect } from 'react'
 import {
   Link,
+  Navigate,
   Route,
   BrowserRouter as Router,
   Routes,
   useLocation,
+  useParams,
 } from 'react-router-dom'
 import { BottomBar } from '@/components/BottomBar'
 import { ChatDock } from '@/components/chat/ChatDock'
@@ -161,6 +163,11 @@ function HomePage() {
   )
 }
 
+function RedirectMessagesToChat() {
+  const { id } = useParams<{ id: string }>()
+  return <Navigate to={id ? `/chat/${id}` : '/chat'} replace />
+}
+
 function RoutesWithPrefetch() {
   const location = useLocation()
   const queryClient = useQueryClient()
@@ -176,6 +183,8 @@ function RoutesWithPrefetch() {
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path='/' element={<HomePage />} />
+        <Route path='/messages' element={<Navigate to='/chat' replace />} />
+        <Route path='/messages/:id' element={<RedirectMessagesToChat />} />
         <Route path='/login' element={<Login />} />
         <Route path='/signup' element={<Signup />} />
         <Route path='/posts' element={<Posts />} />
