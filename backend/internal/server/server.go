@@ -521,13 +521,26 @@ func (s *Server) AuthRequired() fiber.Handler {
 		ticket := c.Query("ticket")
 		if ticket != "" && s.redis != nil {
 			key := fmt.Sprintf("ws_ticket:%s", ticket)
-			userIDStr, err := s.redis.GetDel(c.Context(), key).Result()
+
+			var userIDStr string
+			var err error
+
+			if isWSPath {
+				// For WS paths, we use GET and let the handler consume it to avoid 401 loops
+				// during multi-pass handshake evaluation.
+				userIDStr, err = s.redis.Get(c.Context(), key).Result()
+			} else {
+				// For non-WS paths (if any use tickets), keep atomic GETDEL
+				userIDStr, err = s.redis.GetDel(c.Context(), key).Result()
+			}
+
 			if err == nil {
 				// Valid ticket!
 				userID, parseErr := strconv.ParseUint(userIDStr, 10, 32)
 				if parseErr == nil {
-					// Store user ID in context
+					// Store user ID and ticket in context
 					c.Locals("userID", uint(userID))
+					c.Locals("wsTicket", ticket)
 					// Sync to UserContext for logging and downstream services
 					ctx := context.WithValue(c.UserContext(), middleware.UserIDKey, uint(userID))
 					c.SetUserContext(ctx)
@@ -639,6 +652,21 @@ func (s *Server) AuthRequired() fiber.Handler {
 		}
 
 		return c.Next()
+	}
+}
+
+// consumeWSTicket deletes the WebSocket ticket from Redis best-effort.
+func (s *Server) consumeWSTicket(ctx context.Context, ticketVal any) {
+	if ticketVal == nil || s.redis == nil {
+		return
+	}
+	ticket, ok := ticketVal.(string)
+	if !ok || ticket == "" {
+		return
+	}
+	key := fmt.Sprintf("ws_ticket:%s", ticket)
+	if err := s.redis.Del(ctx, key).Err(); err != nil {
+		log.Printf("WS: failed to consume ticket %s: %v", ticket, err)
 	}
 }
 

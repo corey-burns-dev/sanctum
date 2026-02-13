@@ -65,6 +65,16 @@ Critical alerts defined in `infra/prometheus/alerts.yml`:
 * **`DatabaseUnhealthy`**: Tied to readiness probe failures
 * **`RedisUnhealthy`**: Connection failure detection
 
+### Redis Quick Checks (`redli`)
+
+Use `redli` for fast Redis sanity checks during stress runs (see canonical ops standard: [`production-readiness.md#redis-cli-standard-redli`](production-readiness.md#redis-cli-standard-redli)).
+
+```bash
+redli -h localhost -p 6379 PING
+redli -h localhost -p 6379 INFO server
+redli -h localhost -p 6379 SCAN 0 MATCH 'ws_ticket:*' COUNT 20
+```
+
 ---
 
 ## 🧪 Test Scenarios

@@ -41,11 +41,14 @@ Execute mode includes:
 
 1. Health:
    `curl -sf http://localhost:8375/health/ready`
-2. Critical API smoke:
+2. Redis connectivity (`redli`):
+   - `redli -h localhost -p 6379 PING`
+   - Optional ticket-key sanity: `redli -h localhost -p 6379 SCAN 0 MATCH 'ws_ticket:*' COUNT 20`
+3. Critical API smoke:
    - auth login
    - feed read
    - chat send
-3. Confirm error rates and latency trends in monitoring.
+4. Confirm error rates and latency trends in monitoring.
 
 ## Notes
 

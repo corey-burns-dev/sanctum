@@ -19,7 +19,7 @@ GREEN := \033[1;32m
 YELLOW := \033[1;33m
 NC := \033[0m # No Color
 
-.PHONY: help dev dev-backend dev-frontend dev-both build build-backend build-frontend up down recreate recreate-frontend recreate-backend logs logs-backend logs-frontend logs-all fmt fmt-frontend lint lint-frontend install env restart check-versions versions-check clean test test-api test-backend-integration test-frontend test-up test-down test-backend seed db-migrate db-migrate-up db-migrate-auto db-schema-status db-reset-dev deps-update deps-update-backend deps-update-frontend deps-tidy deps-check deps-vuln deps-audit deps-freshness monitor-up monitor-down monitor-logs monitor-config monitor-lite-up monitor-lite-down config-sanity
+.PHONY: help dev dev-clean dev-backend dev-frontend dev-both build build-backend build-frontend up down recreate recreate-frontend recreate-backend logs logs-backend logs-frontend logs-all fmt fmt-frontend lint lint-frontend install env restart check-versions versions-check clean test test-api test-backend-integration test-frontend test-up test-down test-backend seed db-migrate db-migrate-up db-migrate-auto db-schema-status db-reset-dev deps-update deps-update-backend deps-update-frontend deps-tidy deps-check deps-vuln deps-audit deps-freshness monitor-up monitor-down monitor-logs monitor-config monitor-lite-up monitor-lite-down config-sanity
 
 # Default target
 help:
@@ -29,6 +29,7 @@ help:
 	@echo ""
 	@echo "$(GREEN)Development:$(NC)"
 	@echo "  make dev                - 🚀 Start full stack (backend + frontend + databases)"
+	@echo "  make dev-clean          - 🧹 Fresh start (clean volumes/data + dev)"
 	@echo "  make dev-backend        - 🔧 Backend only (Go + Redis + Postgres)"
 	@echo "  make dev-frontend       - 🎨 Frontend only (Vite dev server, local)"
 	@echo "  make dev-both           - 🔀 Backend in Docker + Frontend local (best DX)"
@@ -99,6 +100,8 @@ help:
 dev: env
 	@echo "$(BLUE)Starting full stack development environment...$(NC)"
 	@set -a; [ -f .env ] && . ./.env; set +a; $(DOCKER_COMPOSE) $(COMPOSE_FILES) up --build
+
+dev-clean: clean dev
 
 dev-backend: env
 	@echo "$(BLUE)Starting backend services (Go, Redis, Postgres)...$(NC)"

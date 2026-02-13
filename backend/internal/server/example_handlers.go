@@ -53,6 +53,9 @@ func (s *Server) WebsocketHandler() fiber.Handler {
 			return
 		}
 
+		// Consume ticket if present
+		s.consumeWSTicket(context.Background(), conn.Locals("wsTicket"))
+
 		if s.hub == nil {
 			_ = conn.Close()
 			return

@@ -72,3 +72,5 @@ When introducing a new Docker image:
   - Fix drift between `infra/versions.env` and compose/dockerfile references.
 - Error: local `.env` missing values
   - Run `make env` and re-run command.
+- Error: Redis looks unreachable after compose/env updates
+  - Verify connectivity with `redli -h localhost -p 6379 PING`.

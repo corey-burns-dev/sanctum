@@ -60,6 +60,11 @@ Notes:
 - CI now includes a fast `go test -short` job that runs early to fail fast on obvious test regressions.
 - Nightly job: `Nightly Go Race Detector` runs `go test -race ./...` against a test Postgres and Redis.
 - Dependabot is enabled for Actions and Go modules; review Dependabot PRs and test updates locally.
+- Redis command examples in ops docs use `redli` (`redis-cli` replacement).
+
+```bash
+redli -h localhost -p 6379 PING
+```
 
 If CI fails on formatting or linting, fix locally and push; do not merge until checks are green.
 

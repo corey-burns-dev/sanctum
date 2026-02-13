@@ -35,6 +35,9 @@ func (s *Server) WebSocketChatHandler() fiber.Handler {
 		}
 		userID := userIDVal.(uint)
 
+		// Consume ticket if present
+		s.consumeWSTicket(ctx, conn.Locals("wsTicket"))
+
 		// Get user info for username
 		user, err := s.userRepo.GetByID(ctx, userID)
 		if err != nil {

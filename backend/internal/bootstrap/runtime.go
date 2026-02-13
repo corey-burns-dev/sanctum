@@ -103,13 +103,16 @@ func ensureDevRootAdmin(cfg *config.Config, db *gorm.DB) error {
 		}
 
 		// Ensure users ID sequence is not behind explicit ID insertion.
-		_ = tx.Exec(`
-			SELECT setval(
-				pg_get_serial_sequence('users', 'id'),
-				GREATEST((SELECT COALESCE(MAX(id), 1) FROM users), 1),
-				true
-			)
-		`).Error
+		// This is PostgreSQL-specific.
+		if tx.Dialector.Name() == "postgres" {
+			_ = tx.Exec(`
+				SELECT setval(
+					pg_get_serial_sequence('users', 'id'),
+					GREATEST((SELECT COALESCE(MAX(id), 1) FROM users), 1),
+					true
+				)
+			`).Error
+		}
 
 		return nil
 	}); err != nil {

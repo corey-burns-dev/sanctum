@@ -96,6 +96,16 @@ Examples:
 
 **Rule:** The app must continue functioning if Redis is unavailable.
 
+#### Redis CLI Standard: `redli`
+
+Operations docs and runbooks assume `redli` for Redis checks (`redis-cli` replacement).
+
+```bash
+redli -h localhost -p 6379 PING
+redli -h localhost -p 6379 INFO server
+redli -h localhost -p 6379 SCAN 0 MATCH 'ws_ticket:*' COUNT 20
+```
+
 ---
 
 ### 4. WebSockets at Scale
