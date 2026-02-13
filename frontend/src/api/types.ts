@@ -316,6 +316,7 @@ export interface AdminUserDetailResponse {
   active_mutes: ChatroomMute[]
   blocks_given: UserBlock[]
   blocks_received: UserBlock[]
+  warnings?: string[]
 }
 
 export interface CreateConversationRequest {
@@ -337,13 +338,13 @@ export interface GameRoom {
   id: number
   type: string
   status: string
-  creator_id: number
+  creator_id?: number
   opponent_id?: number
   winner_id?: number
   is_draw: boolean
   next_turn_id: number
   current_state: string
-  creator: User
+  creator?: User
   opponent?: User
 }
 

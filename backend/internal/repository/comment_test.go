@@ -58,4 +58,23 @@ func TestCommentRepository_Integration(t *testing.T) {
 		_, err = repo.GetByID(ctx, comment.ID)
 		assert.Error(t, err)
 	})
+
+	t.Run("ListByPost Hard Cap", func(t *testing.T) {
+		// Clear existing comments for this post
+		testDB.Where("post_id = ?", post.ID).Delete(&models.Comment{})
+
+		// Create 1005 comments
+		for i := 0; i < 1005; i++ {
+			c := &models.Comment{
+				Content: fmt.Sprintf("Comment %d", i),
+				PostID:  post.ID,
+				UserID:  user.ID,
+			}
+			require.NoError(t, testDB.Create(c).Error)
+		}
+
+		comments, err := repo.ListByPost(ctx, post.ID)
+		assert.NoError(t, err)
+		assert.Equal(t, 1000, len(comments))
+	})
 }

@@ -4,6 +4,8 @@ import (
 	"log"
 	"time"
 
+	"sanctum/internal/observability"
+
 	"github.com/gofiber/websocket/v2"
 )
 
@@ -24,6 +26,7 @@ const (
 // WSHub is an interface for hubs that manage generic clients
 type WSHub interface {
 	UnregisterClient(c *Client)
+	Name() string
 }
 
 // Client is a generic middleman between the websocket connection and a hub.
@@ -119,13 +122,16 @@ func (c *Client) WritePump() {
 // TrySend attempts to send a message to the client, handling closed channels and full buffers
 func (c *Client) TrySend(message []byte) {
 	defer func() {
-		_ = recover() // Recover from panic if channel is closed
+		if r := recover(); r != nil {
+			observability.WebSocketBackpressureDrops.WithLabelValues(c.Hub.Name(), "closed").Inc()
+		}
 	}()
 
 	select {
 	case c.Send <- message:
 	default:
 		// Buffer full, drop message
-		log.Printf("Client %d: Buffer full, dropped message", c.UserID)
+		observability.WebSocketBackpressureDrops.WithLabelValues(c.Hub.Name(), "full").Inc()
+		log.Printf("Client %d (%s): Buffer full, dropped message", c.UserID, c.Hub.Name())
 	}
 }

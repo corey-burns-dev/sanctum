@@ -88,21 +88,25 @@ func (r *chatRepository) GetConversation(ctx context.Context, id uint) (*models.
 func (r *chatRepository) GetUserConversations(ctx context.Context, userID uint) ([]*models.Conversation, error) {
 	start := time.Now()
 	var conversations []*models.Conversation
-	readDB := database.GetReadDB()
-	if readDB == nil {
-		readDB = r.db
-	}
-	err := readDB.WithContext(ctx).
-		Joins("JOIN conversation_participants cp ON conversations.id = cp.conversation_id").
-		Where("cp.user_id = ?", userID).
-		Select("conversations.*, COALESCE(cp.unread_count, 0) as unread_count").
-		Preload("Participants").
-		Preload("Messages", func(db *gorm.DB) *gorm.DB {
-			return db.Order("created_at DESC").Limit(1)
-		}).
-		Preload("Messages.Sender").
-		Order("conversations.updated_at DESC").
-		Find(&conversations).Error
+	key := cache.UserConversationsKey(userID)
+
+	err := cache.Aside(ctx, key, &conversations, cache.ListTTL, func() error {
+		readDB := database.GetReadDB()
+		if readDB == nil {
+			readDB = r.db
+		}
+		return readDB.WithContext(ctx).
+			Joins("JOIN conversation_participants cp ON conversations.id = cp.conversation_id").
+			Where("cp.user_id = ?", userID).
+			Select("conversations.*, COALESCE(cp.unread_count, 0) as unread_count").
+			Preload("Participants").
+			Preload("Messages", func(db *gorm.DB) *gorm.DB {
+				return db.Order("created_at DESC").Limit(1)
+			}).
+			Preload("Messages.Sender").
+			Order("conversations.updated_at DESC").
+			Find(&conversations).Error
+	})
 	defer func() {
 		observability.DatabaseQueryLatency.WithLabelValues("read", "conversations").Observe(time.Since(start).Seconds())
 	}()
@@ -111,7 +115,7 @@ func (r *chatRepository) GetUserConversations(ctx context.Context, userID uint) 
 		return nil, err
 	}
 	r.logger.LogRead(ctx, map[string]interface{}{"user_id": userID, "count": len(conversations)})
-	return conversations, err
+	return conversations, nil
 }
 
 func (r *chatRepository) AddParticipant(ctx context.Context, convID, userID uint) error {
@@ -129,6 +133,7 @@ func (r *chatRepository) AddParticipant(ctx context.Context, convID, userID uint
 		return err
 	}
 	cache.InvalidateRoom(ctx, convID)
+	cache.InvalidateUser(ctx, userID)
 	r.logger.LogCreate(ctx, map[string]interface{}{"conversation_id": convID, "user_id": userID})
 	return nil
 }
@@ -144,6 +149,7 @@ func (r *chatRepository) RemoveParticipant(ctx context.Context, convID, userID u
 		return err
 	}
 	cache.InvalidateRoom(ctx, convID)
+	cache.InvalidateUser(ctx, userID)
 	r.logger.LogDelete(ctx, map[string]interface{}{"conversation_id": convID, "user_id": userID})
 	return nil
 }
@@ -159,6 +165,17 @@ func (r *chatRepository) CreateMessage(ctx context.Context, msg *models.Message)
 		return err
 	}
 	cache.InvalidateRoom(ctx, msg.ConversationID)
+
+	// Invalidate conversation list for all participants
+	var userIDs []uint
+	if err := r.db.WithContext(ctx).Model(&models.ConversationParticipant{}).
+		Where("conversation_id = ?", msg.ConversationID).
+		Pluck("user_id", &userIDs).Error; err == nil {
+		for _, uid := range userIDs {
+			cache.InvalidateUser(ctx, uid)
+		}
+	}
+
 	r.logger.LogCreate(ctx, map[string]interface{}{"message_id": msg.ID, "conversation_id": msg.ConversationID})
 	return nil
 }
@@ -237,6 +254,7 @@ func (r *chatRepository) UpdateLastRead(ctx context.Context, convID, userID uint
 		r.logger.LogError(ctx, err, "update_last_read")
 		return err
 	}
+	cache.InvalidateUser(ctx, userID)
 	r.logger.LogUpdate(ctx, map[string]interface{}{"conversation_id": convID, "user_id": userID})
 	return nil
 }

@@ -39,7 +39,7 @@ type GameRoom struct {
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
 	Type          GameType       `gorm:"not null" json:"type"`
 	Status        GameStatus     `gorm:"default:'pending'" json:"status"`
-	CreatorID     uint           `gorm:"not null" json:"creator_id"`
+	CreatorID     *uint          `json:"creator_id,omitempty"`
 	OpponentID    *uint          `json:"opponent_id,omitempty"`
 	WinnerID      *uint          `json:"winner_id,omitempty"`
 	IsDraw        bool           `gorm:"default:false" json:"is_draw"`

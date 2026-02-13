@@ -1,3 +1,5 @@
+import { useAuthSessionStore } from '../stores/useAuthSessionStore'
+
 // Shared handler for auth/foreign key errors in mutations
 export function handleAuthOrFKError(error: unknown): boolean {
   let msg: string
@@ -18,7 +20,7 @@ export function handleAuthOrFKError(error: unknown): boolean {
     msg.toLowerCase().includes('forbidden') ||
     msg.includes('foreign key constraint')
   ) {
-    localStorage.removeItem('token')
+    useAuthSessionStore.getState().clear()
     localStorage.removeItem('user')
     alert(
       'Your session is invalid or your user no longer exists. Please log in again.'

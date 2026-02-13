@@ -37,7 +37,7 @@ func (s *GameService) CreateGameRoom(_ context.Context, userID uint, gameType mo
 
 	now := time.Now()
 	for _, room := range existingRooms {
-		if room.CreatorID == userID {
+		if room.CreatorID != nil && *room.CreatorID == userID {
 			if isPendingRoomStale(room, now) {
 				room.Status = models.GameCancelled
 				room.OpponentID = nil
@@ -56,7 +56,7 @@ func (s *GameService) CreateGameRoom(_ context.Context, userID uint, gameType mo
 	room := &models.GameRoom{
 		Type:          gameType,
 		Status:        models.GamePending,
-		CreatorID:     userID,
+		CreatorID:     &userID,
 		CurrentState:  "{}",
 		Configuration: "{}",
 	}
@@ -129,7 +129,7 @@ func (s *GameService) LeaveGameRoom(_ context.Context, userID, roomID uint) (*mo
 		return nil, false, models.NewInternalError(err)
 	}
 
-	isCreator := room.CreatorID == userID
+	isCreator := room.CreatorID != nil && *room.CreatorID == userID
 	isOpponent := room.OpponentID != nil && *room.OpponentID == userID
 	if !isCreator && !isOpponent {
 		return nil, false, models.NewForbiddenError("Not a participant in this room")

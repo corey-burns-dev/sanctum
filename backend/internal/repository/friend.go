@@ -28,6 +28,10 @@ type friendRepository struct {
 	db *gorm.DB
 }
 
+const (
+	maxFriendLimit = 1000
+)
+
 // NewFriendRepository creates a new friend repository
 func NewFriendRepository(db *gorm.DB) FriendRepository {
 	return &friendRepository{db: db}
@@ -78,6 +82,8 @@ func (r *friendRepository) GetFriends(ctx context.Context, userID uint) ([]model
 		Joins("JOIN friendships f ON (users.id = f.requester_id OR users.id = f.addressee_id)").
 		Where("f.status = ? AND (f.requester_id = ? OR f.addressee_id = ?) AND users.id != ?",
 			models.FriendshipStatusAccepted, userID, userID, userID).
+		Order("f.created_at desc").
+		Limit(maxFriendLimit).
 		Find(&users).Error; err != nil {
 		return nil, models.NewInternalError(err)
 	}
@@ -93,6 +99,8 @@ func (r *friendRepository) GetPendingRequests(ctx context.Context, userID uint) 
 		Where("addressee_id = ? AND status = ?", userID, models.FriendshipStatusPending).
 		Preload("Requester").
 		Preload("Addressee").
+		Order("created_at desc").
+		Limit(maxFriendLimit).
 		Find(&friendships).Error; err != nil {
 		return nil, models.NewInternalError(err)
 	}
@@ -108,6 +116,8 @@ func (r *friendRepository) GetSentRequests(ctx context.Context, userID uint) ([]
 		Where("requester_id = ? AND status = ?", userID, models.FriendshipStatusPending).
 		Preload("Requester").
 		Preload("Addressee").
+		Order("created_at desc").
+		Limit(maxFriendLimit).
 		Find(&friendships).Error; err != nil {
 		return nil, models.NewInternalError(err)
 	}

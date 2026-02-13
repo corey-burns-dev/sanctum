@@ -26,6 +26,7 @@ APP_ENV="${APP_ENV:-$(get_cfg APP_ENV)}"
 APP_ENV="${APP_ENV:-development}"
 JWT_SECRET="${JWT_SECRET:-$(get_cfg JWT_SECRET)}"
 DB_PASSWORD="${DB_PASSWORD:-$(get_cfg DB_PASSWORD)}"
+DB_SSLMODE="${DB_SSLMODE:-$(get_cfg DB_SSLMODE)}"
 DB_SCHEMA_MODE="${DB_SCHEMA_MODE:-$(get_cfg DB_SCHEMA_MODE)}"
 DB_SCHEMA_MODE="${DB_SCHEMA_MODE:-sql}"
 
@@ -44,6 +45,12 @@ if [ "$APP_ENV" = "production" ] || [ "$APP_ENV" = "prod" ]; then
   fi
   if [ -z "$DB_PASSWORD" ] || [ "$DB_PASSWORD" = "password" ]; then
     echo "Production requires non-default DB_PASSWORD."
+    exit 1
+  fi
+  # Normalize to lowercase for check
+  DB_SSLMODE_LOWER=$(echo "$DB_SSLMODE" | tr '[:upper:]' '[:lower:]')
+  if [ -z "$DB_SSLMODE_LOWER" ] || [ "$DB_SSLMODE_LOWER" = "disable" ]; then
+    echo "Production requires secure DB_SSLMODE (not 'disable' or empty)."
     exit 1
   fi
 fi

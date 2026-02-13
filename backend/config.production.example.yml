@@ -9,6 +9,7 @@ DB_HOST: "postgres"
 DB_PORT: "5432"
 DB_USER: "sanctum_admin"
 DB_NAME: "sanctum_prod"
+DB_SSLMODE: "require"
 
 # Security
 # ALLOWED_ORIGINS: "https://your-domain.com"

@@ -54,6 +54,7 @@ export function useUserActions(user: User) {
       const openRoom = freshRooms.find(
         room =>
           room.status === 'pending' &&
+          room.creator_id &&
           room.creator_id !== currentUser?.id &&
           !room.opponent_id
       )

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"sanctum/internal/models"
+	"sanctum/internal/service"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -267,54 +268,20 @@ func (s *Server) ResolveAdminReport(c *fiber.Ctx) error {
 	return c.JSON(report)
 }
 
+func (s *Server) moderationSvc() *service.ModerationService {
+	return s.moderationService
+}
+
 func (s *Server) GetAdminBanRequests(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 	page := parsePagination(c, 100)
 
-	type BanRequestRow struct {
-		ReportedUserID uint      `json:"reported_user_id"`
-		ReportCount    int64     `json:"report_count"`
-		LatestReportAt time.Time `json:"latest_report_at"`
-	}
-
-	var rows []BanRequestRow
-	if err := s.db.WithContext(ctx).
-		Table("moderation_reports").
-		Select("reported_user_id, COUNT(*) as report_count, MAX(created_at) as latest_report_at").
-		Where("status = ? AND target_type = ? AND reported_user_id IS NOT NULL", models.ReportStatusOpen, models.ReportTargetUser).
-		Group("reported_user_id").
-		Order("report_count DESC, latest_report_at DESC").
-		Limit(page.Limit).
-		Offset(page.Offset).
-		Scan(&rows).Error; err != nil {
+	rows, err := s.moderationSvc().GetAdminBanRequests(ctx, page.Limit, page.Offset)
+	if err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
 
-	userIDs := make([]uint, 0, len(rows))
-	for _, row := range rows {
-		userIDs = append(userIDs, row.ReportedUserID)
-	}
-	usersByID := map[uint]models.User{}
-	if len(userIDs) > 0 {
-		var users []models.User
-		if err := s.db.WithContext(ctx).Where("id IN ?", userIDs).Find(&users).Error; err != nil {
-			return models.RespondWithError(c, fiber.StatusInternalServerError, err)
-		}
-		for _, user := range users {
-			usersByID[user.ID] = user
-		}
-	}
-
-	resp := make([]fiber.Map, 0, len(rows))
-	for _, row := range rows {
-		resp = append(resp, fiber.Map{
-			"reported_user_id": row.ReportedUserID,
-			"report_count":     row.ReportCount,
-			"latest_report_at": row.LatestReportAt,
-			"user":             usersByID[row.ReportedUserID],
-		})
-	}
-	return c.JSON(resp)
+	return c.JSON(rows)
 }
 
 func (s *Server) GetAdminUsers(c *fiber.Ctx) error {
@@ -342,40 +309,15 @@ func (s *Server) GetAdminUserDetail(c *fiber.Ctx) error {
 		return nil
 	}
 
-	var user models.User
-	if err := s.db.WithContext(ctx).First(&user, targetID).Error; err != nil {
+	detail, err := s.moderationSvc().GetAdminUserDetail(ctx, targetID)
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return models.RespondWithError(c, fiber.StatusNotFound, models.NewNotFoundError("User", targetID))
 		}
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}
 
-	var reports []models.ModerationReport
-	_ = s.db.WithContext(ctx).
-		Where("reported_user_id = ?", targetID).
-		Order("created_at DESC").
-		Limit(200).
-		Find(&reports).Error
-
-	var activeMutes []models.ChatroomMute
-	_ = s.db.WithContext(ctx).
-		Where("user_id = ?", targetID).
-		Order("created_at DESC").
-		Find(&activeMutes).Error
-
-	var blocksGiven []models.UserBlock
-	_ = s.db.WithContext(ctx).Where("blocker_id = ?", targetID).Order("created_at DESC").Limit(200).Find(&blocksGiven).Error
-
-	var blocksReceived []models.UserBlock
-	_ = s.db.WithContext(ctx).Where("blocked_id = ?", targetID).Order("created_at DESC").Limit(200).Find(&blocksReceived).Error
-
-	return c.JSON(fiber.Map{
-		"user":            user,
-		"reports":         reports,
-		"active_mutes":    activeMutes,
-		"blocks_given":    blocksGiven,
-		"blocks_received": blocksReceived,
-	})
+	return c.JSON(detail)
 }
 
 func (s *Server) BanUser(c *fiber.Ctx) error {

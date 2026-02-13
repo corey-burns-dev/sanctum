@@ -4,6 +4,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -85,19 +86,28 @@ func RespondWithError(c *fiber.Ctx, status int, err error) error {
 		rid = fmt.Sprintf("%v", val)
 	}
 
+	isDev := os.Getenv("APP_ENV") == "development" || os.Getenv("APP_ENV") == ""
+
 	if errors.As(err, &appErr) {
 		response = ErrorResponse{
 			Error:     appErr.Message,
 			Code:      appErr.Code,
 			RequestID: rid,
 		}
-		if appErr.Err != nil {
+		if appErr.Err != nil && isDev {
 			response.Details = appErr.Err.Error()
 		}
 	} else {
-		response = ErrorResponse{
-			Error:     err.Error(),
-			RequestID: rid,
+		if !isDev {
+			response = ErrorResponse{
+				Error:     "Internal server error",
+				RequestID: rid,
+			}
+		} else {
+			response = ErrorResponse{
+				Error:     err.Error(),
+				RequestID: rid,
+			}
 		}
 	}
 	return c.Status(status).JSON(response)

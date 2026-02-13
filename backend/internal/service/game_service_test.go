@@ -73,10 +73,11 @@ func noopGameRepo() *gameRepoStub {
 func TestGameServiceCreateGameRoomReturnsExistingPending(t *testing.T) {
 	repo := noopGameRepo()
 	repo.getActiveRoomsFn = func(models.GameType) ([]models.GameRoom, error) {
+		cID := uint(9)
 		return []models.GameRoom{
 			{
 				ID:        17,
-				CreatorID: 9,
+				CreatorID: &cID,
 				Status:    models.GamePending,
 				UpdatedAt: time.Now(),
 			},
@@ -115,11 +116,12 @@ func TestGameServiceGetGameRoomNotFound(t *testing.T) {
 
 func TestGameServiceLeaveGameRoomForbidden(t *testing.T) {
 	opponent := uint(88)
+	creator := uint(77)
 	repo := noopGameRepo()
 	repo.getRoomFn = func(uint) (*models.GameRoom, error) {
 		return &models.GameRoom{
 			ID:         44,
-			CreatorID:  77,
+			CreatorID:  &creator,
 			OpponentID: &opponent,
 			Status:     models.GameActive,
 		}, nil
@@ -137,11 +139,12 @@ func TestGameServiceLeaveGameRoomForbidden(t *testing.T) {
 }
 
 func TestGameServiceLeaveGameRoomAlreadyClosed(t *testing.T) {
+	creator := uint(5)
 	repo := noopGameRepo()
 	repo.getRoomFn = func(uint) (*models.GameRoom, error) {
 		return &models.GameRoom{
 			ID:        33,
-			CreatorID: 5,
+			CreatorID: &creator,
 			Status:    models.GameFinished,
 		}, nil
 	}

@@ -16,7 +16,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { getAuthToken, getCurrentUser } from '@/hooks'
+import { getCurrentUser } from '@/hooks'
+import { useAuthToken } from '@/hooks/useAuth'
 import { useGameRoomSession } from '@/hooks/useGameRoomSession'
 import { getAvatarUrl } from '@/lib/chat-utils'
 
@@ -38,7 +39,7 @@ type ActiveGameRoom = {
   id: number
   type: string
   status: string
-  creator_id: number
+  creator_id: number | null
   opponent_id?: number | null
 }
 
@@ -80,7 +81,7 @@ export default function ConnectFour() {
   const { id } = useParams()
   const navigate = useNavigate()
   const currentUser = getCurrentUser()
-  const token = getAuthToken()
+  const token = useAuthToken()
   const queryClient = useQueryClient()
 
   const [gameState, setGameState] = useState<GameState | null>(null)
@@ -383,6 +384,7 @@ export default function ConnectFour() {
       const joinableRoom = freshRooms.find(
         activeRoom =>
           activeRoom.status === 'pending' &&
+          activeRoom.creator_id &&
           activeRoom.creator_id !== currentUser.id &&
           !activeRoom.opponent_id
       )
@@ -424,11 +426,12 @@ export default function ConnectFour() {
   const canJoin = !isPlayer && room.status === 'pending'
   const isMyTurn =
     gameState.status === 'active' && gameState.next_turn === currentUser?.id
-  const playerOneName = room.creator.username
+  const playerOneName = room.creator?.username ?? 'Deleted User'
   const playerTwoName =
     room.opponent?.username ||
     (gameState.status === 'pending' ? 'WAITING...' : 'BOT')
-  const playerOneAvatar = room.creator.avatar || getAvatarUrl(playerOneName, 80)
+  const playerOneAvatar =
+    room.creator?.avatar || getAvatarUrl(playerOneName, 80)
   const playerTwoAvatar = room.opponent?.avatar
     ? room.opponent.avatar
     : room.opponent?.username

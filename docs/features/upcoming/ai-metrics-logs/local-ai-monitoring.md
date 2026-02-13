@@ -7,6 +7,7 @@ You're absolutely right - you don't need cloud APIs! Let's use your local GPU fo
 ## 🎯 Why Local is Better for You
 
 **Advantages:**
+
 - ✅ **Zero API costs** - Run unlimited queries
 - ✅ **No data leaves your server** - Total privacy
 - ✅ **Faster responses** - No network latency
@@ -14,6 +15,7 @@ You're absolutely right - you don't need cloud APIs! Let's use your local GPU fo
 - ✅ **Works offline** - No internet dependency
 
 **Your Setup:**
+
 - Local server with good GPU ✓
 - Already running monitoring stack ✓
 - Want simple, automated monitoring ✓
@@ -27,6 +29,7 @@ You're absolutely right - you don't need cloud APIs! Let's use your local GPU fo
 ### Why This Stack?
 
 **Ollama:**
+
 - Dead simple to install and run
 - Manages models automatically
 - REST API built-in
@@ -34,6 +37,7 @@ You're absolutely right - you don't need cloud APIs! Let's use your local GPU fo
 - Very lightweight
 
 **Llama 3.1 8B:**
+
 - Great at log analysis and summarization
 - Fits easily in 6-8GB VRAM
 - Fast inference (perfect for monitoring)
@@ -41,6 +45,7 @@ You're absolutely right - you don't need cloud APIs! Let's use your local GPU fo
 - Free and unrestricted use
 
 **Alternative models:**
+
 - Mistral 7B (also excellent)
 - Gemma 2 9B (if you have more VRAM)
 - Qwen 2.5 7B (great at code/structured data)
@@ -244,11 +249,13 @@ if __name__ == "__main__":
 ```
 
 **Make it executable:**
+
 ```bash
 chmod +x scripts/local-ai-monitor.py
 ```
 
 **Test it:**
+
 ```bash
 python3 scripts/local-ai-monitor.py
 ```
@@ -320,6 +327,7 @@ volumes:
 ```
 
 **Dockerfile.monitor:**
+
 ```dockerfile
 FROM python:3.11-slim
 
@@ -381,6 +389,7 @@ if __name__ == '__main__':
 ```
 
 **Usage:**
+
 ```bash
 # Start the chat server
 python3 scripts/monitor-chat.py
@@ -395,6 +404,7 @@ curl -X POST http://localhost:5000/ask \
 ```
 
 **Or create a simple web UI:**
+
 ```html
 <!-- monitoring-chat.html -->
 <!DOCTYPE html>
@@ -456,6 +466,7 @@ services:
 ```
 
 **Then wrap your monitoring in Langfuse:**
+
 ```python
 from langfuse import Langfuse
 
@@ -469,6 +480,7 @@ def analyze_health():
 ```
 
 **You get:**
+
 - Dashboard of all LLM calls
 - Token usage tracking
 - Performance metrics
@@ -478,13 +490,13 @@ def analyze_health():
 
 ## 🎛️ Model Comparison for Monitoring
 
-| Model | VRAM | Speed | Quality | Best For |
-|-------|------|-------|---------|----------|
-| **Llama 3.1 8B** | 6GB | Fast | Great | General monitoring ⭐ |
-| **Mistral 7B** | 6GB | Faster | Good | Quick checks |
-| **Gemma 2 9B** | 8GB | Medium | Great | Detailed analysis |
-| **Qwen 2.5 7B** | 6GB | Fast | Great | Code/structured data |
-| **Llama 3.1 70B** | 40GB+ | Slow | Excellent | Critical analysis only |
+| Model             | VRAM  | Speed  | Quality   | Best For               |
+| ----------------- | ----- | ------ | --------- | ---------------------- |
+| **Llama 3.1 8B**  | 6GB   | Fast   | Great     | General monitoring ⭐   |
+| **Mistral 7B**    | 6GB   | Faster | Good      | Quick checks           |
+| **Gemma 2 9B**    | 8GB   | Medium | Great     | Detailed analysis      |
+| **Qwen 2.5 7B**   | 6GB   | Fast   | Great     | Code/structured data   |
+| **Llama 3.1 70B** | 40GB+ | Slow   | Excellent | Critical analysis only |
 
 **Recommendation:** Start with **Llama 3.1 8B** - perfect balance.
 
@@ -518,6 +530,7 @@ curl -X POST "$DISCORD_WEBHOOK_URL" \
 ```
 
 **Schedule for 8 AM:**
+
 ```bash
 0 8 * * * /path/to/scripts/morning-digest.sh
 ```
@@ -527,12 +540,14 @@ curl -X POST "$DISCORD_WEBHOOK_URL" \
 ## 🔋 Resource Usage
 
 **Ollama + Llama 3.1 8B:**
+
 - VRAM: ~6GB during inference
 - Idle VRAM: ~2GB (model loaded)
 - CPU: Minimal
 - Response time: 1-3 seconds (local network)
 
 **Tips to reduce usage:**
+
 1. Unload model when not in use: `ollama stop llama3.1:8b`
 2. Use smaller model: `ollama pull mistral:7b`
 3. Quantized models: `ollama pull llama3.1:8b-q4_0` (uses less VRAM)
@@ -575,16 +590,16 @@ export DISCORD_WEBHOOK_URL="your-webhook-here"
 
 ## 🆚 Comparison: Cloud vs Local
 
-| Feature | Cloud (Anthropic) | Local (Ollama) |
-|---------|------------------|----------------|
-| **Cost** | $3-15/month | $0 (electricity) |
-| **Speed** | 2-5 seconds | 1-3 seconds |
-| **Privacy** | Data sent to API | 100% local |
-| **Quality** | Excellent | Very Good |
-| **Limits** | Rate limited | Unlimited |
-| **Setup** | 2 minutes | 10 minutes |
-| **Offline** | ❌ Requires internet | ✅ Works offline |
-| **VRAM** | None | 6GB |
+| Feature     | Cloud (Anthropic)   | Local (Ollama)   |
+| ----------- | ------------------- | ---------------- |
+| **Cost**    | $3-15/month         | $0 (electricity) |
+| **Speed**   | 2-5 seconds         | 1-3 seconds      |
+| **Privacy** | Data sent to API    | 100% local       |
+| **Quality** | Excellent           | Very Good        |
+| **Limits**  | Rate limited        | Unlimited        |
+| **Setup**   | 2 minutes           | 10 minutes       |
+| **Offline** | ❌ Requires internet | ✅ Works offline  |
+| **VRAM**    | None                | 6GB              |
 
 **For your setup:** Local is the clear winner! ✅
 
@@ -593,6 +608,7 @@ export DISCORD_WEBHOOK_URL="your-webhook-here"
 ## 🎯 Recommended Configuration
 
 **Start with this:**
+
 ```bash
 # 1. Ollama running as service
 sudo systemctl enable ollama
@@ -608,6 +624,7 @@ python3 scripts/monitor-chat.py
 ```
 
 **This gives you:**
+
 - Morning summary in Discord
 - Detailed analysis morning & evening
 - Ability to ask questions anytime
@@ -646,12 +663,14 @@ Keep it brief - just the concerning changes."""
 **You don't need cloud APIs at all!**
 
 **Your setup:**
+
 1. Install Ollama (1 command)
 2. Download Llama 3.1 8B (1 command)
 3. Run monitoring script (works out of the box)
 4. Schedule with cron
 
 **You get:**
+
 - Unlimited queries
 - Zero cost
 - Full privacy

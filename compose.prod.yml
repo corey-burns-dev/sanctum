@@ -8,17 +8,37 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 768M
 
   postgres:
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 1G
     # In real prod, don't expose ports
     # ports:
     #   - "5432:5432"
 
   redis:
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
 
   frontend:
     ports:
       - "80:80"
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M

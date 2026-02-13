@@ -4,8 +4,8 @@ import { ApiError, apiClient } from '@/api/client'
 import { createTicketedWS, getNextBackoff } from '@/lib/ws-utils'
 
 type RoomSession = {
-  // ...
-  creator_id: number
+  id: number
+  creator_id: number | null
   opponent_id?: number | null
   status: string
 }

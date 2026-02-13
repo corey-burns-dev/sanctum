@@ -68,8 +68,9 @@ type Server struct {
 	postService    *service.PostService
 	imageService   *service.ImageService
 	commentService *service.CommentService
-	chatService    *service.ChatService
-	userService    *service.UserService
+	chatService       *service.ChatService
+	userService       *service.UserService
+	moderationService *service.ModerationService
 }
 
 // NewServer creates a new server instance with all dependencies
@@ -123,6 +124,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		server.canModerateChatroomByUserID,
 	)
 	server.userService = service.NewUserService(server.userRepo)
+	server.moderationService = service.NewModerationService(server.db)
 	// NOTE: built-in sanctum seeding is intentionally NOT performed here.
 	// Seeding should be explicit during runtime bootstrap (cmd) or test setup.
 
@@ -182,6 +184,7 @@ func NewServerWithDeps(cfg *config.Config, db *gorm.DB, redisClient *redis.Clien
 		server.canModerateChatroomByUserID,
 	)
 	server.userService = service.NewUserService(server.userRepo)
+	server.moderationService = service.NewModerationService(server.db)
 
 	// Initialize notifier and hub if Redis is available
 	if redisClient != nil {
@@ -336,7 +339,7 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	users.Post("/:id/demote-admin", s.AdminRequired(), s.DemoteFromAdmin)
 	users.Post("/:id/block", s.BlockUser)
 	users.Delete("/:id/block", s.UnblockUser)
-	users.Post("/:id/report", s.ReportUser)
+	users.Post("/:id/report", middleware.RateLimit(s.redis, 5, 10*time.Minute, "report"), s.ReportUser)
 	users.Get("/:id", s.GetUserProfile)
 
 	// Friend routes
@@ -365,7 +368,7 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 		s.redis, 1, time.Minute, "create_comment"), s.CreateComment)
 	posts.Put("/:id/comments/:commentId", s.UpdateComment)
 	posts.Delete("/:id/comments/:commentId", s.DeleteComment)
-	posts.Post("/:id/report", s.ReportPost)
+	posts.Post("/:id/report", middleware.RateLimit(s.redis, 5, 10*time.Minute, "report"), s.ReportPost)
 	posts.Post("/:id/poll/vote", s.VotePoll)
 	// Generic /:id routes (for item detail, update, delete)
 	posts.Put("/:id", s.UpdatePost)
@@ -382,7 +385,7 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	conversations.Post("/:id/read", s.MarkConversationRead)
 	conversations.Post("/:id/messages/:messageId/reactions", s.AddMessageReaction)
 	conversations.Delete("/:id/messages/:messageId/reactions", s.RemoveMessageReaction)
-	conversations.Post("/:id/messages/:messageId/report", s.ReportMessage)
+	conversations.Post("/:id/messages/:messageId/report", middleware.RateLimit(s.redis, 5, 10*time.Minute, "report"), s.ReportMessage)
 	conversations.Post("/:id/participants", s.AddParticipant)
 	conversations.Delete("/:id", s.LeaveConversation)
 	// Generic /:id route must be last
@@ -417,18 +420,18 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 
 	// Admin routes
 	admin := protected.Group("/admin", s.AdminRequired())
-	admin.Get("/feature-flags", s.GetFeatureFlags)
-	admin.Get("/reports", s.GetAdminReports)
-	admin.Post("/reports/:id/resolve", s.ResolveAdminReport)
-	admin.Get("/ban-requests", s.GetAdminBanRequests)
-	admin.Get("/users", s.GetAdminUsers)
-	admin.Get("/users/:id", s.GetAdminUserDetail)
-	admin.Post("/users/:id/ban", s.BanUser)
-	admin.Post("/users/:id/unban", s.UnbanUser)
+	admin.Get("/feature-flags", middleware.RateLimit(s.redis, 30, time.Minute, "admin_read"), s.GetFeatureFlags)
+	admin.Get("/reports", middleware.RateLimit(s.redis, 30, time.Minute, "admin_read"), s.GetAdminReports)
+	admin.Post("/reports/:id/resolve", middleware.RateLimit(s.redis, 10, 5*time.Minute, "admin_write"), s.ResolveAdminReport)
+	admin.Get("/ban-requests", middleware.RateLimit(s.redis, 30, time.Minute, "admin_read"), s.GetAdminBanRequests)
+	admin.Get("/users", middleware.RateLimit(s.redis, 30, time.Minute, "admin_read"), s.GetAdminUsers)
+	admin.Get("/users/:id", middleware.RateLimit(s.redis, 30, time.Minute, "admin_read"), s.GetAdminUserDetail)
+	admin.Post("/users/:id/ban", middleware.RateLimit(s.redis, 10, 5*time.Minute, "admin_write"), s.BanUser)
+	admin.Post("/users/:id/unban", middleware.RateLimit(s.redis, 10, 5*time.Minute, "admin_write"), s.UnbanUser)
 	adminSanctumRequests := admin.Group("/sanctum-requests")
-	adminSanctumRequests.Get("/", s.GetAdminSanctumRequests)
-	adminSanctumRequests.Post("/:id/approve", s.ApproveSanctumRequest)
-	adminSanctumRequests.Post("/:id/reject", s.RejectSanctumRequest)
+	adminSanctumRequests.Get("/", middleware.RateLimit(s.redis, 30, time.Minute, "admin_read"), s.GetAdminSanctumRequests)
+	adminSanctumRequests.Post("/:id/approve", middleware.RateLimit(s.redis, 10, 5*time.Minute, "admin_write"), s.ApproveSanctumRequest)
+	adminSanctumRequests.Post("/:id/reject", middleware.RateLimit(s.redis, 10, 5*time.Minute, "admin_write"), s.RejectSanctumRequest)
 }
 
 // HealthCheck is a legacy/simple alias for ReadinessCheck
@@ -515,17 +518,11 @@ func (s *Server) AuthRequired() fiber.Handler {
 		ticket := c.Query("ticket")
 		if ticket != "" && s.redis != nil {
 			key := fmt.Sprintf("ws_ticket:%s", ticket)
-			userIDStr, err := s.redis.Get(c.Context(), key).Result()
+			userIDStr, err := s.redis.GetDel(c.Context(), key).Result()
 			if err == nil {
 				// Valid ticket!
 				userID, parseErr := strconv.ParseUint(userIDStr, 10, 32)
 				if parseErr == nil {
-					// For WebSocket paths, we defer ticket deletion to the handler
-					// to avoid issues with redirects or multi-pass middleware.
-					if !isWSPath {
-						s.redis.Del(c.Context(), key)
-					}
-
 					// Store user ID in context
 					c.Locals("userID", uint(userID))
 					// Sync to UserContext for logging and downstream services

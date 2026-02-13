@@ -130,9 +130,9 @@ interface GameRoom {
   id: number
   type: string
   status: string
-  creator_id: number
+  creator_id?: number
   opponent_id?: number | null
-  creator: {
+  creator?: {
     username: string
   }
 }
@@ -169,6 +169,7 @@ export default function Games() {
         const openRoom = freshRooms.find(
           room =>
             room.status === 'pending' &&
+            room.creator_id &&
             room.creator_id !== currentUser?.id &&
             !room.opponent_id
         )
@@ -179,7 +180,9 @@ export default function Games() {
         } else {
           const myPendingRoom = freshRooms.find(
             room =>
-              room.status === 'pending' && room.creator_id === currentUser?.id
+              room.status === 'pending' &&
+              room.creator_id &&
+              room.creator_id === currentUser?.id
           )
           if (myPendingRoom) {
             navigate(`/games/${type}/${myPendingRoom.id}`)
@@ -215,6 +218,7 @@ export default function Games() {
     (activeRooms as GameRoom[] | undefined)?.filter(
       room =>
         room.status === 'pending' &&
+        room.creator_id &&
         room.creator_id !== currentUser?.id &&
         !room.opponent_id
     ) ?? []
@@ -223,6 +227,7 @@ export default function Games() {
     (activeRooms as GameRoom[] | undefined)?.filter(
       room =>
         room.status === 'pending' &&
+        room.creator_id &&
         room.creator_id === currentUser?.id &&
         !room.opponent_id
     ) ?? []
@@ -390,7 +395,7 @@ export default function Games() {
                               {room.type}
                             </span>
                             <span className='text-sm font-bold truncate max-w-30'>
-                              {room.creator.username}'s Room
+                              {room.creator?.username ?? 'Deleted User'}'s Room
                             </span>
                           </div>
                           <Button

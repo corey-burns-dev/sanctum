@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"runtime/debug"
 	"strconv"
 
 	"github.com/redis/go-redis/v9"
@@ -53,7 +55,14 @@ func (n *Notifier) StartPatternSubscriber(
 	go func() {
 		for msg := range ch {
 			// Example channel: notifications:user:123
-			onMessage(msg.Channel, msg.Payload)
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("PANIC in PatternSubscriber: %v\n%s", r, debug.Stack())
+					}
+				}()
+				onMessage(msg.Channel, msg.Payload)
+			}()
 		}
 	}()
 
@@ -119,7 +128,14 @@ func (n *Notifier) StartChatSubscriber(
 
 	go func() {
 		for msg := range ch {
-			onMessage(msg.Channel, msg.Payload)
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("PANIC in ChatSubscriber: %v\n%s", r, debug.Stack())
+					}
+				}()
+				onMessage(msg.Channel, msg.Payload)
+			}()
 		}
 	}()
 
@@ -149,7 +165,14 @@ func (n *Notifier) StartGameSubscriber(
 
 	go func() {
 		for msg := range ch {
-			onMessage(msg.Channel, msg.Payload)
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("PANIC in GameSubscriber: %v\n%s", r, debug.Stack())
+					}
+				}()
+				onMessage(msg.Channel, msg.Payload)
+			}()
 		}
 	}()
 

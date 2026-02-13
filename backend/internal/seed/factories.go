@@ -130,7 +130,7 @@ func (f *Factory) CreateGame(creator *models.User, gameType models.GameType, sta
 	game := &models.GameRoom{
 		Type:      gameType,
 		Status:    status,
-		CreatorID: creator.ID,
+		CreatorID: &creator.ID,
 	}
 
 	for _, override := range overrides {

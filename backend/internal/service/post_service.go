@@ -177,11 +177,34 @@ func (s *PostService) CreatePost(ctx context.Context, in CreatePostInput) (*mode
 func (s *PostService) ListPosts(ctx context.Context, in ListPostsInput) ([]*models.Post, error) {
 	var posts []*models.Post
 	var err error
-	if in.SanctumID != nil {
+
+	if in.SanctumID == nil && in.Offset == 0 && in.Limit <= 20 {
+		key := cache.PostsListKey(ctx)
+		err = cache.Aside(ctx, key, &posts, cache.ListTTL, func() error {
+			var fetchErr error
+			posts, fetchErr = s.postRepo.List(ctx, in.Limit, in.Offset, 0)
+			return fetchErr
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		// Re-enrich with current user's liked status if they are logged in
+		if in.CurrentUserID != 0 {
+			// We need to work on a shallow copy of the slice to avoid modifying cached objects if they are shared
+			// Although Aside/Unmarshal should provide fresh objects.
+			for _, p := range posts {
+				if liked, err := s.postRepo.IsLiked(ctx, in.CurrentUserID, p.ID); err == nil {
+					p.Liked = liked
+				}
+			}
+		}
+	} else if in.SanctumID != nil {
 		posts, err = s.postRepo.GetBySanctumID(ctx, *in.SanctumID, in.Limit, in.Offset, in.CurrentUserID)
 	} else {
 		posts, err = s.postRepo.List(ctx, in.Limit, in.Offset, in.CurrentUserID)
 	}
+
 	if err != nil {
 		return nil, err
 	}

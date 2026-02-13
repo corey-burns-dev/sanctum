@@ -91,6 +91,41 @@ func TestParsePagination_Custom(t *testing.T) {
 	assert.Equal(t, float64(30), body["offset"])
 }
 
+func TestParsePagination_Clamping(t *testing.T) {
+	app := fiber.New()
+	app.Get("/items", func(c *fiber.Ctx) error {
+		p := parsePagination(c, 25)
+		return c.JSON(fiber.Map{"limit": p.Limit, "offset": p.Offset})
+	})
+
+	tests := []struct {
+		name           string
+		query          string
+		expectedLimit  float64
+		expectedOffset float64
+	}{
+		{"Limit above max", "?limit=200", 100, 0},
+		{"Limit zero", "?limit=0", 25, 0},
+		{"Limit negative", "?limit=-10", 25, 0},
+		{"Offset negative", "?offset=-50", 25, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/items"+tt.query, nil)
+			resp, err := app.Test(req)
+			require.NoError(t, err)
+			defer func() { _ = resp.Body.Close() }()
+
+			var body map[string]float64
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+
+			assert.Equal(t, tt.expectedLimit, body["limit"])
+			assert.Equal(t, tt.expectedOffset, body["offset"])
+		})
+	}
+}
+
 // --- parseID ---
 
 func TestParseID_ValidID(t *testing.T) {

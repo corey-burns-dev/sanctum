@@ -30,20 +30,32 @@ func (r *pollRepository) Create(ctx context.Context, postID uint, question strin
 		PostID:   postID,
 		Question: question,
 	}
-	if err := r.db.WithContext(ctx).Create(poll).Error; err != nil {
+
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(poll).Error; err != nil {
+			return err
+		}
+
+		pollOptions := make([]models.PollOption, 0, len(options))
+		for i, text := range options {
+			opt := models.PollOption{
+				PollID:       poll.ID,
+				OptionText:   text,
+				DisplayOrder: i,
+			}
+			if err := tx.Create(&opt).Error; err != nil {
+				return err
+			}
+			pollOptions = append(pollOptions, opt)
+		}
+		poll.Options = pollOptions
+		return nil
+	})
+
+	if err != nil {
 		return nil, err
 	}
-	for i, text := range options {
-		opt := models.PollOption{
-			PollID:       poll.ID,
-			OptionText:   text,
-			DisplayOrder: i,
-		}
-		if err := r.db.WithContext(ctx).Create(&opt).Error; err != nil {
-			return nil, err
-		}
-		poll.Options = append(poll.Options, opt)
-	}
+
 	return poll, nil
 }
 

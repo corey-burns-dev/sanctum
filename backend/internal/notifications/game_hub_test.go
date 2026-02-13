@@ -63,7 +63,7 @@ func TestGameHub_HandleJoin(t *testing.T) {
 
 	room := models.GameRoom{
 		ID:        roomID,
-		CreatorID: creatorID,
+		CreatorID: &creatorID,
 		Status:    models.GamePending,
 	}
 

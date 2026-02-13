@@ -1,0 +1,72 @@
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=ec0963c340b1ed3b5be0ab4e2e2c80a2611ae4a6778adfe80ca92135f9a29748' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=02c3849d178739fa43522be8537b4b7fe477ddb50f2b12017762df99e1bb69e1' failed: 
+createTicketedWS @ ws-utils.ts:78
+installHook.js:1 WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+overrideMethod @ installHook.js:1
+onError @ ChatProvider.tsx:703
+ChatProvider.tsx:714 WebSocket disconnected. Reconnecting in 1063.5011762999472ms (attempt 1)
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=6d2d8624f796a6b43593a9c67930b485212adb1f10b892376408b22c8d1402f9' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=9f3cd1fcdcba6fc78b20ba6730e573984ffab126197c97db91c9b7f98f4b5db3' failed: 
+createTicketedWS @ ws-utils.ts:78
+installHook.js:1 WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+overrideMethod @ installHook.js:1
+onError @ ChatProvider.tsx:703
+ChatProvider.tsx:714 WebSocket disconnected. Reconnecting in 2001.4408385770128ms (attempt 2)
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=e3490d874d0e4fcbaafedf295304ac7a770a8fb72739e7bf39b533f3ba9dbc09' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=8d9b124740847a90e87701e9cea3075bc1078519ae4aaf5dc051cf4554275048' failed: 
+createTicketedWS @ ws-utils.ts:78
+installHook.js:1 WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+overrideMethod @ installHook.js:1
+onError @ ChatProvider.tsx:703
+ChatProvider.tsx:714 WebSocket disconnected. Reconnecting in 4170.266860444326ms (attempt 3)
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=fd517b011ba9f19d80ce691b3a08937adf14157be335c01e1f88c315a5a6fcb2' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=1792a44c6a2f9d1975965d874a09cf28d59ac94a473489c0d8cec2b1eaef17ca' failed: 
+createTicketedWS @ ws-utils.ts:78
+installHook.js:1 WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+overrideMethod @ installHook.js:1
+onError @ ChatProvider.tsx:703
+ChatProvider.tsx:714 WebSocket disconnected. Reconnecting in 8371.280777493133ms (attempt 4)
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=4c7ab74edd8dc3cb53905608a761d60d11b56dbe95d1d58d4cc5c0202c580a92' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=d347a24f4030ac26d1cf4b3f914d0eead4b83d73aa5e9ab7c289ba013a748374' failed: 
+createTicketedWS @ ws-utils.ts:78
+installHook.js:1 WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+overrideMethod @ installHook.js:1
+onError @ ChatProvider.tsx:703
+ChatProvider.tsx:714 WebSocket disconnected. Reconnecting in 17480.191236015507ms (attempt 5)
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=fbff2109c78ccd08e7015f9e2341953101f9c592b6004495519ee05ce1cbaf97' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=c502a196c99dcffc13b1363264e0f78024e21f2c2c05c15d26a6be57cbd770d0' failed: 
+createTicketedWS @ ws-utils.ts:78
+installHook.js:1 WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+overrideMethod @ installHook.js:1
+onError @ ChatProvider.tsx:703
+ChatProvider.tsx:714 WebSocket disconnected. Reconnecting in 32305.850116515165ms (attempt 6)
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=d6c441456dd984dad96b1fea0b5176e45a028793956a62f0a81943af5b434dd8' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=17892d618e4402968f66e8373ee3136daf53c3a1ba10b6a8b7cce6f3180a2bf7' failed: 
+createTicketedWS @ ws-utils.ts:78
+installHook.js:1 WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+overrideMethod @ installHook.js:1
+onError @ ChatProvider.tsx:703
+ChatProvider.tsx:714 WebSocket disconnected. Reconnecting in 31057.86931363847ms (attempt 7)
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=e56ac111a530e8ca6dec6f4f3a3a6bca1788245105bb849c8fc6edd43ad1e05d' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=7887b7888cf7fe62627e3a88a027b288c52b68dd48dd9397dabca2a15ec970be' failed: 
+createTicketedWS @ ws-utils.ts:78
+installHook.js:1 WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+overrideMethod @ installHook.js:1
+onError @ ChatProvider.tsx:703
+ChatProvider.tsx:714 WebSocket disconnected. Reconnecting in 32282.044499735268ms (attempt 8)
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws?ticket=e8fee93ff24ab8ae3d1824b60c553e220e8ba76410affc66efa26abd7c8e6002' failed: 
+createTicketedWS @ ws-utils.ts:78
+ws-utils.ts:78 WebSocket connection to 'ws://localhost:8375/api/ws/chat?ticket=e1ab6432a19ce9a1b835e9b937b93ca3b35f30128af3a4f284e3664bcf0907f0' failed: 
+createTicketedWS @ ws-utils.ts:78
+installHook.js:1 WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+overrideMethod @ installHook.js:1
+onError @ ChatProvider.tsx:703
+ChatProvider.tsx:714 WebSocket disconnected. Reconnecting in 31997.282707595612ms (attempt 9)

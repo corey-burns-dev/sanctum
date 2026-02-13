@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-query'
 import { ApiError, apiClient } from '../api/client'
 import type { UpdateProfileRequest, User } from '../api/types'
+import { useAuthSessionStore } from '../stores/useAuthSessionStore'
 
 // Query keys
 export const userKeys = {
@@ -117,7 +118,7 @@ export function getCurrentUser(): User | null {
 
 // Check if user is authenticated (with basic token validation)
 export function useIsAuthenticated(): boolean {
-  const token = localStorage.getItem('token')
+  const token = useAuthSessionStore(state => state.accessToken)
   if (!token) return false
 
   try {
@@ -133,6 +134,8 @@ export function useIsAuthenticated(): boolean {
 
 // Validate token by making a test API call
 export function useValidateToken() {
+  const token = useAuthSessionStore(state => state.accessToken)
+
   return useQuery({
     queryKey: ['auth', 'validate'],
     queryFn: async () => {
@@ -149,8 +152,8 @@ export function useValidateToken() {
               error.message.includes('Unauthorized') ||
               error.message.includes('Forbidden')))
         if (isAuthError) {
-          // Clear invalid token
-          localStorage.removeItem('token')
+          // Clear invalid session
+          useAuthSessionStore.getState().clear()
           localStorage.removeItem('user')
           return false
         }
@@ -158,7 +161,7 @@ export function useValidateToken() {
         return true
       }
     },
-    enabled: !!localStorage.getItem('token'),
+    enabled: !!token,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
   })

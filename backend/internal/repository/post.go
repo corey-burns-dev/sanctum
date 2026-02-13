@@ -38,7 +38,11 @@ func NewPostRepository(db *gorm.DB) PostRepository {
 }
 
 func (r *postRepository) Create(ctx context.Context, post *models.Post) error {
-	return r.db.WithContext(ctx).Create(post).Error
+	err := r.db.WithContext(ctx).Create(post).Error
+	if err == nil {
+		cache.InvalidatePostsList(ctx)
+	}
+	return err
 }
 
 func (r *postRepository) GetByID(ctx context.Context, id uint, currentUserID uint) (*models.Post, error) {
@@ -252,6 +256,7 @@ func (r *postRepository) Delete(ctx context.Context, id uint) error {
 		return err
 	}
 	cache.Invalidate(ctx, cache.PostKey(id))
+	cache.InvalidatePostsList(ctx)
 	return nil
 }
 
@@ -277,6 +282,7 @@ func (r *postRepository) Like(ctx context.Context, userID, postID uint) error {
 	)
 	if result.Error == nil {
 		cache.Invalidate(ctx, cache.PostKey(postID))
+		cache.InvalidatePostsList(ctx)
 	}
 	return result.Error
 }
@@ -286,6 +292,7 @@ func (r *postRepository) Unlike(ctx context.Context, userID, postID uint) error 
 	err := r.db.WithContext(ctx).Unscoped().Where("user_id = ? AND post_id = ?", userID, postID).Delete(&models.Like{}).Error
 	if err == nil {
 		cache.Invalidate(ctx, cache.PostKey(postID))
+		cache.InvalidatePostsList(ctx)
 	}
 	return err
 }

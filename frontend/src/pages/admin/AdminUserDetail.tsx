@@ -41,6 +41,19 @@ export default function AdminUserDetail() {
         </Button>
       </header>
 
+      {data?.warnings && data.warnings.length > 0 && (
+        <div className='rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3'>
+          <h4 className='text-sm font-semibold text-yellow-600 dark:text-yellow-400'>
+            Partial Data Warnings
+          </h4>
+          <ul className='mt-1 list-inside list-disc text-xs text-yellow-600 dark:text-yellow-400'>
+            {data.warnings.map(warning => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {isLoading && (
         <p className='text-sm text-muted-foreground'>Loading user detail…</p>
       )}

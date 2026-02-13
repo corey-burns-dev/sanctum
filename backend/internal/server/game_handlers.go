@@ -146,12 +146,6 @@ func (s *Server) WebSocketGameHandler() fiber.Handler {
 		}
 		userID := userIDVal.(uint)
 
-		// Consume the ticket
-		ticket := c.Query("ticket")
-		if ticket != "" && s.redis != nil {
-			s.redis.Del(context.Background(), "ws_ticket:"+ticket)
-		}
-
 		roomIDStr := c.Query("room_id")
 		if roomIDStr == "" {
 			log.Println("GameWS: No room_id in query")

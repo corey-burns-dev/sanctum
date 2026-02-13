@@ -113,7 +113,7 @@ func (h *GameHub) UnregisterClient(client *Client) {
 				// Database cleanup: If the creator leaves a pending room, cancel it
 				var gRoom models.GameRoom
 				if err := h.db.First(&gRoom, roomID).Error; err == nil {
-					if gRoom.Status == models.GamePending && gRoom.CreatorID == userID {
+					if gRoom.Status == models.GamePending && gRoom.CreatorID != nil && *gRoom.CreatorID == userID {
 						gRoom.Status = models.GameCancelled
 						h.db.Save(&gRoom)
 						log.Printf("GameHub: Pending room %d cancelled because creator (User %d) disconnected", roomID, userID)
@@ -176,15 +176,20 @@ func (h *GameHub) handleJoin(userID uint, action GameAction) {
 		return
 	}
 
-	if room.CreatorID == userID {
+	if room.CreatorID != nil && *room.CreatorID == userID {
 		h.sendError(userID, action.RoomID, "You are the creator")
+		return
+	}
+
+	if room.CreatorID == nil {
+		h.sendError(userID, action.RoomID, "Game creator no longer exists")
 		return
 	}
 
 	// Join as opponent
 	room.OpponentID = &userID
 	room.Status = models.GameActive
-	room.NextTurnID = room.CreatorID // Creator goes first
+	room.NextTurnID = *room.CreatorID // Creator goes first
 
 	if err := h.db.Save(&room).Error; err != nil {
 		h.sendError(userID, action.RoomID, "Failed to start game")
@@ -300,44 +305,62 @@ func (h *GameHub) handleMove(userID uint, action GameAction) {
 	if finished {
 		room.Status = models.GameFinished
 		if winnerSym != "" {
-			winID := room.CreatorID
+			var winID *uint = room.CreatorID
 			if winnerSym == "O" && room.OpponentID != nil {
-				winID = *room.OpponentID
+				winID = room.OpponentID
 			}
-			room.WinnerID = &winID
-			// Award points
-			points := 10
-			if room.Type == models.ConnectFour {
-				points = 15
-			}
-			h.db.Model(&models.GameStats{}).Where("user_id = ? AND game_type = ?", winID, room.Type).
-				Update("points", gorm.Expr("points + ?", points)).
-				Update("wins", gorm.Expr("wins + ?", 1)).
-				Update("total_games", gorm.Expr("total_games + ?", 1))
+			room.WinnerID = winID
 
-			lossID := room.CreatorID
-			if winID == room.CreatorID && room.OpponentID != nil {
-				lossID = *room.OpponentID
+			// Award points if winner still exists
+			if winID != nil {
+				points := 10
+				if room.Type == models.ConnectFour {
+					points = 15
+				}
+				h.db.Model(&models.GameStats{}).Where("user_id = ? AND game_type = ?", *winID, room.Type).
+					Update("points", gorm.Expr("points + ?", points)).
+					Update("wins", gorm.Expr("wins + ?", 1)).
+					Update("total_games", gorm.Expr("total_games + ?", 1))
 			}
-			h.db.Model(&models.GameStats{}).Where("user_id = ? AND game_type = ?", lossID, room.Type).
-				Update("losses", gorm.Expr("losses + ?", 1)).
-				Update("total_games", gorm.Expr("total_games + ?", 1))
+
+			var lossID *uint = room.CreatorID
+			if winID == room.CreatorID && room.OpponentID != nil {
+				lossID = room.OpponentID
+			}
+
+			if lossID != nil {
+				h.db.Model(&models.GameStats{}).Where("user_id = ? AND game_type = ?", *lossID, room.Type).
+					Update("losses", gorm.Expr("losses + ?", 1)).
+					Update("total_games", gorm.Expr("total_games + ?", 1))
+			}
 		} else {
 			room.IsDraw = true
-			opponentID := uint(0)
-			if room.OpponentID != nil {
-				opponentID = *room.OpponentID
+			userIDs := make([]uint, 0, 2)
+			if room.CreatorID != nil {
+				userIDs = append(userIDs, *room.CreatorID)
 			}
-			h.db.Model(&models.GameStats{}).Where("user_id IN (?, ?) AND game_type = ?", room.CreatorID, opponentID, room.Type).
-				Update("draws", gorm.Expr("draws + ?", 1)).
-				Update("total_games", gorm.Expr("total_games + ?", 1))
+			if room.OpponentID != nil {
+				userIDs = append(userIDs, *room.OpponentID)
+			}
+
+			if len(userIDs) > 0 {
+				h.db.Model(&models.GameStats{}).Where("user_id IN ? AND game_type = ?", userIDs, room.Type).
+					Update("draws", gorm.Expr("draws + ?", 1)).
+					Update("total_games", gorm.Expr("total_games + ?", 1))
+			}
 		}
 	} else {
 		// Switch turn
-		if userID == room.CreatorID && room.OpponentID != nil {
+		if room.CreatorID != nil && userID == *room.CreatorID && room.OpponentID != nil {
 			room.NextTurnID = *room.OpponentID
+		} else if room.CreatorID != nil {
+			room.NextTurnID = *room.CreatorID
 		} else {
-			room.NextTurnID = room.CreatorID
+			// Creator deleted during game, and it was their turn? 
+			// Or creator deleted and it's now their turn.
+			// If creator is nil, we can't really continue easily if it's their turn.
+			// But the logic above should ideally handle it.
+			room.Status = models.GameCancelled
 		}
 	}
 

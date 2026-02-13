@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"sanctum/internal/models"
 
@@ -154,7 +155,7 @@ func (s *Server) PromoteSanctumAdmin(c *fiber.Ctx) error {
 		},
 		DoUpdates: clause.Assignments(map[string]any{
 			"role":       models.SanctumMembershipRoleMod,
-			"updated_at": gorm.Expr("NOW()"),
+			"updated_at": time.Now(),
 		}),
 	}).Create(&membership).Error; err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
@@ -223,7 +224,7 @@ func (s *Server) DemoteSanctumAdmin(c *fiber.Ctx) error {
 		Where("sanctum_id = ? AND user_id = ?", sanctum.ID, targetUserID).
 		Updates(map[string]any{
 			"role":       models.SanctumMembershipRoleMember,
-			"updated_at": gorm.Expr("NOW()"),
+			"updated_at": time.Now(),
 		}).Error; err != nil {
 		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
 	}

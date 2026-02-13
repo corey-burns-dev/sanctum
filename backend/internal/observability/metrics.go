@@ -43,6 +43,11 @@ var (
 		Name: "sanctum_websocket_events_total",
 		Help: "Total WebSocket events by type",
 	}, []string{"event_type"})
+
+	WebSocketBackpressureDrops = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "sanctum_websocket_backpressure_drops_total",
+		Help: "Total number of WebSocket messages dropped due to backpressure",
+	}, []string{"hub", "reason"})
 )
 
 type DatabaseMetrics struct {

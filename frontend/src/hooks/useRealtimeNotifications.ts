@@ -5,6 +5,7 @@ import { create } from 'zustand'
 import { ApiError, apiClient } from '@/api/client'
 import { usePresenceStore } from '@/hooks/usePresence'
 import { createTicketedWS, getNextBackoff } from '@/lib/ws-utils'
+import { useAuthSessionStore } from '@/stores/useAuthSessionStore'
 
 type RealtimeEventType =
   | 'post_created'
@@ -124,6 +125,7 @@ export function useRealtimeNotifications(enabled = true) {
   const setInitialOnlineUsers = usePresenceStore(
     state => state.setInitialOnlineUsers
   )
+  const accessToken = useAuthSessionStore(state => state.accessToken)
 
   const openDirectMessage = useCallback(async (userID: number) => {
     try {
@@ -137,10 +139,7 @@ export function useRealtimeNotifications(enabled = true) {
   }, [])
 
   useEffect(() => {
-    if (!enabled) return
-
-    const token = localStorage.getItem('token')
-    if (!token) return
+    if (!enabled || !accessToken) return
 
     let closedByEffect = false
     let ws: WebSocket | null = null
@@ -535,6 +534,7 @@ export function useRealtimeNotifications(enabled = true) {
     }
   }, [
     enabled,
+    accessToken,
     queryClient,
     addNotification,
     setOnline,

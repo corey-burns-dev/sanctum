@@ -1,5 +1,3 @@
-import { getCurrentUser } from '@/hooks/useUsers'
-import { cn } from '@/lib/utils'
 import {
   BellRing,
   Flag,
@@ -16,6 +14,8 @@ import {
 } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { getCurrentUser } from '@/hooks/useUsers'
+import { cn } from '@/lib/utils'
 
 interface AdminNavItem {
   label: string

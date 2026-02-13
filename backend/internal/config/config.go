@@ -134,6 +134,9 @@ func (c *Config) Validate() error {
 
 	isProduction := c.Env == "production" || c.Env == "prod"
 
+	// DB SSL Mode normalization
+	c.DBSSLMode = strings.ToLower(strings.TrimSpace(c.DBSSLMode))
+
 	// Strict checks for production
 	if isProduction {
 		if c.JWTSecret == "your-secret-key-change-in-production" {
@@ -146,7 +149,7 @@ func (c *Config) Validate() error {
 			return errors.New("a strong DB_PASSWORD is required in production")
 		}
 		if c.DBSSLMode == "disable" || c.DBSSLMode == "" {
-			log.Println("WARNING: DB_SSLMODE is 'disable' in production. It is highly recommended to use SSL for database connections.")
+			return errors.New("DB_SSLMODE must not be 'disable' or empty in production")
 		}
 		if c.AllowedOrigins == "*" {
 			log.Println("WARNING: ALLOWED_ORIGINS is set to '*' in production. This is insecure.")

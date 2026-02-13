@@ -27,6 +27,10 @@ func NewCommentRepository(db *gorm.DB) CommentRepository {
 	return &commentRepository{db: db}
 }
 
+const (
+	maxCommentLimit = 1000
+)
+
 func (r *commentRepository) Create(ctx context.Context, comment *models.Comment) error {
 	return r.db.WithContext(ctx).Create(comment).Error
 }
@@ -44,7 +48,12 @@ func (r *commentRepository) ListByPost(
 	postID uint,
 ) ([]*models.Comment, error) {
 	var comments []*models.Comment
-	err := r.db.WithContext(ctx).Preload("User").Where("post_id = ?", postID).Order("created_at desc").Find(&comments).Error
+	err := r.db.WithContext(ctx).
+		Preload("User").
+		Where("post_id = ?", postID).
+		Order("created_at desc").
+		Limit(maxCommentLimit).
+		Find(&comments).Error
 	return comments, err
 }
 

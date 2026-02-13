@@ -89,12 +89,7 @@ func (h *Hub) Broadcast(userID uint, message string) {
 	if clients, ok := h.conns[userID]; ok {
 		data := []byte(message)
 		for c := range clients {
-			select {
-			case c.Send <- data:
-			default:
-				// Backpressure: Drop message if buffer full to avoid blocking the hub
-				log.Printf("Backpressure: dropping message for user %d (buffer full)", userID)
-			}
+			c.TrySend(data)
 		}
 	}
 }
@@ -114,11 +109,7 @@ func (h *Hub) BroadcastAll(message string) {
 	data := []byte(message)
 	for _, clients := range h.conns {
 		for c := range clients {
-			select {
-			case c.Send <- data:
-			default:
-				// Backpressure
-			}
+			c.TrySend(data)
 		}
 	}
 }

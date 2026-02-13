@@ -1,4 +1,5 @@
 import { logger } from '../lib/logger'
+import { useAuthSessionStore } from '../stores/useAuthSessionStore'
 import type {
   AdminBanRequest,
   AdminSanctumRequestActionResponse,
@@ -60,13 +61,14 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
 
 class ApiClient {
   private baseUrl: string
+  private refreshPromise: Promise<string | null> | null = null
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl
   }
 
   private getAuthToken(): string | null {
-    return localStorage.getItem('token')
+    return useAuthSessionStore.getState().accessToken
   }
 
   private async request<T>(
@@ -112,39 +114,30 @@ class ApiClient {
 
       if (!response.ok) {
         // Handle token refresh on 401
+        // Allow refresh attempt even when no in-memory token is present (cookie bootstrap case),
+        // excluding auth endpoints.
         if (
           response.status === 401 &&
           endpoint !== '/auth/login' &&
           endpoint !== '/auth/signup' &&
           endpoint !== '/auth/refresh' &&
-          token // Only try to refresh if we actually had a token
+          endpoint !== '/auth/logout'
         ) {
-          logger.info('Access token expired, attempting refresh...')
-          try {
-            const refreshResponse = await fetch(
-              `${this.baseUrl}/auth/refresh`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-              }
-            )
+          logger.info('Access token missing or expired, attempting refresh...')
 
-            if (refreshResponse.ok) {
-              const data = await refreshResponse.json()
-              if (data.token) {
-                localStorage.setItem('token', data.token)
-                logger.info('Token refreshed successfully, retrying request')
-                // Retry with new token
-                return this.request(endpoint, options)
-              }
+          try {
+            const newToken = await this.performRefresh()
+            if (newToken) {
+              logger.info('Token refreshed successfully, retrying request')
+              // Retry with new token
+              return this.request(endpoint, options)
             }
           } catch (refreshErr) {
             logger.error('Token refresh failed', { error: refreshErr })
           }
 
           // If refresh fails, clear auth and redirect to login
-          localStorage.removeItem('token')
+          useAuthSessionStore.getState().clear()
           localStorage.removeItem('user')
           window.location.href = '/login'
         }
@@ -193,6 +186,38 @@ class ApiClient {
     }
   }
 
+  private async performRefresh(): Promise<string | null> {
+    if (this.refreshPromise) {
+      return this.refreshPromise
+    }
+
+    this.refreshPromise = (async () => {
+      try {
+        const refreshResponse = await fetch(`${this.baseUrl}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        })
+
+        if (refreshResponse.ok) {
+          const data = await refreshResponse.json()
+          if (data.token) {
+            useAuthSessionStore.getState().setAccessToken(data.token)
+            return data.token
+          }
+        }
+        return null
+      } catch (err) {
+        logger.error('Refresh call failed', { error: err })
+        return null
+      } finally {
+        this.refreshPromise = null
+      }
+    })()
+
+    return this.refreshPromise
+  }
+
   // Health
   async healthCheck(): Promise<{ message: string }> {
     return this.request('/')
@@ -200,17 +225,25 @@ class ApiClient {
 
   // Auth
   async signup(data: SignupRequest): Promise<AuthResponse> {
-    return this.request('/auth/signup', {
+    const resp = await this.request<AuthResponse>('/auth/signup', {
       method: 'POST',
       body: JSON.stringify(data),
     })
+    if (resp.token) {
+      useAuthSessionStore.getState().setAccessToken(resp.token)
+    }
+    return resp
   }
 
   async login(data: LoginRequest): Promise<AuthResponse> {
-    return this.request('/auth/login', {
+    const resp = await this.request<AuthResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(data),
     })
+    if (resp.token) {
+      useAuthSessionStore.getState().setAccessToken(resp.token)
+    }
+    return resp
   }
 
   async logout(): Promise<void> {
@@ -220,13 +253,20 @@ class ApiClient {
       })
     } catch (err) {
       logger.error('Logout request failed', { error: err })
+    } finally {
+      useAuthSessionStore.getState().clear()
+      localStorage.removeItem('user')
     }
   }
 
   async refresh(): Promise<{ token: string }> {
-    return this.request('/auth/refresh', {
+    const resp = await this.request<{ token: string }>('/auth/refresh', {
       method: 'POST',
     })
+    if (resp.token) {
+      useAuthSessionStore.getState().setAccessToken(resp.token)
+    }
+    return resp
   }
 
   // Posts

@@ -25,11 +25,28 @@ type Pagination struct {
 	Offset int
 }
 
+const (
+	maxPaginationLimit = 100
+)
+
 // parsePagination extracts limit and offset query parameters with the given default limit.
 func parsePagination(c *fiber.Ctx, defaultLimit int) Pagination {
+	limit := c.QueryInt("limit", defaultLimit)
+	if limit <= 0 {
+		limit = defaultLimit
+	}
+	if limit > maxPaginationLimit {
+		limit = maxPaginationLimit
+	}
+
+	offset := c.QueryInt("offset", 0)
+	if offset < 0 {
+		offset = 0
+	}
+
 	return Pagination{
-		Limit:  c.QueryInt("limit", defaultLimit),
-		Offset: c.QueryInt("offset", 0),
+		Limit:  limit,
+		Offset: offset,
 	}
 }
 

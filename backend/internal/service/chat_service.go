@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"sanctum/internal/cache"
 	"sanctum/internal/models"
 	"sanctum/internal/repository"
 
@@ -263,15 +264,19 @@ func (s *ChatService) LeaveConversation(ctx context.Context, convID, userID uint
 
 func (s *ChatService) GetAllChatrooms(ctx context.Context, userID uint) ([]ChatroomWithJoined, error) {
 	var chatrooms []*models.Conversation
-	err := s.db.WithContext(ctx).
-		Where("is_group = ?", true).
-		Preload("Participants").
-		Preload("Messages", func(db *gorm.DB) *gorm.DB {
-			return db.Order("created_at DESC").Limit(1)
-		}).
-		Preload("Messages.Sender").
-		Order("name ASC").
-		Find(&chatrooms).Error
+	key := cache.ChatroomsAllKeyWithVersion(ctx)
+
+	err := cache.Aside(ctx, key, &chatrooms, cache.ListTTL, func() error {
+		return s.db.WithContext(ctx).
+			Where("is_group = ?", true).
+			Preload("Participants").
+			Preload("Messages", func(db *gorm.DB) *gorm.DB {
+				return db.Order("created_at DESC").Limit(1)
+			}).
+			Preload("Messages.Sender").
+			Order("name ASC").
+			Find(&chatrooms).Error
+	})
 	if err != nil {
 		return nil, err
 	}
