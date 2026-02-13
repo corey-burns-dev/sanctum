@@ -19,6 +19,8 @@ services:
   loki:
     image: grafana/loki:${LOKI_VERSION}
     container_name: sanctum_loki
+    ports:
+      - "3100:3100"
     volumes:
       - ./infra/loki/loki-config.yml:/etc/loki/local-config.yaml
     command: -config.file=/etc/loki/local-config.yaml

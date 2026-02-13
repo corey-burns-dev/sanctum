@@ -23,48 +23,120 @@
   "liveNow": false,
   "panels": [
     {
+      "datasource": "Prometheus",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total[1m]))",
+          "legendFormat": "requests/sec",
+          "refId": "A"
+        }
+      ],
       "title": "Request Rate",
-      "type": "timeseries",
-      "datasource": "Prometheus",
-      "targets": [
-        {
-          "expr": "rate(http_requests_total[1m])",
-          "legendFormat": "{{method}} {{path}}"
-        }
-      ]
+      "type": "timeseries"
     },
     {
+      "datasource": "Prometheus",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[1m]))",
+          "legendFormat": "5xx/sec",
+          "refId": "A"
+        }
+      ],
       "title": "Error Rate (5xx)",
-      "type": "timeseries",
-      "datasource": "Prometheus",
-      "targets": [
-        {
-          "expr": "rate(http_requests_total{status=~"5.."}[1m])",
-          "legendFormat": "{{status}}"
-        }
-      ]
+      "type": "timeseries"
     },
     {
-      "title": "P95 Latency",
-      "type": "timeseries",
       "datasource": "Prometheus",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
-          "legendFormat": "p95"
+          "legendFormat": "p95",
+          "refId": "A"
         }
-      ]
+      ],
+      "title": "P95 Latency",
+      "type": "timeseries"
     },
     {
-      "title": "Active WebSockets",
-      "type": "timeseries",
       "datasource": "Prometheus",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 9
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "targets": [
         {
-          "expr": "ws_active_connections",
-          "legendFormat": "connections"
+          "expr": "sanctum_active_websockets",
+          "legendFormat": "active sockets",
+          "refId": "A"
         }
-      ]
+      ],
+      "title": "Active WebSockets",
+      "type": "timeseries"
     }
   ],
   "refresh": "5s",

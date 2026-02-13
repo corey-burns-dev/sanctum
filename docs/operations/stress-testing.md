@@ -31,6 +31,32 @@ To run the full suite and verify the system is ready for production:
 
 ---
 
+## 🤖 AI-Assisted Pipeline
+
+The repository now supports a Makefile-first AI stress reporting flow:
+
+```bash
+make stress-ai-low
+make stress-ai-medium
+make stress-ai-high
+```
+
+Each run will:
+
+1. Start the app + monitoring stack (`make up`, `make monitor-up`).
+2. Execute a mixed social stress profile (`load/scripts/social_mixed.js`).
+3. Persist run artifacts to `tmp/stress-runs/<timestamp>-<profile>/`.
+4. Query Prometheus + Loki and send structured context to local Ollama.
+5. Generate `ai-analysis.json`, `report.html`, `report.md`, and `report.txt` in the run folder.
+
+To execute all three profiles with an index page:
+
+```bash
+make stress-all
+```
+
+---
+
 ## 📊 Monitoring & Observability
 
 ### Grafana Dashboards
@@ -50,6 +76,16 @@ This is your primary view during a stress test. Monitor:
 * **Message Throughput:** Messages per second across rooms
 * **Notification Event Volume:** Event fanout tracking
 * **Game Action Latency:** Game move/state update timing
+
+**Dashboard: "API Endpoints Overview"**
+
+Auto-provisioned and endpoint-focused:
+
+* Top endpoints by request rate
+* Top 5xx endpoints
+* P95 latency by endpoint
+* Request rate by status code
+* Endpoint hit count table
 
 ### Prometheus Alerts
 
@@ -277,11 +313,20 @@ make test-stress-ws         # WebSocket-focused stress test
 make test-soak              # Long-running soak test
 make observability-verify   # Verify monitoring stack health
 make monitor-up             # Start Prometheus/Grafana/Loki
+make stress-stack-up        # Start app + monitoring + health verification
+make stress-low             # Mixed low-profile run (k6 summary artifact)
+make stress-medium          # Mixed medium-profile run
+make stress-high            # Mixed high-profile run
+make ai-report              # Generate AI report for latest run
+make stress-ai-medium       # End-to-end medium run + AI report
+make stress-ai-high         # End-to-end high run + AI report
+make stress-all             # Run low/medium/high with AI reports + index
+make stress-index           # Build tmp/stress-runs/index.html
 ```
 
 ### Load Profile Configuration
 
-**File:** `load/profiles/moderate.json`
+**Files:** `load/profiles/low.json`, `load/profiles/medium.json`, `load/profiles/high.json`
 
 Source of truth for:
 - Virtual users (VUs)
@@ -289,6 +334,39 @@ Source of truth for:
 - Test duration
 - Thresholds
 - Scenarios
+
+### Runtime Environment Variables
+
+Defaults used by the stress + AI pipeline:
+
+- `BASE_URL=http://localhost:8375`
+- `OLLAMA_URL=http://localhost:11434`
+- `OLLAMA_MODEL=llama3.2:3b`
+- `PROM_URL=http://localhost:9090`
+- `LOKI_URL=http://localhost:3100`
+- `ARTIFACT_DIR=tmp/stress-runs`
+
+### Artifact Contract
+
+Every run directory contains:
+
+- `metadata.json` (profile + run window)
+- `summary.json` (k6 summary export)
+- `metrics.json` (Prometheus query results)
+- `logs.json` (Loki excerpts)
+- `ai-analysis.json` (structured AI verdict)
+- `report.html` (standalone report)
+- `report.md` (markdown report)
+- `report.txt` (plain-text report)
+
+---
+
+## Troubleshooting (AI Pipeline)
+
+- **Ollama unavailable**: ensure host service is reachable at `OLLAMA_URL`; `ai-report` will fall back to partial report mode if unreachable.
+- **Prometheus empty metrics**: confirm app metrics endpoint is scraped (`http://localhost:9090/targets`) and rerun with longer profile duration.
+- **Loki missing logs**: verify promtail is running and container log labels are present in Loki.
+- **k6 summary missing**: ensure stress command completed and `summary.json` exists in the run directory.
 
 ### Prometheus Configuration
 
