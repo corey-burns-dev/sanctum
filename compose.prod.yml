@@ -1,5 +1,6 @@
 services:
   app:
+    image: ghcr.io/${GITHUB_REPOSITORY:-cburns/sanctum}/backend:latest
     environment:
       - APP_ENV=production
     restart: always
@@ -37,6 +38,7 @@ services:
           memory: 64M
 
   frontend:
+    image: ghcr.io/${GITHUB_REPOSITORY:-cburns/sanctum}/frontend:latest
     ports:
       - "80:80"
     restart: always

@@ -6,14 +6,14 @@ import { logger } from '@/lib/logger'
 import { createTicketedWS, getNextBackoff } from '@/lib/ws-utils'
 import { useQueryClient } from '@tanstack/react-query'
 import {
-    createContext,
-    type ReactNode,
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from 'react'
 
 interface ChatWebSocketMessage {
@@ -884,7 +884,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
     const ws = wsRef.current
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'leave', conversation_id: conversationId }))
+      ws.send(
+        JSON.stringify({ type: 'leave', conversation_id: conversationId })
+      )
     }
   }, [])
 
