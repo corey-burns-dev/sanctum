@@ -14,6 +14,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -155,7 +156,8 @@ func TestSignup(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/signup", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 
-			resp, _ := app.Test(req)
+			resp, err := app.Test(req, 5000)
+			require.NoError(t, err)
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
 
@@ -228,7 +230,8 @@ func TestLogin(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 
-			resp, _ := app.Test(req)
+			resp, err := app.Test(req, 5000)
+			require.NoError(t, err)
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
 
@@ -298,7 +301,8 @@ func TestRefresh(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/refresh", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 
-			resp, _ := app.Test(req)
+			resp, err := app.Test(req, 5000)
+			require.NoError(t, err)
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
 
@@ -327,7 +331,8 @@ func TestLogout(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req, 5000)
+		require.NoError(t, err)
 		defer func() { _ = resp.Body.Close() }()
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 	})
@@ -337,7 +342,8 @@ func TestLogout(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req, 5000)
+		require.NoError(t, err)
 		defer func() { _ = resp.Body.Close() }()
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 	})
