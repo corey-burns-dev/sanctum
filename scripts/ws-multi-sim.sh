@@ -168,6 +168,21 @@ resolve_conversation_id() {
   echo "$room_id"
 }
 
+join_room() {
+  local token="$1"
+  local room_id="$2"
+  local status
+  status="$(curl -sS -o /tmp/ws-join-room-explicit.json -w "%{http_code}" \
+    -H "Authorization: Bearer $token" \
+    -H "Content-Type: application/json" \
+    -X POST "$AUTH_API_URL/chatrooms/$room_id/join" \
+    -d "{}" || true)"
+  if [ "$status" = "200" ] || [ "$status" = "201" ]; then
+    return 0
+  fi
+  return 1
+}
+
 # Execute chattest using prebuilt binary when available, fallback to go run.
 CHATT_TEST_PKG="./cmd/chattest"
 if [ -x "$ROOT_DIR/backend/bin/chattest" ]; then
@@ -269,6 +284,18 @@ for i in $(seq 1 "$USERS_NEEDED"); do
     user_creds="$(create_perf_user "$i")" || exit 2
     user_email="${user_creds%%:*}"
     user_password="${user_creds#*:}"
+    
+    # Join the new user to the conversation so they can participate
+    user_token="$(get_auth_token "$user_email" "$user_password")"
+    if [ -n "$user_token" ]; then
+      if ! join_room "$user_token" "$CONVERSATION_ID"; then
+        echo "Error: User $user_email failed to join $CONVERSATION_ID" >&2
+        exit 2
+      fi
+    else
+      echo "Error: Failed to get token for user $user_email" >&2
+      exit 2
+    fi
   fi
 
   log_file="/tmp/chattest-user-${i}.log"
