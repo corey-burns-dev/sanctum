@@ -2,15 +2,15 @@
  * Integration tests for ChatProvider: WebSocket connection, message flow,
  * and subscription behavior. Builds on unit tests in ChatProvider.spec.tsx.
  */
+import {
+    shouldPlayFriendOnlineSound,
+    shouldPlayNewMessageSoundForDM,
+} from '@/lib/chat-sounds'
+import { useAuthSessionStore } from '@/stores/useAuthSessionStore'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, render } from '@testing-library/react'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  shouldPlayFriendOnlineSound,
-  shouldPlayNewMessageSoundForDM,
-} from '@/lib/chat-sounds'
-import { useAuthSessionStore } from '@/stores/useAuthSessionStore'
 import { ChatProvider, useChatContext } from './ChatProvider'
 
 vi.mock('@/api/client', () => ({
@@ -55,6 +55,7 @@ class MockWS {
   onmessage: ((ev: { data: string }) => void) | null = null
   readyState = 0
   url: string
+  sent: string[] = []
 
   constructor(url: string) {
     this.url = url
@@ -179,6 +180,94 @@ describe('ChatProvider integration', () => {
 
     expect(received.length).toBe(1)
     expect((received[0] as { content: string }).content).toBe('Hi')
+  })
+
+  it('records join intent before open, re-joins on connect, and forwards typing events', async () => {
+    vi.useFakeTimers()
+
+    const wrapper = ({ children }: { children?: React.ReactNode }) => (
+      <QueryClientProvider client={qc}>
+        <ChatProvider>{children}</ChatProvider>
+      </QueryClientProvider>
+    )
+
+    const sent: string[] = []
+    const typingReceived: unknown[] = []
+    let capturedCtx: ReturnType<typeof useChatContext> | null = null
+
+    function TestHook() {
+      const ctx = useChatContext()
+      capturedCtx = ctx
+      React.useEffect(() => {
+        // Subscribe to typing events
+        const unsub = ctx.subscribeOnTyping(
+          (convId, userId, username, isTyping) => {
+            typingReceived.push({ convId, userId, username, isTyping })
+          }
+        )
+
+        // Request join before socket open
+        ctx.joinRoom(123)
+
+        return () => unsub()
+      }, [ctx])
+
+      return null
+    }
+
+    // Render provider + hook
+    act(() => {
+      render(<TestHook />, { wrapper })
+    })
+
+    // Advance timers so the provider attempts the deferred connect and
+    // a MockWS instance is created.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1)
+    })
+
+    // WS instance should exist now
+    expect(MockWS.instances.length).toBeGreaterThan(0)
+    const ws = MockWS.instances[0]
+
+    // Patch send to record outgoing messages (mutate instance for test)
+    ws.send = (msg: string) => {
+      sent.push(msg)
+      // also store on instance for visibility
+      // @ts-ignore - test helper mutation
+      ws.sent = ws.sent || []
+      // @ts-ignore - test helper mutation
+      ws.sent.push(msg)
+    }
+
+    // The provider should have recorded the join intent immediately
+    expect(capturedCtx).not.toBeNull()
+    // Use `any` cast to avoid TS narrowing issues in test code
+    expect((capturedCtx as any)?.joinedRooms?.has(123)).toBe(true)
+
+    // Now open the socket (this should trigger join messages to be sent)
+    await act(async () => {
+      ws.flushOpen()
+    })
+
+    // After open, the patched send should have recorded the join
+    expect(sent.some(s => s.includes('join') && s.includes('123'))).toBe(true)
+
+    // Simulate a typing event from server
+    act(() => {
+      ws.receive({
+        type: 'typing',
+        conversation_id: 123,
+        user_id: 2,
+        username: 'bob',
+        is_typing: true,
+      })
+    })
+
+    await act(async () => {})
+
+    expect(typingReceived.length).toBeGreaterThan(0)
+    expect((typingReceived[0] as any).username).toBe('bob')
   })
 
   it('sound helpers trigger playNewMessageSound and playFriendOnlineSound when conditions met', async () => {
