@@ -162,7 +162,7 @@ func (m *ConnectionManager) Touch(ctx context.Context, userID uint) {
 	}
 }
 
-func (m *ConnectionManager) Unregister(ctx context.Context, userID uint) {
+func (m *ConnectionManager) Unregister(_ context.Context, userID uint) {
 	m.mu.Lock()
 	if n, ok := m.localConnCounts[userID]; ok {
 		n--

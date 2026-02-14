@@ -472,7 +472,7 @@ func (h *ChatHub) handleUserOffline(userID uint) {
 }
 
 func (h *ChatHub) onlineUsersSnapshot(excludeUserID uint) []uint {
-	onlineIDs := make([]uint, 0)
+	var onlineIDs []uint
 	if h.presence != nil {
 		ids := h.presence.GetOnlineUserIDs(context.Background())
 		onlineIDs = make([]uint, 0, len(ids))
