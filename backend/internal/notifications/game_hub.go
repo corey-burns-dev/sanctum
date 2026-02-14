@@ -334,7 +334,7 @@ func (h *GameHub) handleMove(userID uint, action GameAction) {
 	if finished {
 		room.Status = models.GameFinished
 		if winnerSym != "" {
-			var winID *uint = room.CreatorID
+			winID := room.CreatorID
 			if winnerSym == "O" && room.OpponentID != nil {
 				winID = room.OpponentID
 			}
@@ -359,7 +359,7 @@ func (h *GameHub) handleMove(userID uint, action GameAction) {
 				}
 			}
 
-			var lossID *uint = room.CreatorID
+			lossID := room.CreatorID
 			if winID == room.CreatorID && room.OpponentID != nil {
 				lossID = room.OpponentID
 			}
@@ -401,11 +401,12 @@ func (h *GameHub) handleMove(userID uint, action GameAction) {
 		}
 	} else {
 		// Switch turn
-		if room.CreatorID != nil && userID == *room.CreatorID && room.OpponentID != nil {
+		switch {
+		case room.CreatorID != nil && userID == *room.CreatorID && room.OpponentID != nil:
 			room.NextTurnID = *room.OpponentID
-		} else if room.CreatorID != nil {
+		case room.CreatorID != nil:
 			room.NextTurnID = *room.CreatorID
-		} else {
+		default:
 			// Creator deleted during game, and it was their turn?
 			// Or creator deleted and it's now their turn.
 			// If creator is nil, we can't really continue easily if it's their turn.

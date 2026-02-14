@@ -67,59 +67,61 @@ func main() {
 		log.Fatalf("❌ Built-in sanctum seeding failed: %v", err)
 	}
 
-	if *preset != "" {
+	switch {
+	case *preset != "":
 		if err := s.ApplyPreset(*preset); err != nil {
 			log.Fatalf("❌ Preset seeding failed: %v", err)
 		}
-	} else if *allSanctums || *sanctumSlug != "" {
-		users, err := s.SeedSocialMesh(*numUsers)
-		if *preset != "" {
-			if err := s.ApplyPreset(*preset); err != nil {
-				log.Fatalf("❌ Preset seeding failed: %v", err)
+	case *allSanctums || *sanctumSlug != "" || *countsFile != "":
+		users, meshErr := s.SeedSocialMesh(*numUsers)
+		if meshErr != nil {
+			log.Fatalf("❌ Social mesh seeding failed: %v", meshErr)
+		}
+
+		switch {
+		case *countsFile != "":
+			countsMap, err := seed.ParseCountsFile(*countsFile)
+			if err != nil {
+				log.Fatalf("❌ Failed to parse counts file: %v", err)
 			}
-		} else if *allSanctums || *sanctumSlug != "" || *countsFile != "" {
+			var sanctums []*models.Sanctum
+			if err := database.DB.Find(&sanctums).Error; err != nil {
+				log.Fatalf("❌ Failed to find sanctums: %v", err)
+			}
+			for _, st := range sanctums {
+				if entry, ok := countsMap[st.Slug]; ok {
+					if err := s.SeedSanctumWithExactCounts(users, st, entry); err != nil {
+						log.Fatalf("❌ Sanctum seeding failed for %s: %v", st.Slug, err)
+					}
+				}
+			}
+		case *allSanctums:
 			if err := s.SeedSanctumsWithDistribution(users, *countPerSanctum); err != nil {
 				log.Fatalf("❌ Sanctum seeding failed: %v", err)
 			}
-		} else {
-			// If a counts file is provided, parse and apply exact counts per sanctum
-			if *countsFile != "" {
-				countsMap, err := seed.ParseCountsFile(*countsFile)
-				if err != nil {
-					log.Fatalf("❌ Failed to parse counts file: %v", err)
-				}
-				// iterate sanctums and apply exact counts when present
-				var sanctums []*models.Sanctum
-				if err := database.DB.Find(&sanctums).Error; err != nil {
-					log.Fatalf("❌ Failed to find sanctums: %v", err)
-				}
-				for _, st := range sanctums {
-					if entry, ok := countsMap[st.Slug]; ok {
-						if err := s.SeedSanctumWithExactCounts(users, st, entry); err != nil {
-							log.Fatalf("❌ Sanctum seeding failed for %s: %v", st.Slug, err)
-						}
-					}
-				}
-			} else if *allSanctums {
-				if err := s.SeedSanctumsWithDistribution(users, *countPerSanctum); err != nil {
-					log.Fatalf("❌ Sanctum seeding failed: %v", err)
-				}
-			} else {
-				// seed a specific sanctum by slug
-				var sanctums []*models.Sanctum
-				if err := database.DB.Find(&sanctums, "slug = ?", *sanctumSlug).Error; err != nil {
-					log.Fatalf("❌ Failed to find sanctum: %v", err)
-				}
-				if len(sanctums) == 0 {
-					log.Fatalf("❌ No sanctum found with slug: %s", *sanctumSlug)
-				}
-				if err := s.SeedSanctumWithDistributionSingle(users, sanctums[0], *countPerSanctum); err != nil {
-					log.Fatalf("❌ Sanctum seeding failed: %v", err)
-				}
+		case *sanctumSlug != "":
+			var sanctums []*models.Sanctum
+			if err := database.DB.Find(&sanctums, "slug = ?", *sanctumSlug).Error; err != nil {
+				log.Fatalf("❌ Failed to find sanctum: %v", err)
+			}
+			if len(sanctums) == 0 {
+				log.Fatalf("❌ No sanctum found with slug: %s", *sanctumSlug)
+			}
+			if err := s.SeedSanctumWithDistributionSingle(users, sanctums[0], *countPerSanctum); err != nil {
+				log.Fatalf("❌ Sanctum seeding failed: %v", err)
 			}
 		}
-		_, err = s.SeedEngagement(users, *numPosts)
+
+		if _, err := s.SeedEngagement(users, *numPosts); err != nil {
+			log.Fatalf("❌ Engagement seeding failed: %v", err)
+		}
+	default:
+		// Default behavior: seed social mesh then engagement
+		users, err := s.SeedSocialMesh(*numUsers)
 		if err != nil {
+			log.Fatalf("❌ Social mesh seeding failed: %v", err)
+		}
+		if _, err := s.SeedEngagement(users, *numPosts); err != nil {
 			log.Fatalf("❌ Engagement seeding failed: %v", err)
 		}
 	}

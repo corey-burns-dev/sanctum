@@ -104,7 +104,7 @@ func ensureDevRootAdmin(cfg *config.Config, db *gorm.DB) error {
 
 		// Ensure users ID sequence is not behind explicit ID insertion.
 		// This is PostgreSQL-specific.
-		if tx.Dialector.Name() == "postgres" {
+		if tx.Name() == "postgres" {
 			if err := tx.Exec(`
 				SELECT setval(
 					pg_get_serial_sequence('users', 'id'),

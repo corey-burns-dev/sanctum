@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"io"
 	"strings"
 
@@ -57,7 +58,8 @@ func (s *Server) UploadImage(c *fiber.Ctx) error {
 	})
 	if err != nil {
 		status := fiber.StatusInternalServerError
-		if appErr, ok := err.(*models.AppError); ok {
+		var appErr *models.AppError
+		if errors.As(err, &appErr) {
 			switch appErr.Code {
 			case "VALIDATION_ERROR":
 				status = fiber.StatusBadRequest
@@ -77,7 +79,8 @@ func (s *Server) GetImageStatus(c *fiber.Ctx) error {
 	img, err := s.imageSvc().GetByHashWithVariants(c.UserContext(), hash)
 	if err != nil {
 		status := fiber.StatusInternalServerError
-		if appErr, ok := err.(*models.AppError); ok {
+		var appErr *models.AppError
+		if errors.As(err, &appErr) {
 			switch appErr.Code {
 			case "VALIDATION_ERROR":
 				status = fiber.StatusBadRequest
@@ -104,7 +107,7 @@ func (s *Server) ServeImage(c *fiber.Ctx) error {
 	}
 	// Validate the hash is strictly hex to prevent path traversal
 	for _, ch := range hash {
-		if !((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f')) {
+		if (ch < '0' || ch > '9') && (ch < 'a' || ch > 'f') {
 			return models.RespondWithError(c, fiber.StatusBadRequest, models.NewValidationError("Invalid image hash"))
 		}
 	}

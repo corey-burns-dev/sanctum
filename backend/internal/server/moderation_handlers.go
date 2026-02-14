@@ -89,22 +89,22 @@ func (s *Server) ReportUser(c *fiber.Ctx) error {
 		Reason  string `json:"reason"`
 		Details string `json:"details"`
 	}
-	if err := c.BodyParser(&req); err != nil {
+	if bodyErr := c.BodyParser(&req); bodyErr != nil {
 		return models.RespondWithError(c, fiber.StatusBadRequest,
 			models.NewValidationError("Invalid request body"))
 	}
 
 	var target models.User
-	if err := s.db.WithContext(ctx).Select("id").First(&target, targetID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+	if dbErr := s.db.WithContext(ctx).Select("id").First(&target, targetID).Error; dbErr != nil {
+		if errors.Is(dbErr, gorm.ErrRecordNotFound) {
 			return models.RespondWithError(c, fiber.StatusNotFound, models.NewNotFoundError("User", targetID))
 		}
-		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+		return models.RespondWithError(c, fiber.StatusInternalServerError, dbErr)
 	}
 
-	report, err := s.createModerationReport(ctx, reporterID, models.ReportTargetUser, targetID, &targetID, req.Reason, req.Details)
-	if err != nil {
-		return models.RespondWithError(c, fiber.StatusBadRequest, err)
+	report, createErr := s.createModerationReport(ctx, reporterID, models.ReportTargetUser, targetID, &targetID, req.Reason, req.Details)
+	if createErr != nil {
+		return models.RespondWithError(c, fiber.StatusBadRequest, createErr)
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(report)
@@ -122,22 +122,22 @@ func (s *Server) ReportPost(c *fiber.Ctx) error {
 		Reason  string `json:"reason"`
 		Details string `json:"details"`
 	}
-	if err := c.BodyParser(&req); err != nil {
+	if bodyErr := c.BodyParser(&req); bodyErr != nil {
 		return models.RespondWithError(c, fiber.StatusBadRequest,
 			models.NewValidationError("Invalid request body"))
 	}
 
 	var post models.Post
-	if err := s.db.WithContext(ctx).Select("id", "user_id").First(&post, postID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+	if dbErr := s.db.WithContext(ctx).Select("id", "user_id").First(&post, postID).Error; dbErr != nil {
+		if errors.Is(dbErr, gorm.ErrRecordNotFound) {
 			return models.RespondWithError(c, fiber.StatusNotFound, models.NewNotFoundError("Post", postID))
 		}
-		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+		return models.RespondWithError(c, fiber.StatusInternalServerError, dbErr)
 	}
 
-	report, err := s.createModerationReport(ctx, reporterID, models.ReportTargetPost, postID, &post.UserID, req.Reason, req.Details)
-	if err != nil {
-		return models.RespondWithError(c, fiber.StatusBadRequest, err)
+	report, createErr := s.createModerationReport(ctx, reporterID, models.ReportTargetPost, postID, &post.UserID, req.Reason, req.Details)
+	if createErr != nil {
+		return models.RespondWithError(c, fiber.StatusBadRequest, createErr)
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(report)
@@ -159,33 +159,33 @@ func (s *Server) ReportMessage(c *fiber.Ctx) error {
 		Reason  string `json:"reason"`
 		Details string `json:"details"`
 	}
-	if err := c.BodyParser(&req); err != nil {
+	if bodyErr := c.BodyParser(&req); bodyErr != nil {
 		return models.RespondWithError(c, fiber.StatusBadRequest,
 			models.NewValidationError("Invalid request body"))
 	}
 
-	if _, err := s.chatSvc().GetConversationForUser(ctx, convID, reporterID); err != nil {
+	if _, convErr := s.chatSvc().GetConversationForUser(ctx, convID, reporterID); convErr != nil {
 		status := fiber.StatusForbidden
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(convErr, gorm.ErrRecordNotFound) {
 			status = fiber.StatusNotFound
 		}
-		return models.RespondWithError(c, status, err)
+		return models.RespondWithError(c, status, convErr)
 	}
 
 	var message models.Message
-	if err := s.db.WithContext(ctx).
+	if dbErr := s.db.WithContext(ctx).
 		Select("id", "sender_id", "conversation_id").
 		Where("id = ? AND conversation_id = ?", messageID, convID).
-		First(&message).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		First(&message).Error; dbErr != nil {
+		if errors.Is(dbErr, gorm.ErrRecordNotFound) {
 			return models.RespondWithError(c, fiber.StatusNotFound, models.NewNotFoundError("Message", messageID))
 		}
-		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+		return models.RespondWithError(c, fiber.StatusInternalServerError, dbErr)
 	}
 
-	report, err := s.createModerationReport(ctx, reporterID, models.ReportTargetMessage, messageID, &message.SenderID, req.Reason, req.Details)
-	if err != nil {
-		return models.RespondWithError(c, fiber.StatusBadRequest, err)
+	report, createErr := s.createModerationReport(ctx, reporterID, models.ReportTargetMessage, messageID, &message.SenderID, req.Reason, req.Details)
+	if createErr != nil {
+		return models.RespondWithError(c, fiber.StatusBadRequest, createErr)
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(report)

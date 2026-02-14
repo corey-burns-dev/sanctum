@@ -43,13 +43,14 @@ func TestCommentRepository_Integration(t *testing.T) {
 
 	t.Run("Update and Delete", func(t *testing.T) {
 		comment := &models.Comment{Content: "Old", PostID: post.ID, UserID: user.ID}
-		repo.Create(ctx, comment)
+		require.NoError(t, repo.Create(ctx, comment))
 
 		comment.Content = "New"
 		err := repo.Update(ctx, comment)
 		assert.NoError(t, err)
 
-		fetched, _ := repo.GetByID(ctx, comment.ID)
+		fetched, err := repo.GetByID(ctx, comment.ID)
+		assert.NoError(t, err)
 		assert.Equal(t, "New", fetched.Content)
 
 		err = repo.Delete(ctx, comment.ID)

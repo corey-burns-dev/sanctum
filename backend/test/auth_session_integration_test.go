@@ -42,8 +42,8 @@ func TestAuthSessionLifecycleIntegration(t *testing.T) {
 		Token        string `json:"token"`
 		RefreshToken string `json:"refresh_token"`
 	}
-	if err := json.NewDecoder(signupResp.Body).Decode(&signupData); err != nil {
-		t.Fatalf("decode signup response: %v", err)
+	if signupErr := json.NewDecoder(signupResp.Body).Decode(&signupData); signupErr != nil {
+		t.Fatalf("decode signup response: %v", signupErr)
 	}
 	if signupData.Token == "" || signupData.RefreshToken == "" {
 		t.Fatalf("signup response missing tokens: %+v", signupData)
@@ -68,8 +68,8 @@ func TestAuthSessionLifecycleIntegration(t *testing.T) {
 		Token        string `json:"token"`
 		RefreshToken string `json:"refresh_token"`
 	}
-	if err := json.NewDecoder(refreshResp.Body).Decode(&refreshData); err != nil {
-		t.Fatalf("decode refresh response: %v", err)
+	if refreshErr := json.NewDecoder(refreshResp.Body).Decode(&refreshData); refreshErr != nil {
+		t.Fatalf("decode refresh response: %v", refreshErr)
 	}
 	if refreshData.Token == "" || refreshData.RefreshToken == "" {
 		t.Fatalf("refresh response missing tokens: %+v", refreshData)

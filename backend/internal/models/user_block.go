@@ -13,6 +13,7 @@ type UserBlock struct {
 	Blocked *User `gorm:"foreignKey:BlockedID" json:"blocked,omitempty"`
 }
 
+// TableName returns the database table name for UserBlock.
 func (UserBlock) TableName() string {
 	return "user_blocks"
 }

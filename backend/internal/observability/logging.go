@@ -7,10 +7,12 @@ import (
 	"os"
 )
 
+// Logger wraps slog.Logger to provide specialized logging methods.
 type Logger struct {
 	*slog.Logger
 }
 
+// GlobalLogger is the default logger instance for the application.
 var GlobalLogger *Logger
 
 func init() {
@@ -20,14 +22,17 @@ func init() {
 	GlobalLogger = &Logger{Logger: slog.New(handler)}
 }
 
+// LogContextKey is a type for context keys used by the logging package.
 type LogContextKey string
 
+// Context keys for logging
 const (
 	CorrelationID LogContextKey = "correlation_id"
 	SpanID        LogContextKey = "span_id"
 	TraceID       LogContextKey = "trace_id"
 )
 
+// LoggingConfig defines which types of automated logging are enabled.
 type LoggingConfig struct {
 	EnableCorrelationID bool
 	EnableRepoLogging   bool
@@ -35,6 +40,7 @@ type LoggingConfig struct {
 }
 
 var (
+	// Config holds the current logging configuration.
 	Config = LoggingConfig{
 		EnableCorrelationID: true,
 		EnableRepoLogging:   true,
@@ -42,14 +48,17 @@ var (
 	}
 )
 
+// GenerateCorrelationID creates a new unique correlation ID.
 func GenerateCorrelationID() string {
 	return fmt.Sprintf("%d", 0)
 }
 
+// WithCorrelationID returns a new context with the given correlation ID.
 func WithCorrelationID(ctx context.Context, id string) context.Context {
 	return context.WithValue(ctx, CorrelationID, id)
 }
 
+// ExtractCorrelationID retrieves the correlation ID from the context.
 func ExtractCorrelationID(ctx context.Context) string {
 	if id := ctx.Value(CorrelationID); id != nil {
 		return id.(string)
@@ -57,11 +66,13 @@ func ExtractCorrelationID(ctx context.Context) string {
 	return ""
 }
 
+// RepoLogger provides structured logging for repository operations.
 type RepoLogger struct {
 	tableName string
 	logger    *Logger
 }
 
+// NewRepoLogger creates a new RepoLogger for the given table.
 func NewRepoLogger(tableName string) *RepoLogger {
 	return &RepoLogger{
 		tableName: tableName,
@@ -69,6 +80,7 @@ func NewRepoLogger(tableName string) *RepoLogger {
 	}
 }
 
+// LogCreate logs a repository create operation.
 func (l *RepoLogger) LogCreate(ctx context.Context, fields map[string]interface{}) {
 	if !Config.EnableRepoLogging {
 		return
@@ -84,6 +96,7 @@ func (l *RepoLogger) LogCreate(ctx context.Context, fields map[string]interface{
 	l.logger.InfoContext(ctx, "repository create", attrs...)
 }
 
+// LogRead logs a repository read operation.
 func (l *RepoLogger) LogRead(ctx context.Context, fields map[string]interface{}) {
 	if !Config.EnableRepoLogging {
 		return
@@ -99,6 +112,7 @@ func (l *RepoLogger) LogRead(ctx context.Context, fields map[string]interface{})
 	l.logger.InfoContext(ctx, "repository read", attrs...)
 }
 
+// LogUpdate logs a repository update operation.
 func (l *RepoLogger) LogUpdate(ctx context.Context, fields map[string]interface{}) {
 	if !Config.EnableRepoLogging {
 		return
@@ -114,6 +128,7 @@ func (l *RepoLogger) LogUpdate(ctx context.Context, fields map[string]interface{
 	l.logger.InfoContext(ctx, "repository update", attrs...)
 }
 
+// LogDelete logs a repository delete operation.
 func (l *RepoLogger) LogDelete(ctx context.Context, fields map[string]interface{}) {
 	if !Config.EnableRepoLogging {
 		return
@@ -129,6 +144,7 @@ func (l *RepoLogger) LogDelete(ctx context.Context, fields map[string]interface{
 	l.logger.InfoContext(ctx, "repository delete", attrs...)
 }
 
+// LogError logs a repository error.
 func (l *RepoLogger) LogError(ctx context.Context, err error, operation string) {
 	if !Config.EnableRepoLogging {
 		return
@@ -141,11 +157,13 @@ func (l *RepoLogger) LogError(ctx context.Context, err error, operation string) 
 	)
 }
 
+// WSLogger provides structured logging for WebSocket operations.
 type WSLogger struct {
 	hubName string
 	logger  *Logger
 }
 
+// NewWSLogger creates a new WSLogger for the given hub.
 func NewWSLogger(hubName string) *WSLogger {
 	return &WSLogger{
 		hubName: hubName,
@@ -153,6 +171,7 @@ func NewWSLogger(hubName string) *WSLogger {
 	}
 }
 
+// LogConnect logs a WebSocket connection event.
 func (l *WSLogger) LogConnect(ctx context.Context, userID uint, roomID string) {
 	if !Config.EnableWSLogging {
 		return
@@ -165,6 +184,7 @@ func (l *WSLogger) LogConnect(ctx context.Context, userID uint, roomID string) {
 	)
 }
 
+// LogDisconnect logs a WebSocket disconnection event.
 func (l *WSLogger) LogDisconnect(ctx context.Context, userID uint, roomID string, reason string) {
 	if !Config.EnableWSLogging {
 		return
@@ -178,6 +198,7 @@ func (l *WSLogger) LogDisconnect(ctx context.Context, userID uint, roomID string
 	)
 }
 
+// LogError logs a WebSocket error event.
 func (l *WSLogger) LogError(ctx context.Context, userID uint, roomID string, err error, eventType string) {
 	if !Config.EnableWSLogging {
 		return
@@ -192,6 +213,7 @@ func (l *WSLogger) LogError(ctx context.Context, userID uint, roomID string, err
 	)
 }
 
+// LogMessage logs an incoming WebSocket message.
 func (l *WSLogger) LogMessage(ctx context.Context, userID uint, roomID string, messageType string) {
 	if !Config.EnableWSLogging {
 		return
@@ -205,6 +227,7 @@ func (l *WSLogger) LogMessage(ctx context.Context, userID uint, roomID string, m
 	)
 }
 
+// LogLifecycle logs a WebSocket hub lifecycle event.
 func (l *WSLogger) LogLifecycle(ctx context.Context, event string, fields map[string]interface{}) {
 	if !Config.EnableWSLogging {
 		return
@@ -220,6 +243,7 @@ func (l *WSLogger) LogLifecycle(ctx context.Context, event string, fields map[st
 	l.logger.InfoContext(ctx, "websocket lifecycle", attrs...)
 }
 
+// LogAsyncOperationStart logs the start of an asynchronous operation.
 func LogAsyncOperationStart(ctx context.Context, operation string, fields map[string]interface{}) {
 	attrs := []any{
 		slog.String("operation", operation),
@@ -232,6 +256,7 @@ func LogAsyncOperationStart(ctx context.Context, operation string, fields map[st
 	GlobalLogger.InfoContext(ctx, "async operation started", attrs...)
 }
 
+// LogAsyncOperationEnd logs the completion of an asynchronous operation.
 func LogAsyncOperationEnd(ctx context.Context, operation string, fields map[string]interface{}) {
 	attrs := []any{
 		slog.String("operation", operation),
@@ -244,6 +269,7 @@ func LogAsyncOperationEnd(ctx context.Context, operation string, fields map[stri
 	GlobalLogger.InfoContext(ctx, "async operation completed", attrs...)
 }
 
+// LogAsyncOperationError logs an error in an asynchronous operation.
 func LogAsyncOperationError(ctx context.Context, operation string, err error, fields map[string]interface{}) {
 	attrs := []any{
 		slog.String("operation", operation),
@@ -257,12 +283,15 @@ func LogAsyncOperationError(ctx context.Context, operation string, err error, fi
 	GlobalLogger.ErrorContext(ctx, "async operation failed", attrs...)
 }
 
+// StructuredLogger provides a general-purpose structured logger.
 type StructuredLogger struct{}
 
+// NewStructuredLogger creates a new StructuredLogger instance.
 func NewStructuredLogger() *StructuredLogger {
 	return &StructuredLogger{}
 }
 
+// LogWithCorrelation logs a message with the current correlation ID.
 func (l *StructuredLogger) LogWithCorrelation(ctx context.Context, msg string, fields map[string]interface{}) {
 	attrs := []any{
 		slog.String("correlation_id", ExtractCorrelationID(ctx)),
@@ -273,6 +302,7 @@ func (l *StructuredLogger) LogWithCorrelation(ctx context.Context, msg string, f
 	GlobalLogger.InfoContext(ctx, msg, attrs...)
 }
 
+// LogServiceCall logs a service method call.
 func (l *StructuredLogger) LogServiceCall(ctx context.Context, service, method string, fields map[string]interface{}) {
 	attrs := []any{
 		slog.String("service", service),

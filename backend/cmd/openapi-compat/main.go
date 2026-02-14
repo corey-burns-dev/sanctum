@@ -63,6 +63,7 @@ func main() {
 }
 
 func loadSpec(path string) (parsedSpec, error) {
+	// #nosec G304: path comes from CLI flags in a dev tool
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return parsedSpec{}, err

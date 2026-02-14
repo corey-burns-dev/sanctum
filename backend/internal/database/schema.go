@@ -12,12 +12,14 @@ import (
 	"gorm.io/gorm"
 )
 
+// Database schema modes
 const (
 	SchemaModeHybrid = "hybrid"
 	SchemaModeSQL    = "sql"
 	SchemaModeAuto   = "auto"
 )
 
+// SchemaStatus describes the current schema management policy and migration state.
 type SchemaStatus struct {
 	Mode               string
 	Environment        string
@@ -63,6 +65,7 @@ func runAutoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(PersistentModels()...)
 }
 
+// ApplySchema executes database schema setup based on configured policy.
 func ApplySchema(ctx context.Context, db *gorm.DB, cfg *config.Config) error {
 	runSQL, runAuto, err := schemaPolicy(cfg)
 	if err != nil {
@@ -89,6 +92,7 @@ func ApplySchema(ctx context.Context, db *gorm.DB, cfg *config.Config) error {
 	return nil
 }
 
+// GetSchemaStatus returns detailed information about current database schema state.
 func GetSchemaStatus(ctx context.Context, db *gorm.DB, cfg *config.Config) (*SchemaStatus, error) {
 	runSQL, runAuto, err := schemaPolicy(cfg)
 	if err != nil {

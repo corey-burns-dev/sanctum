@@ -104,6 +104,6 @@ func normalize(s string) string {
 
 func rolloutBucket(name string, userID uint) int {
 	h := fnv.New32a()
-	_, _ = h.Write([]byte(fmt.Sprintf("%s:%d", normalize(name), userID)))
+	_, _ = fmt.Fprintf(h, "%s:%d", normalize(name), userID)
 	return int(h.Sum32() % 100)
 }

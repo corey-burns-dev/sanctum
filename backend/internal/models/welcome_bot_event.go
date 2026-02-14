@@ -2,6 +2,7 @@ package models
 
 import "time"
 
+// Welcome bot event types
 const (
 	WelcomeEventSignupDM = "signup_dm"
 	WelcomeEventRoomJoin = "room_join"
@@ -19,6 +20,7 @@ type WelcomeBotEvent struct {
 	Conversation *Conversation `gorm:"foreignKey:ConversationID" json:"conversation,omitempty"`
 }
 
+// TableName returns the database table name for WelcomeBotEvent.
 func (WelcomeBotEvent) TableName() string {
 	return "welcome_bot_events"
 }

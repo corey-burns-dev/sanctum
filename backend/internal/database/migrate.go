@@ -11,6 +11,7 @@ import (
 	"sanctum/internal/middleware"
 )
 
+// Migration represents a single database schema migration.
 type Migration struct {
 	Version    int
 	Name       string
@@ -29,6 +30,7 @@ func init() {
 	}
 }
 
+// RegisterMigrations scans an embedded filesystem for .sql migration files.
 func RegisterMigrations(efs embed.FS) error {
 	migrations = nil
 
@@ -92,10 +94,12 @@ func RegisterMigrations(efs embed.FS) error {
 	return nil
 }
 
+// GetMigrations returns all registered migrations sorted by version.
 func GetMigrations() []Migration {
 	return migrations
 }
 
+// GetMigrationByVersion returns a registered migration with the given version number.
 func GetMigrationByVersion(version int) *Migration {
 	for _, m := range migrations {
 		if m.Version == version {

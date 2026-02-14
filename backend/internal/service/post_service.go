@@ -190,7 +190,8 @@ func (s *PostService) ListPosts(ctx context.Context, in ListPostsInput) ([]*mode
 	var posts []*models.Post
 	var err error
 
-	if in.SanctumID == nil && in.Offset == 0 && in.Limit <= 20 {
+	switch {
+	case in.SanctumID == nil && in.Offset == 0 && in.Limit <= 20:
 		key := cache.PostsListKey(ctx)
 		err = cache.Aside(ctx, key, &posts, cache.ListTTL, func() error {
 			var fetchErr error
@@ -210,8 +211,8 @@ func (s *PostService) ListPosts(ctx context.Context, in ListPostsInput) ([]*mode
 				postIDs[i] = p.ID
 			}
 
-			likedIDs, err := s.postRepo.GetLikedPostIDs(ctx, in.CurrentUserID, postIDs)
-			if err == nil {
+			likedIDs, likedErr := s.postRepo.GetLikedPostIDs(ctx, in.CurrentUserID, postIDs)
+			if likedErr == nil {
 				likedMap := make(map[uint]bool, len(likedIDs))
 				for _, id := range likedIDs {
 					likedMap[id] = true
@@ -221,9 +222,9 @@ func (s *PostService) ListPosts(ctx context.Context, in ListPostsInput) ([]*mode
 				}
 			}
 		}
-	} else if in.SanctumID != nil {
+	case in.SanctumID != nil:
 		posts, err = s.postRepo.GetBySanctumID(ctx, *in.SanctumID, in.Limit, in.Offset, in.CurrentUserID)
-	} else {
+	default:
 		posts, err = s.postRepo.List(ctx, in.Limit, in.Offset, in.CurrentUserID)
 	}
 

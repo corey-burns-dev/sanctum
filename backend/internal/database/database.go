@@ -16,9 +16,13 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+// DB is the primary database connection instance.
 var DB *gorm.DB
+
+// ReadDB is the read replica database connection instance.
 var ReadDB *gorm.DB
 
+// ConnectOptions configures how the database connection is initialized.
 type ConnectOptions struct {
 	ApplySchema bool
 }
@@ -124,7 +128,7 @@ func buildDSN(cfg *config.Config, read bool) string {
 	)
 }
 
-func newDBInstance(dsn string, cfg *config.Config) (*gorm.DB, error) {
+func newDBInstance(dsn string, _ *config.Config) (*gorm.DB, error) {
 	gormLogger := &CustomGormLogger{
 		logger: middleware.Logger,
 		Config: logger.Config{

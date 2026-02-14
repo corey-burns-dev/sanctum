@@ -53,7 +53,7 @@ func (n *Notifier) StartPatternSubscriber(
 	ch := sub.Channel()
 
 	go func() {
-		defer sub.Close()
+		defer func() { _ = sub.Close() }()
 		for {
 			select {
 			case <-ctx.Done():
@@ -141,7 +141,7 @@ func (n *Notifier) StartChatSubscriber(
 	ch := sub.Channel()
 
 	go func() {
-		defer sub.Close()
+		defer func() { _ = sub.Close() }()
 		for {
 			select {
 			case <-ctx.Done():
@@ -187,7 +187,7 @@ func (n *Notifier) StartGameSubscriber(
 	ch := sub.Channel()
 
 	go func() {
-		defer sub.Close()
+		defer func() { _ = sub.Close() }()
 		for {
 			select {
 			case <-ctx.Done():

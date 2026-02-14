@@ -91,8 +91,8 @@ func (r *postRepository) GetByUserID(ctx context.Context, userID uint, limit, of
 	if err != nil {
 		return nil, err
 	}
-	if err := r.enrichImageMetadata(ctx, posts); err != nil {
-		return nil, err
+	if enrichErr := r.enrichImageMetadata(ctx, posts); enrichErr != nil {
+		return nil, enrichErr
 	}
 	return posts, err
 }
@@ -111,8 +111,8 @@ func (r *postRepository) GetBySanctumID(ctx context.Context, sanctumID uint, lim
 	if err != nil {
 		return nil, err
 	}
-	if err := r.enrichImageMetadata(ctx, posts); err != nil {
-		return nil, err
+	if enrichErr := r.enrichImageMetadata(ctx, posts); enrichErr != nil {
+		return nil, enrichErr
 	}
 	return posts, nil
 }
@@ -130,8 +130,8 @@ func (r *postRepository) List(ctx context.Context, limit, offset int, currentUse
 	if err != nil {
 		return nil, err
 	}
-	if err := r.enrichImageMetadata(ctx, posts); err != nil {
-		return nil, err
+	if enrichErr := r.enrichImageMetadata(ctx, posts); enrichErr != nil {
+		return nil, enrichErr
 	}
 	return posts, nil
 }
@@ -151,8 +151,8 @@ func (r *postRepository) Search(ctx context.Context, query string, limit, offset
 	if err != nil {
 		return nil, err
 	}
-	if err := r.enrichImageMetadata(ctx, posts); err != nil {
-		return nil, err
+	if enrichErr := r.enrichImageMetadata(ctx, posts); enrichErr != nil {
+		return nil, enrichErr
 	}
 	return posts, nil
 }

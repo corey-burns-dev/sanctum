@@ -63,7 +63,8 @@ func (s *Server) GetSanctumAdmins(c *fiber.Ctx) error {
 	sanctum, err := s.findSanctumBySlug(ctx, c.Params("slug"))
 	if err != nil {
 		status := fiber.StatusInternalServerError
-		if appErr, ok := err.(*models.AppError); ok {
+		var appErr *models.AppError
+		if errors.As(err, &appErr) {
 			switch appErr.Code {
 			case "VALIDATION_ERROR":
 				status = fiber.StatusBadRequest
@@ -115,7 +116,8 @@ func (s *Server) PromoteSanctumAdmin(c *fiber.Ctx) error {
 	sanctum, err := s.findSanctumBySlug(ctx, c.Params("slug"))
 	if err != nil {
 		status := fiber.StatusInternalServerError
-		if appErr, ok := err.(*models.AppError); ok {
+		var appErr *models.AppError
+		if errors.As(err, &appErr) {
 			switch appErr.Code {
 			case "VALIDATION_ERROR":
 				status = fiber.StatusBadRequest
@@ -184,7 +186,8 @@ func (s *Server) DemoteSanctumAdmin(c *fiber.Ctx) error {
 	sanctum, err := s.findSanctumBySlug(ctx, c.Params("slug"))
 	if err != nil {
 		status := fiber.StatusInternalServerError
-		if appErr, ok := err.(*models.AppError); ok {
+		var appErr *models.AppError
+		if errors.As(err, &appErr) {
 			switch appErr.Code {
 			case "VALIDATION_ERROR":
 				status = fiber.StatusBadRequest

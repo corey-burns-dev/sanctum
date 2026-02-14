@@ -3,6 +3,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -89,7 +90,8 @@ func (s *Server) Signup(c *fiber.Ctx) error {
 
 	if createErr := s.userRepo.Create(c.Context(), user); createErr != nil {
 		status := fiber.StatusInternalServerError
-		if appErr, ok := createErr.(*models.AppError); ok && appErr.Code == "VALIDATION_ERROR" {
+		var appErr *models.AppError
+		if errors.As(createErr, &appErr) && appErr.Code == "VALIDATION_ERROR" {
 			status = fiber.StatusConflict
 		}
 		return models.RespondWithError(c, status, createErr)
@@ -246,38 +248,38 @@ func (s *Server) Refresh(c *fiber.Ctx) error {
 	}
 
 	// Check if it's a refresh token
-	if aud, ok := claims["aud"].(string); !ok || aud != "sanctum-refresh" {
+	if aud, okAud := claims["aud"].(string); !okAud || aud != "sanctum-refresh" {
 		return models.RespondWithError(c, fiber.StatusUnauthorized,
 			models.NewUnauthorizedError("Invalid token type"))
 	}
 
 	// Extract user ID
-	sub, ok := claims["sub"].(string)
-	if !ok {
+	sub, okSub := claims["sub"].(string)
+	if !okSub {
 		return models.RespondWithError(c, fiber.StatusUnauthorized,
 			models.NewUnauthorizedError("Invalid subject claim"))
 	}
 
-	userID64, err := strconv.ParseUint(sub, 10, 32)
-	if err != nil {
+	userID64, errParse := strconv.ParseUint(sub, 10, 32)
+	if errParse != nil {
 		return models.RespondWithError(c, fiber.StatusUnauthorized,
 			models.NewUnauthorizedError("Invalid user ID in token"))
 	}
 	userID := uint(userID64)
 
 	// Check JTI in Redis (revocation check)
-	jti, ok := claims["jti"].(string)
-	if !ok {
+	jti, okJti := claims["jti"].(string)
+	if !okJti {
 		return models.RespondWithError(c, fiber.StatusUnauthorized,
 			models.NewUnauthorizedError("Invalid JTI claim"))
 	}
 
 	if s.redis != nil {
 		redisKey := fmt.Sprintf("refresh_token:%d:%s", userID, jti)
-		exists, err := s.redis.Exists(c.Context(), redisKey).Result()
-		if err != nil {
+		exists, errExists := s.redis.Exists(c.Context(), redisKey).Result()
+		if errExists != nil {
 			return models.RespondWithError(c, fiber.StatusInternalServerError,
-				models.NewInternalError(err))
+				models.NewInternalError(errExists))
 		}
 		if exists == 0 {
 			return models.RespondWithError(c, fiber.StatusUnauthorized,
@@ -287,9 +289,9 @@ func (s *Server) Refresh(c *fiber.Ctx) error {
 		// Refresh token rotation: Revoke current one. If deletion fails,
 		// reject the request to prevent issuing new tokens while the old
 		// refresh token remains valid.
-		if err := s.redis.Del(c.Context(), redisKey).Err(); err != nil {
+		if errDel := s.redis.Del(c.Context(), redisKey).Err(); errDel != nil {
 			return models.RespondWithError(c, fiber.StatusInternalServerError,
-				models.NewInternalError(fmt.Errorf("failed to revoke refresh token: %w", err)))
+				models.NewInternalError(fmt.Errorf("failed to revoke refresh token: %w", errDel)))
 		}
 	}
 
@@ -348,7 +350,7 @@ func (s *Server) Logout(c *fiber.Ctx) error {
 		parts := strings.Split(authHeader, " ")
 		if len(parts) == 2 && parts[0] == "Bearer" {
 			accessToken := parts[1]
-			token, err := jwt.Parse(accessToken, func(token *jwt.Token) (interface{}, error) {
+			token, err := jwt.Parse(accessToken, func(_ *jwt.Token) (interface{}, error) {
 				return []byte(s.config.JWTSecret), nil
 			})
 			if err == nil && token.Valid {
@@ -379,7 +381,7 @@ func (s *Server) Logout(c *fiber.Ctx) error {
 	}
 
 	// Parse token to get JTI and userID
-	token, err := jwt.Parse(req.RefreshToken, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(req.RefreshToken, func(_ *jwt.Token) (interface{}, error) {
 		return []byte(s.config.JWTSecret), nil
 	})
 

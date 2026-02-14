@@ -97,7 +97,7 @@ func (r *imageRepository) GetVariantsByImageID(ctx context.Context, imageID uint
 }
 
 func (r *imageRepository) ClaimNextQueued(ctx context.Context) (*models.Image, error) {
-	if r.db.Dialector.Name() == "postgres" {
+	if r.db.Name() == "postgres" {
 		var claimed models.Image
 		err := r.db.WithContext(ctx).Raw(`
 WITH picked AS (

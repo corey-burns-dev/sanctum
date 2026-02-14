@@ -59,11 +59,14 @@ func TestGetMyBlocks(t *testing.T) {
 	t.Run("empty list", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/blocks/me", nil)
 		resp, _ := app.Test(req)
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("expected 200, got %d", resp.StatusCode)
 		}
 		var blocks []models.UserBlock
-		json.NewDecoder(resp.Body).Decode(&blocks)
+		if err := json.NewDecoder(resp.Body).Decode(&blocks); err != nil {
+			t.Fatalf("decode blocks: %v", err)
+		}
 		if len(blocks) != 0 {
 			t.Errorf("expected 0 blocks, got %d", len(blocks))
 		}
@@ -73,8 +76,11 @@ func TestGetMyBlocks(t *testing.T) {
 		db.Create(&models.UserBlock{BlockerID: user.ID, BlockedID: blocked.ID})
 		req := httptest.NewRequest(http.MethodGet, "/blocks/me", nil)
 		resp, _ := app.Test(req)
+		defer func() { _ = resp.Body.Close() }()
 		var blocks []models.UserBlock
-		json.NewDecoder(resp.Body).Decode(&blocks)
+		if err := json.NewDecoder(resp.Body).Decode(&blocks); err != nil {
+			t.Fatalf("decode blocks: %v", err)
+		}
 		if len(blocks) != 1 {
 			t.Errorf("expected 1 block, got %d", len(blocks))
 		}
@@ -103,6 +109,7 @@ func TestBlockUser(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/users/%d/block", target.ID), nil)
 		resp, _ := app.Test(req)
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("expected 200, got %d", resp.StatusCode)
 		}
@@ -115,6 +122,7 @@ func TestBlockUser(t *testing.T) {
 	t.Run("self-block prevention", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/users/%d/block", user.ID), nil)
 		resp, _ := app.Test(req)
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode == http.StatusOK {
 			t.Errorf("expected error, got 200")
 		}
@@ -144,6 +152,7 @@ func TestUnblockUser(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/users/%d/block", target.ID), nil)
 		resp, _ := app.Test(req)
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("expected 200, got %d", resp.StatusCode)
 		}
@@ -179,6 +188,7 @@ func TestReportUser(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/users/%d/report", target.ID), bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req)
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 			t.Errorf("expected success, got %d", resp.StatusCode)
 		}
@@ -211,6 +221,7 @@ func TestReportPost(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/posts/%d/report", post.ID), bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req)
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 			t.Errorf("expected success, got %d", resp.StatusCode)
 		}
@@ -238,6 +249,7 @@ func TestGetAdminReports(t *testing.T) {
 	t.Run("list all", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/admin/reports", nil)
 		resp, _ := app.Test(req)
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("expected 200, got %d", resp.StatusCode)
 		}
@@ -268,6 +280,7 @@ func TestResolveAdminReport(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/admin/reports/%d/resolve", report.ID), bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req)
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("expected 200, got %d", resp.StatusCode)
 		}
@@ -297,6 +310,7 @@ func TestGetAdminBanRequests(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/admin/ban-requests", nil)
 		resp, _ := app.Test(req)
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("expected 200, got %d", resp.StatusCode)
 		}
@@ -324,6 +338,7 @@ func TestGetAdminUsers(t *testing.T) {
 	t.Run("list with filter", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/admin/users?q=target", nil)
 		resp, _ := app.Test(req)
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("expected 200, got %d", resp.StatusCode)
 		}
@@ -333,6 +348,7 @@ func TestGetAdminUsers(t *testing.T) {
 		longQ := "this_is_a_very_long_search_query_that_exceeds_sixty_four_characters_limit_1234567890"
 		req := httptest.NewRequest(http.MethodGet, "/admin/users?q="+longQ, nil)
 		resp, _ := app.Test(req)
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("expected 400, got %d", resp.StatusCode)
 		}
@@ -363,6 +379,7 @@ func TestBanUser(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/admin/users/%d/ban", target.ID), bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req)
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("expected 200, got %d", resp.StatusCode)
 		}
@@ -376,6 +393,7 @@ func TestBanUser(t *testing.T) {
 	t.Run("self-ban prevention", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/admin/users/%d/ban", admin.ID), nil)
 		resp, _ := app.Test(req)
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode == http.StatusOK {
 			t.Errorf("expected error, got 200")
 		}
@@ -404,6 +422,7 @@ func TestUnbanUser(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/admin/users/%d/unban", target.ID), nil)
 		resp, _ := app.Test(req)
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("expected 200, got %d", resp.StatusCode)
 		}

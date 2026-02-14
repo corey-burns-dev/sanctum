@@ -13,6 +13,7 @@ type MessageReaction struct {
 	User *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
 
+// TableName returns the database table name for MessageReaction.
 func (MessageReaction) TableName() string {
 	return "message_reactions"
 }

@@ -51,6 +51,7 @@ func TestGetSanctumAdmins(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/sanctums/%s/admins", sanctum.Slug), nil)
 		resp, _ := app.Test(req)
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("expected 200, got %d", resp.StatusCode)
 		}
@@ -80,6 +81,7 @@ func TestPromoteSanctumAdmin(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/sanctums/%s/admins/%d", sanctum.Slug, member.ID), nil)
 		resp, _ := app.Test(req)
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("expected 200, got %d", resp.StatusCode)
 		}
@@ -114,6 +116,7 @@ func TestDemoteSanctumAdmin(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/sanctums/%s/admins/%d", sanctum.Slug, mod.ID), nil)
 		resp, _ := app.Test(req)
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("expected 200, got %d", resp.StatusCode)
 		}
@@ -127,6 +130,7 @@ func TestDemoteSanctumAdmin(t *testing.T) {
 	t.Run("cannot demote owner", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/sanctums/%s/admins/%d", sanctum.Slug, owner.ID), nil)
 		resp, _ := app.Test(req)
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode == http.StatusOK {
 			t.Errorf("expected error when demoting owner, got 200")
 		}

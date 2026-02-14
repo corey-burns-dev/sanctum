@@ -87,11 +87,11 @@ func uploadImageWithFilename(t *testing.T, app *fiber.App, token string, content
 	if err != nil {
 		t.Fatalf("create form file: %v", err)
 	}
-	if _, err := part.Write(content); err != nil {
-		t.Fatalf("write form file: %v", err)
+	if _, writeErr := part.Write(content); writeErr != nil {
+		t.Fatalf("write form file: %v", writeErr)
 	}
-	if err := writer.Close(); err != nil {
-		t.Fatalf("close multipart writer: %v", err)
+	if closeErr := writer.Close(); closeErr != nil {
+		t.Fatalf("close multipart writer: %v", closeErr)
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/api/images/upload", &body)

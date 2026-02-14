@@ -54,8 +54,8 @@ func Sanctums(db *gorm.DB) error {
 						Description: item.Description,
 						Status:      models.SanctumStatusActive,
 					}
-					if err := tx.Create(&sanctum).Error; err != nil {
-						return fmt.Errorf("failed to create sanctum %s: %w", item.Slug, err)
+					if createErr := tx.Create(&sanctum).Error; createErr != nil {
+						return fmt.Errorf("failed to create sanctum %s: %w", item.Slug, createErr)
 					}
 				} else {
 					return err

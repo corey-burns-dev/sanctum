@@ -108,8 +108,8 @@ func TestGameServiceGetGameRoomNotFound(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected not-found error")
 	}
-	appErr, ok := err.(*models.AppError)
-	if !ok || appErr.Code != "NOT_FOUND" {
+	var appErr *models.AppError
+	if !errors.As(err, &appErr) || appErr.Code != "NOT_FOUND" {
 		t.Fatalf("expected NOT_FOUND app error, got %#v", err)
 	}
 }
@@ -132,8 +132,8 @@ func TestGameServiceLeaveGameRoomForbidden(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected forbidden error")
 	}
-	appErr, ok := err.(*models.AppError)
-	if !ok || appErr.Code != "FORBIDDEN" {
+	var appErr *models.AppError
+	if !errors.As(err, &appErr) || appErr.Code != "FORBIDDEN" {
 		t.Fatalf("expected FORBIDDEN app error, got %#v", err)
 	}
 }
@@ -173,8 +173,8 @@ func TestGameServiceGetActiveGameRoomsWrapsInternalError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected internal error")
 	}
-	appErr, ok := err.(*models.AppError)
-	if !ok || appErr.Code != "INTERNAL_ERROR" {
+	var appErr *models.AppError
+	if !errors.As(err, &appErr) || appErr.Code != "INTERNAL_ERROR" {
 		t.Fatalf("expected INTERNAL_ERROR app error, got %#v", err)
 	}
 }

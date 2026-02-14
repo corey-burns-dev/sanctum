@@ -2,6 +2,7 @@
 package server
 
 import (
+	"errors"
 	"time"
 
 	"sanctum/internal/models"
@@ -22,7 +23,8 @@ func (s *Server) SendFriendRequest(c *fiber.Ctx) error {
 	friendship, err := s.friendSvc().SendFriendRequest(ctx, userID, targetUserID)
 	if err != nil {
 		status := fiber.StatusInternalServerError
-		if appErr, ok := err.(*models.AppError); ok {
+		var appErr *models.AppError
+		if errors.As(err, &appErr) {
 			switch appErr.Code {
 			case "NOT_FOUND":
 				status = fiber.StatusNotFound
@@ -89,7 +91,8 @@ func (s *Server) AcceptFriendRequest(c *fiber.Ctx) error {
 	friendship, err := s.friendSvc().AcceptFriendRequest(ctx, userID, requestID)
 	if err != nil {
 		status := fiber.StatusInternalServerError
-		if appErr, ok := err.(*models.AppError); ok {
+		var appErr *models.AppError
+		if errors.As(err, &appErr) {
 			switch appErr.Code {
 			case "NOT_FOUND":
 				status = fiber.StatusNotFound
@@ -128,7 +131,8 @@ func (s *Server) RejectFriendRequest(c *fiber.Ctx) error {
 	friendship, err := s.friendSvc().RejectFriendRequest(ctx, userID, requestID)
 	if err != nil {
 		status := fiber.StatusInternalServerError
-		if appErr, ok := err.(*models.AppError); ok {
+		var appErr *models.AppError
+		if errors.As(err, &appErr) {
 			switch appErr.Code {
 			case "NOT_FOUND":
 				status = fiber.StatusNotFound
@@ -184,7 +188,8 @@ func (s *Server) GetFriendshipStatus(c *fiber.Ctx) error {
 	status, requestID, friendship, err := s.friendSvc().GetFriendshipStatus(ctx, userID, targetUserID)
 	if err != nil {
 		httpStatus := fiber.StatusInternalServerError
-		if appErr, ok := err.(*models.AppError); ok && appErr.Code == "NOT_FOUND" {
+		var appErr *models.AppError
+		if errors.As(err, &appErr) && appErr.Code == "NOT_FOUND" {
 			httpStatus = fiber.StatusNotFound
 		}
 		return models.RespondWithError(c, httpStatus, err)
@@ -209,7 +214,8 @@ func (s *Server) RemoveFriend(c *fiber.Ctx) error {
 	_, err = s.friendSvc().RemoveFriend(ctx, userID, targetUserID)
 	if err != nil {
 		status := fiber.StatusInternalServerError
-		if appErr, ok := err.(*models.AppError); ok && appErr.Code == "NOT_FOUND" {
+		var appErr *models.AppError
+		if errors.As(err, &appErr) && appErr.Code == "NOT_FOUND" {
 			status = fiber.StatusNotFound
 		}
 		return models.RespondWithError(c, status, err)

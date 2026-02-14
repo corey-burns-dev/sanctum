@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"sanctum/internal/models"
@@ -78,7 +79,9 @@ func TestChatService_CreateConversation_Validation(t *testing.T) {
 			ParticipantIDs: []uint{1},
 		})
 		assert.Error(t, err)
-		assert.Equal(t, "VALIDATION_ERROR", err.(*models.AppError).Code)
+		var appErr *models.AppError
+		assert.True(t, errors.As(err, &appErr))
+		assert.Equal(t, "VALIDATION_ERROR", appErr.Code)
 	})
 
 	t.Run("No participants", func(t *testing.T) {
@@ -87,7 +90,9 @@ func TestChatService_CreateConversation_Validation(t *testing.T) {
 			ParticipantIDs: []uint{},
 		})
 		assert.Error(t, err)
-		assert.Equal(t, "VALIDATION_ERROR", err.(*models.AppError).Code)
+		var appErr *models.AppError
+		assert.True(t, errors.As(err, &appErr))
+		assert.Equal(t, "VALIDATION_ERROR", appErr.Code)
 	})
 }
 
@@ -109,7 +114,9 @@ func TestChatService_SendMessage_Unauthorized(t *testing.T) {
 	})
 
 	assert.Error(t, err)
-	assert.Equal(t, "UNAUTHORIZED", err.(*models.AppError).Code)
+	var appErr *models.AppError
+	assert.True(t, errors.As(err, &appErr))
+	assert.Equal(t, "UNAUTHORIZED", appErr.Code)
 }
 
 func TestChatService_FullFlow(t *testing.T) {
@@ -240,7 +247,9 @@ func TestChatService_RemoveParticipant_Authorization(t *testing.T) {
 	// User 1 tries to remove user 3 from room created by user 2
 	_, err := svc.RemoveParticipant(context.Background(), 1, 1, 3)
 	assert.Error(t, err)
-	assert.Equal(t, "UNAUTHORIZED", err.(*models.AppError).Code)
+	var appErr *models.AppError
+	assert.True(t, errors.As(err, &appErr))
+	assert.Equal(t, "UNAUTHORIZED", appErr.Code)
 
 	// Admin can remove
 	isAdminAdmin := func(ctx context.Context, userID uint) (bool, error) {

@@ -18,6 +18,7 @@ type ChatroomMute struct {
 	Conversation *Conversation `gorm:"foreignKey:ConversationID" json:"conversation,omitempty"`
 }
 
+// TableName returns the database table name for ChatroomMute.
 func (ChatroomMute) TableName() string {
 	return "chatroom_mutes"
 }

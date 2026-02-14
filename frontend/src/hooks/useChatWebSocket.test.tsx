@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook } from '@testing-library/react'
-import React from 'react'
+import type React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useChatWebSocket } from './useChatWebSocket'
 
@@ -80,15 +80,15 @@ describe('useChatWebSocket hook', () => {
       <QueryClientProvider client={qc}>{children}</QueryClientProvider>
     )
 
-    let onOpenCallback: (() => void) | undefined
+    let onOpenCallback: ((event: Event) => void) | undefined
 
-    vi.mocked(createTicketedWS).mockImplementation(async (opts: any) => {
+    vi.mocked(createTicketedWS).mockImplementation(async opts => {
       onOpenCallback = opts.onOpen
       return {
         send: vi.fn(),
         close: vi.fn(),
         readyState: 1,
-      } as any
+      } as unknown as WebSocket
     })
 
     const { result } = renderHook(
@@ -105,7 +105,7 @@ describe('useChatWebSocket hook', () => {
 
     // Simulate open
     await act(async () => {
-      if (onOpenCallback) onOpenCallback()
+      if (onOpenCallback) onOpenCallback(new Event('open'))
     })
 
     expect(result.current.isConnected).toBe(true)
@@ -116,17 +116,17 @@ describe('useChatWebSocket hook', () => {
       <QueryClientProvider client={qc}>{children}</QueryClientProvider>
     )
 
-    let onMessageCallback: ((ev: { data: string }) => void) | undefined
+    let onMessageCallback: ((event: MessageEvent) => void) | undefined
     const mockWS = {
       send: vi.fn(),
       close: vi.fn(),
       readyState: 1,
     }
 
-    vi.mocked(createTicketedWS).mockImplementation(async (opts: any) => {
+    vi.mocked(createTicketedWS).mockImplementation(async opts => {
       onMessageCallback = opts.onMessage
-      opts.onOpen()
-      return mockWS as any
+      opts.onOpen?.(new Event('open'))
+      return mockWS as unknown as WebSocket
     })
 
     const onMessage = vi.fn()
@@ -142,12 +142,14 @@ describe('useChatWebSocket hook', () => {
     // Simulate joined message to set isJoined
     await act(async () => {
       if (onMessageCallback) {
-        onMessageCallback({
-          data: JSON.stringify({
-            type: 'joined',
-            conversation_id: 1,
-          }),
-        })
+        onMessageCallback(
+          new MessageEvent('message', {
+            data: JSON.stringify({
+              type: 'joined',
+              conversation_id: 1,
+            }),
+          })
+        )
       }
     })
 
@@ -155,13 +157,15 @@ describe('useChatWebSocket hook', () => {
     const messagePayload = { id: 100, content: 'Hello' }
     await act(async () => {
       if (onMessageCallback) {
-        onMessageCallback({
-          data: JSON.stringify({
-            type: 'message',
-            conversation_id: 1,
-            payload: messagePayload,
-          }),
-        })
+        onMessageCallback(
+          new MessageEvent('message', {
+            data: JSON.stringify({
+              type: 'message',
+              conversation_id: 1,
+              payload: messagePayload,
+            }),
+          })
+        )
       }
     })
 
@@ -179,12 +183,12 @@ describe('useChatWebSocket hook', () => {
       readyState: 1,
     }
 
-    let onOpenCallback: (() => void) | undefined
-    let onMessageCallback: ((ev: { data: string }) => void) | undefined
-    vi.mocked(createTicketedWS).mockImplementation(async (opts: any) => {
+    let onOpenCallback: ((event: Event) => void) | undefined
+    let onMessageCallback: ((event: MessageEvent) => void) | undefined
+    vi.mocked(createTicketedWS).mockImplementation(async opts => {
       onOpenCallback = opts.onOpen
       onMessageCallback = opts.onMessage
-      return mockWS as any
+      return mockWS as unknown as WebSocket
     })
 
     const { result } = renderHook(
@@ -197,15 +201,17 @@ describe('useChatWebSocket hook', () => {
     })
 
     await act(async () => {
-      if (onOpenCallback) onOpenCallback()
+      if (onOpenCallback) onOpenCallback(new Event('open'))
     })
 
     // Must be joined to send typing
     await act(async () => {
       if (onMessageCallback) {
-        onMessageCallback({
-          data: JSON.stringify({ type: 'joined', conversation_id: 1 }),
-        })
+        onMessageCallback(
+          new MessageEvent('message', {
+            data: JSON.stringify({ type: 'joined', conversation_id: 1 }),
+          })
+        )
       }
     })
 

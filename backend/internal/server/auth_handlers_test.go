@@ -161,7 +161,9 @@ func TestSignup(t *testing.T) {
 
 			if tt.expectedStatus == http.StatusCreated {
 				var result map[string]interface{}
-				json.NewDecoder(resp.Body).Decode(&result)
+				if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+					t.Fatalf("decode result: %v", err)
+				}
 				assert.Contains(t, result, "token")
 				assert.Contains(t, result, "refresh_token")
 				assert.Contains(t, result, "user")
@@ -232,7 +234,9 @@ func TestLogin(t *testing.T) {
 
 			if tt.expectedStatus == http.StatusOK {
 				var result map[string]interface{}
-				json.NewDecoder(resp.Body).Decode(&result)
+				if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+					t.Fatalf("decode result: %v", err)
+				}
 				assert.Contains(t, result, "token")
 				assert.Contains(t, result, "refresh_token")
 				assert.Contains(t, result, "user")
@@ -300,7 +304,9 @@ func TestRefresh(t *testing.T) {
 
 			if tt.expectedStatus == http.StatusOK {
 				var result map[string]interface{}
-				_ = json.NewDecoder(resp.Body).Decode(&result)
+				if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+					t.Fatalf("decode result: %v", err)
+				}
 				assert.Contains(t, result, "token")
 				assert.Contains(t, result, "refresh_token")
 			}

@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"strconv"
 	"time"
@@ -90,7 +91,8 @@ func (s *Server) GetGameRoom(c *fiber.Ctx) error {
 	room, err := s.gameSvc().GetGameRoom(ctx, roomID)
 	if err != nil {
 		status := fiber.StatusInternalServerError
-		if appErr, ok := err.(*models.AppError); ok && appErr.Code == "NOT_FOUND" {
+		var appErr *models.AppError
+		if errors.As(err, &appErr) && appErr.Code == "NOT_FOUND" {
 			status = fiber.StatusNotFound
 		}
 		return models.RespondWithError(c, status, err)
@@ -111,7 +113,8 @@ func (s *Server) LeaveGameRoom(c *fiber.Ctx) error {
 	room, alreadyClosed, err := s.gameSvc().LeaveGameRoom(ctx, userID, roomID)
 	if err != nil {
 		status := fiber.StatusInternalServerError
-		if appErr, ok := err.(*models.AppError); ok {
+		var appErr *models.AppError
+		if errors.As(err, &appErr) {
 			switch appErr.Code {
 			case "NOT_FOUND":
 				status = fiber.StatusNotFound

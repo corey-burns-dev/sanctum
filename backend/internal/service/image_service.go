@@ -248,7 +248,7 @@ func isValidImageHash(hash string) bool {
 		return false
 	}
 	for _, c := range hash {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 			return false
 		}
 	}
@@ -334,6 +334,7 @@ func (s *ImageService) workerLoop(ctx context.Context) {
 
 func (s *ImageService) processQueuedImage(ctx context.Context, img *models.Image) error {
 	masterPath := filepath.Join(s.uploadDir, img.Hash, "master.jpg")
+	// #nosec G304: masterPath is constructed from validated hash
 	f, err := os.Open(masterPath)
 	if err != nil {
 		return err
@@ -359,10 +360,10 @@ func (s *ImageService) processQueuedImage(ctx context.Context, img *models.Image
 			return err
 		}
 		webpRel := filepath.ToSlash(filepath.Join(img.Hash, fmt.Sprintf("%d.webp", size)))
-		if err := writeBytesToFile(filepath.Join(s.uploadDir, webpRel), webpBytes); err != nil {
-			return err
+		if writeErr := writeBytesToFile(filepath.Join(s.uploadDir, webpRel), webpBytes); writeErr != nil {
+			return writeErr
 		}
-		if err := s.repo.UpsertVariant(ctx, &models.ImageVariant{
+		if upsertErr := s.repo.UpsertVariant(ctx, &models.ImageVariant{
 			ImageID:  img.ID,
 			SizeName: sizeName,
 			SizePx:   size,
@@ -371,8 +372,8 @@ func (s *ImageService) processQueuedImage(ctx context.Context, img *models.Image
 			Width:    rb.Dx(),
 			Height:   rb.Dy(),
 			Bytes:    int64(len(webpBytes)),
-		}); err != nil {
-			return err
+		}); upsertErr != nil {
+			return upsertErr
 		}
 
 		jpgBytes, err := encodeJPEG(resized, JPEGQuality)
@@ -380,10 +381,10 @@ func (s *ImageService) processQueuedImage(ctx context.Context, img *models.Image
 			return err
 		}
 		jpgRel := filepath.ToSlash(filepath.Join(img.Hash, fmt.Sprintf("%d.jpg", size)))
-		if err := writeBytesToFile(filepath.Join(s.uploadDir, jpgRel), jpgBytes); err != nil {
-			return err
+		if writeErr := writeBytesToFile(filepath.Join(s.uploadDir, jpgRel), jpgBytes); writeErr != nil {
+			return writeErr
 		}
-		if err := s.repo.UpsertVariant(ctx, &models.ImageVariant{
+		if upsertErr := s.repo.UpsertVariant(ctx, &models.ImageVariant{
 			ImageID:  img.ID,
 			SizeName: sizeName,
 			SizePx:   size,
@@ -392,8 +393,8 @@ func (s *ImageService) processQueuedImage(ctx context.Context, img *models.Image
 			Width:    rb.Dx(),
 			Height:   rb.Dy(),
 			Bytes:    int64(len(jpgBytes)),
-		}); err != nil {
-			return err
+		}); upsertErr != nil {
+			return upsertErr
 		}
 	}
 
@@ -565,17 +566,17 @@ func decodedFormatToMime(format string) string {
 
 func buildDeterministicImageHash(userID uint, content []byte) string {
 	h := sha256.New()
-	h.Write([]byte(fmt.Sprintf("%d:", userID)))
+	_, _ = fmt.Fprintf(h, "%d:", userID)
 	h.Write(content)
 	return hex.EncodeToString(h.Sum(nil))
 }
 
 func writeBytesToFile(path string, data []byte) error {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+	return os.WriteFile(path, data, 0o600)
 }
 
 func cleanupImageFiles(paths []string) {

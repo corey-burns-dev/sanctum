@@ -2,6 +2,7 @@
 package server
 
 import (
+	"errors"
 	"strconv"
 	"time"
 
@@ -21,7 +22,8 @@ func (s *Server) SearchPosts(c *fiber.Ctx) error {
 	posts, err := s.postSvc().SearchPosts(ctx, q, page.Limit, page.Offset, userID)
 	if err != nil {
 		status := fiber.StatusInternalServerError
-		if appErr, ok := err.(*models.AppError); ok && appErr.Code == "VALIDATION_ERROR" {
+		var appErr *models.AppError
+		if errors.As(err, &appErr) && appErr.Code == "VALIDATION_ERROR" {
 			status = fiber.StatusBadRequest
 		}
 		return models.RespondWithError(c, status, err)
@@ -63,7 +65,8 @@ func (s *Server) CreatePost(c *fiber.Ctx) error {
 	})
 	if err != nil {
 		status := fiber.StatusInternalServerError
-		if appErr, ok := err.(*models.AppError); ok && appErr.Code == "VALIDATION_ERROR" {
+		var appErr *models.AppError
+		if errors.As(err, &appErr) && appErr.Code == "VALIDATION_ERROR" {
 			status = fiber.StatusBadRequest
 		}
 		return models.RespondWithError(c, status, err)
@@ -176,7 +179,8 @@ func (s *Server) UpdatePost(c *fiber.Ctx) error {
 	})
 	if err != nil {
 		status := fiber.StatusInternalServerError
-		if appErr, ok := err.(*models.AppError); ok {
+		var appErr *models.AppError
+		if errors.As(err, &appErr) {
 			switch appErr.Code {
 			case "UNAUTHORIZED":
 				status = fiber.StatusForbidden
@@ -204,7 +208,8 @@ func (s *Server) DeletePost(c *fiber.Ctx) error {
 		PostID: postID,
 	}); err != nil {
 		status := fiber.StatusInternalServerError
-		if appErr, ok := err.(*models.AppError); ok {
+		var appErr *models.AppError
+		if errors.As(err, &appErr) {
 			switch appErr.Code {
 			case "UNAUTHORIZED":
 				status = fiber.StatusForbidden
@@ -279,7 +284,7 @@ func (s *Server) VotePoll(c *fiber.Ctx) error {
 	var req struct {
 		PollOptionID uint `json:"poll_option_id"`
 	}
-	if err := c.BodyParser(&req); err != nil {
+	if bodyErr := c.BodyParser(&req); bodyErr != nil {
 		return models.RespondWithError(c, fiber.StatusBadRequest,
 			models.NewValidationError("Invalid request body"))
 	}
@@ -291,7 +296,8 @@ func (s *Server) VotePoll(c *fiber.Ctx) error {
 	post, err := s.postSvc().VotePoll(ctx, userID, postID, req.PollOptionID)
 	if err != nil {
 		status := fiber.StatusInternalServerError
-		if appErr, ok := err.(*models.AppError); ok {
+		var appErr *models.AppError
+		if errors.As(err, &appErr) {
 			switch appErr.Code {
 			case "VALIDATION_ERROR":
 				status = fiber.StatusBadRequest

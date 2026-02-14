@@ -159,7 +159,7 @@ func (s *Server) WebSocketChatHandler() fiber.Handler {
 									"message": "Rate limit exceeded. Please wait a moment.",
 								},
 							}
-							if respJSON, err := json.Marshal(response); err == nil {
+							if respJSON, marshalErr := json.Marshal(response); marshalErr == nil {
 								c.TrySend(respJSON)
 							}
 							return

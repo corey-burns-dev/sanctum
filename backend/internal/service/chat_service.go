@@ -325,7 +325,7 @@ func (s *ChatService) GetJoinedChatrooms(ctx context.Context, userID uint) ([]*m
 func (s *ChatService) JoinChatroom(ctx context.Context, roomID, userID uint) (*models.Conversation, error) {
 	var conv models.Conversation
 	if err := s.db.WithContext(ctx).First(&conv, roomID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, models.NewNotFoundError("Chatroom", roomID)
 		}
 		return nil, err
@@ -350,7 +350,7 @@ func (s *ChatService) JoinChatroom(ctx context.Context, roomID, userID uint) (*m
 func (s *ChatService) RemoveParticipant(ctx context.Context, roomID, actorUserID, participantUserID uint) (string, error) {
 	var conv models.Conversation
 	if err := s.db.WithContext(ctx).First(&conv, roomID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return "", models.NewNotFoundError("Chatroom", roomID)
 		}
 		return "", err

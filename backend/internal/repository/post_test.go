@@ -40,28 +40,31 @@ func TestPostRepository_Integration(t *testing.T) {
 
 	t.Run("Like and Unlike", func(t *testing.T) {
 		post := &models.Post{Title: "Like Test", Content: "x", UserID: user.ID}
-		repo.Create(ctx, post)
+		require.NoError(t, repo.Create(ctx, post))
 
 		err := repo.Like(ctx, user.ID, post.ID)
 		assert.NoError(t, err)
 
-		isLiked, _ := repo.IsLiked(ctx, user.ID, post.ID)
+		isLiked, err := repo.IsLiked(ctx, user.ID, post.ID)
+		assert.NoError(t, err)
 		assert.True(t, isLiked)
 
-		fetched, _ := repo.GetByID(ctx, post.ID, user.ID)
+		fetched, err := repo.GetByID(ctx, post.ID, user.ID)
+		assert.NoError(t, err)
 		assert.Equal(t, 1, fetched.LikesCount)
 		assert.True(t, fetched.Liked)
 
 		err = repo.Unlike(ctx, user.ID, post.ID)
 		assert.NoError(t, err)
 
-		isLiked, _ = repo.IsLiked(ctx, user.ID, post.ID)
+		isLiked, err = repo.IsLiked(ctx, user.ID, post.ID)
+		assert.NoError(t, err)
 		assert.False(t, isLiked)
 	})
 
 	t.Run("Search and List", func(t *testing.T) {
-		repo.Create(ctx, &models.Post{Title: "Go Programming", Content: "Rocks", UserID: user.ID})
-		repo.Create(ctx, &models.Post{Title: "Rust Programming", Content: "Fast", UserID: user.ID})
+		require.NoError(t, repo.Create(ctx, &models.Post{Title: "Go Programming", Content: "Rocks", UserID: user.ID}))
+		require.NoError(t, repo.Create(ctx, &models.Post{Title: "Rust Programming", Content: "Fast", UserID: user.ID}))
 
 		posts, err := repo.Search(ctx, "Programming", 10, 0, user.ID)
 		assert.NoError(t, err)

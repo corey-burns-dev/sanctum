@@ -36,8 +36,8 @@ func TestSanctumRequestApprovalAndPostingFlow(t *testing.T) {
 	}
 
 	var sanctumReq models.SanctumRequest
-	if err := json.NewDecoder(createResp.Body).Decode(&sanctumReq); err != nil {
-		t.Fatalf("decode request response: %v", err)
+	if createDecodeErr := json.NewDecoder(createResp.Body).Decode(&sanctumReq); createDecodeErr != nil {
+		t.Fatalf("decode request response: %v", createDecodeErr)
 	}
 	_ = createResp.Body.Close()
 
@@ -52,8 +52,8 @@ func TestSanctumRequestApprovalAndPostingFlow(t *testing.T) {
 	}
 
 	var pendingRequests []models.SanctumRequest
-	if err := json.NewDecoder(adminGetResp.Body).Decode(&pendingRequests); err != nil {
-		t.Fatalf("decode admin requests: %v", err)
+	if adminGetDecodeErr := json.NewDecoder(adminGetResp.Body).Decode(&pendingRequests); adminGetDecodeErr != nil {
+		t.Fatalf("decode admin requests: %v", adminGetDecodeErr)
 	}
 	_ = adminGetResp.Body.Close()
 
@@ -88,8 +88,8 @@ func TestSanctumRequestApprovalAndPostingFlow(t *testing.T) {
 			DefaultChatRoomID *uint  `json:"default_chat_room_id"`
 		} `json:"sanctum"`
 	}
-	if err := json.NewDecoder(approveResp.Body).Decode(&approveResult); err != nil {
-		t.Fatalf("decode approve response: %v", err)
+	if approveDecodeErr := json.NewDecoder(approveResp.Body).Decode(&approveResult); approveDecodeErr != nil {
+		t.Fatalf("decode approve response: %v", approveDecodeErr)
 	}
 	_ = approveResp.Body.Close()
 
@@ -116,8 +116,8 @@ func TestSanctumRequestApprovalAndPostingFlow(t *testing.T) {
 	}
 
 	var createdPost models.Post
-	if err := json.NewDecoder(createPostResp.Body).Decode(&createdPost); err != nil {
-		t.Fatalf("decode post response: %v", err)
+	if createPostDecodeErr := json.NewDecoder(createPostResp.Body).Decode(&createdPost); createPostDecodeErr != nil {
+		t.Fatalf("decode post response: %v", createPostDecodeErr)
 	}
 	_ = createPostResp.Body.Close()
 

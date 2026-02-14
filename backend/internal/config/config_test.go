@@ -50,12 +50,12 @@ func TestConfig_ValidateSSLMode(t *testing.T) {
 
 func TestLoadConfig_SSLModeNormalization(t *testing.T) {
 	// Clean up environment variables and viper after test
-	defer os.Unsetenv("APP_ENV")
-	defer os.Unsetenv("DB_SSLMODE")
+	defer func() { _ = os.Unsetenv("APP_ENV") }()
+	defer func() { _ = os.Unsetenv("DB_SSLMODE") }()
 	defer viper.Reset()
 
-	os.Setenv("APP_ENV", "development")
-	os.Setenv("DB_SSLMODE", "  DISABLE  ")
+	assert.NoError(t, os.Setenv("APP_ENV", "development"))
+	assert.NoError(t, os.Setenv("DB_SSLMODE", "  DISABLE  "))
 
 	// Since LoadConfig reads from files, we might need a more controlled way
 	// to test normalization if it doesn't pick up environment variables easily

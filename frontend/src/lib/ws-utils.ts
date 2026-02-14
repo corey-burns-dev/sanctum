@@ -35,10 +35,10 @@ export async function createTicketedWS(
         message: err.message,
       })
       // Suggest a retry delay for developers (non-authoritative)
-      logger.debug('[ws] suggested retry in', getNextBackoff(0), 'ms')
+      logger.debug(`[ws] suggested retry in ${getNextBackoff(0)} ms`)
     } else {
       logger.error('[ws] ticket issuance unexpected error', err)
-      logger.debug('[ws] suggested retry in', getNextBackoff(0), 'ms')
+      logger.debug(`[ws] suggested retry in ${getNextBackoff(0)} ms`)
     }
     throw err
   }
@@ -50,13 +50,13 @@ export async function createTicketedWS(
   const wsUrlNoTicket = `${baseUrl}${options.path}`
 
   // Log the base WS endpoint (do not log the ticket)
-  logger.debug('[ws] connecting to', wsUrlNoTicket, '(ticket appended)')
+  logger.debug(`[ws] connecting to ${wsUrlNoTicket} (ticket appended)`)
 
   let ws: WebSocket
   try {
     ws = new WebSocket(wsUrl)
   } catch (err) {
-    logger.error('[ws] WebSocket constructor failed for', wsUrlNoTicket, err)
+    logger.error(`[ws] WebSocket constructor failed for ${wsUrlNoTicket}`, err)
     throw err
   }
 

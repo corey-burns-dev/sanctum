@@ -191,11 +191,9 @@ func (c *Config) Validate() error {
 		if c.RedisURL == "" {
 			return errors.New("REDIS_URL is required in production (auth, rate limiting, and WebSocket features depend on it)")
 		}
-	} else {
+	} else if len(c.JWTSecret) < 32 {
 		// Development/Test warnings
-		if len(c.JWTSecret) < 32 {
-			log.Println("WARNING: JWT_SECRET is shorter than 32 characters. Consider using a stronger secret for production.")
-		}
+		log.Println("WARNING: JWT_SECRET is shorter than 32 characters. Consider using a stronger secret for production.")
 	}
 
 	return nil

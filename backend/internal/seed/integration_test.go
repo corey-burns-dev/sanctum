@@ -3,7 +3,6 @@
 package seed
 
 import (
-	"context"
 	"net/url"
 	"os"
 	"strings"
@@ -53,22 +52,21 @@ func TestIntegration_SeedSanctumsAuto(t *testing.T) {
 		t.Fatalf("failed parse dsn: %v", err)
 	}
 	// connect and apply schema
-	db, err := database.ConnectWithOptions(cfg)
+	db, err := database.ConnectWithOptions(cfg, database.ConnectOptions{ApplySchema: true})
 	if err != nil {
 		t.Fatalf("db connect failed: %v", err)
 	}
-	ctx := context.Background()
-	if err := database.TruncateAllTables(db); err != nil {
-		t.Fatalf("truncate failed: %v", err)
+	if truncateErr := database.TruncateAllTables(db); truncateErr != nil {
+		t.Fatalf("truncate failed: %v", truncateErr)
 	}
 
 	seed := NewSeeder(db, SeedOptions{SkipBcrypt: true, BatchSize: 50, MaxDays: 30})
-	users, err := seed.SeedSocialMesh(10)
-	if err != nil {
-		t.Fatalf("SeedSocialMesh failed: %v", err)
+	users, meshErr := seed.SeedSocialMesh(10)
+	if meshErr != nil {
+		t.Fatalf("SeedSocialMesh failed: %v", meshErr)
 	}
-	if _, err := seed.SeedSanctumsWithDistribution(users, 5); err != nil {
-		t.Fatalf("SeedSanctumsWithDistribution failed: %v", err)
+	if distErr := seed.SeedSanctumsWithDistribution(users, 5); distErr != nil {
+		t.Fatalf("SeedSanctumsWithDistribution failed: %v", distErr)
 	}
 
 	// give DB some time for async writes (if any)

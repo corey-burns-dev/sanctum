@@ -3,6 +3,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -87,7 +88,17 @@ func login(host, email, password string) (string, error) {
 	}
 	body, _ := json.Marshal(payload)
 
-	resp, err := http.Post(loginURL, "application/json", bytes.NewBuffer(body))
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "POST", loginURL, bytes.NewBuffer(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -109,10 +120,16 @@ func login(host, email, password string) (string, error) {
 
 func getTicket(host, token string) (string, error) {
 	ticketURL := fmt.Sprintf("http://%s/api/ws/ticket", host)
-	req, _ := http.NewRequest("POST", ticketURL, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "POST", ticketURL, nil)
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err

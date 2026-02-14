@@ -15,7 +15,10 @@ var testDB *gorm.DB
 
 func TestMain(m *testing.M) {
 	// Set environment to test
-	os.Setenv("APP_ENV", "test")
+	if err := os.Setenv("APP_ENV", "test"); err != nil {
+		log.Printf("Failed to set APP_ENV: %v", err)
+		os.Exit(1)
+	}
 
 	cfg, err := config.LoadConfig()
 	if err != nil {

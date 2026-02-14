@@ -131,18 +131,18 @@ func TestUploadAndServeImage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create form file: %v", err)
 	}
-	if _, err := part.Write(makeTestPNG(t)); err != nil {
-		t.Fatalf("write image bytes: %v", err)
+	if _, writeErr := part.Write(makeTestPNG(t)); writeErr != nil {
+		t.Fatalf("write image bytes: %v", writeErr)
 	}
-	if err := writer.Close(); err != nil {
-		t.Fatalf("close writer: %v", err)
+	if closeErr := writer.Close(); closeErr != nil {
+		t.Fatalf("close writer: %v", closeErr)
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/api/images/upload", &body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatalf("upload request failed: %v", err)
+	resp, reqErr := app.Test(req)
+	if reqErr != nil {
+		t.Fatalf("upload request failed: %v", reqErr)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
@@ -150,8 +150,8 @@ func TestUploadAndServeImage(t *testing.T) {
 	}
 
 	var uploaded ImageUploadResponse
-	if err := json.NewDecoder(resp.Body).Decode(&uploaded); err != nil {
-		t.Fatalf("decode upload response: %v", err)
+	if decodeErr := json.NewDecoder(resp.Body).Decode(&uploaded); decodeErr != nil {
+		t.Fatalf("decode upload response: %v", decodeErr)
 	}
 	if uploaded.Hash == "" || uploaded.URL == "" {
 		t.Fatalf("unexpected upload response: %+v", uploaded)

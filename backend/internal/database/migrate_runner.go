@@ -14,6 +14,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// MigrationStore defines the interface for tracking and applying migrations.
 type MigrationStore interface {
 	GetAppliedMigrations(ctx context.Context) ([]int, error)
 	ApplyMigration(ctx context.Context, version int, name, sql string) error
@@ -24,16 +25,19 @@ type migrationStore struct {
 	db *gorm.DB
 }
 
+// MigrationLog represents a record of an applied migration in the database.
 type MigrationLog struct {
 	Version   int       `gorm:"primaryKey;autoIncrement:false"`
 	Name      string    `gorm:"size:255"`
 	AppliedAt time.Time `gorm:"autoCreateTime"`
 }
 
+// TableName returns the database table name for MigrationLog.
 func (MigrationLog) TableName() string {
 	return "migration_logs"
 }
 
+// NewMigrationStore creates a new MigrationStore instance.
 func NewMigrationStore(db *gorm.DB) MigrationStore {
 	return &migrationStore{db: db}
 }
@@ -78,6 +82,7 @@ func (s *migrationStore) RemoveMigration(ctx context.Context, version int) error
 	return nil
 }
 
+// RunMigrations ensures the migration log table exists and applies all pending migrations.
 func RunMigrations(ctx context.Context, db *gorm.DB) error {
 	const ensureMigrationLogTableSQL = `
 CREATE TABLE IF NOT EXISTS migration_logs (
@@ -149,6 +154,7 @@ func validateAppliedVersions(applied []int, registered []Migration) error {
 	)
 }
 
+// RollbackMigration reverts a specific migration by version number.
 func RollbackMigration(ctx context.Context, db *gorm.DB, version int) error {
 	store := NewMigrationStore(db)
 	m := GetMigrationByVersion(version)

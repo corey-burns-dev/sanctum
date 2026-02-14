@@ -29,7 +29,6 @@ type Factory struct {
 func NewFactory(db *gorm.DB, opts SeedOptions) *Factory {
 	// seed gofakeit for richer content
 	gofakeit.Seed(time.Now().UnixNano())
-	rand.Seed(time.Now().UnixNano())
 	return &Factory{db: db, opts: opts, nextID: 1000}
 }
 
@@ -48,6 +47,7 @@ func (f *Factory) BuildPostWithTemplate(user *models.User, postType string, over
 	if maxDays <= 0 {
 		maxDays = 90
 	}
+	// #nosec G404: Non-cryptographic randomness is acceptable for seeding test data
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	daysBack := r.Intn(maxDays)
 	hoursBack := r.Intn(24)
@@ -169,6 +169,7 @@ func (f *Factory) CreatePostWithTemplate(user *models.User, postType string, ove
 		maxDays = 90
 	}
 	// #nosec G404: acceptable for seeding
+	// #nosec G404: Non-cryptographic randomness is acceptable for seeding test data
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	daysBack := r.Intn(maxDays)
 	hoursBack := r.Intn(24)

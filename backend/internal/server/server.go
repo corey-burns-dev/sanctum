@@ -565,13 +565,13 @@ func (s *Server) AuthRequired() fiber.Handler {
 				if parseErr == nil {
 					userID = uint(parsed)
 					ticketValid = true
-				// Cache the consumed ticket in-process for 10s to allow
-				// Fiber's websocket upgrade multi-pass handshake to succeed.
-				s.consumedTicketsMu.Lock()
-				if s.consumedTickets != nil {
-					s.consumedTickets[ticket] = consumedTicketEntry{userID: userID, consumeAt: time.Now()}
-				}
-				s.consumedTicketsMu.Unlock()
+					// Cache the consumed ticket in-process for 10s to allow
+					// Fiber's websocket upgrade multi-pass handshake to succeed.
+					s.consumedTicketsMu.Lock()
+					if s.consumedTickets != nil {
+						s.consumedTickets[ticket] = consumedTicketEntry{userID: userID, consumeAt: time.Now()}
+					}
+					s.consumedTicketsMu.Unlock()
 				}
 			} else if s.consumedTickets != nil {
 				// Ticket not in Redis -- check in-process cache for multi-pass handshake

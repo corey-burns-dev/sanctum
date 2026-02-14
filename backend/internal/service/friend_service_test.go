@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"sanctum/internal/models"
@@ -116,8 +117,8 @@ func TestFriendServiceSendFriendRequestSelf(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected validation error")
 	}
-	appErr, ok := err.(*models.AppError)
-	if !ok || appErr.Code != "VALIDATION_ERROR" {
+	var appErr *models.AppError
+	if !errors.As(err, &appErr) || appErr.Code != "VALIDATION_ERROR" {
 		t.Fatalf("expected validation app error, got %#v", err)
 	}
 }
@@ -138,8 +139,8 @@ func TestFriendServiceAcceptUnauthorized(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected unauthorized error")
 	}
-	appErr, ok := err.(*models.AppError)
-	if !ok || appErr.Code != "UNAUTHORIZED" {
+	var appErr *models.AppError
+	if !errors.As(err, &appErr) || appErr.Code != "UNAUTHORIZED" {
 		t.Fatalf("expected unauthorized app error, got %#v", err)
 	}
 }
@@ -158,8 +159,8 @@ func TestFriendServiceRemoveFriendNotAccepted(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected not-found error")
 	}
-	appErr, ok := err.(*models.AppError)
-	if !ok || appErr.Code != "NOT_FOUND" {
+	var appErr *models.AppError
+	if !errors.As(err, &appErr) || appErr.Code != "NOT_FOUND" {
 		t.Fatalf("expected not-found app error, got %#v", err)
 	}
 }

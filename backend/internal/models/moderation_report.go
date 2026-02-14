@@ -2,12 +2,14 @@ package models
 
 import "time"
 
+// Report target types
 const (
 	ReportTargetPost    = "post"
 	ReportTargetMessage = "message"
 	ReportTargetUser    = "user"
 )
 
+// Report status types
 const (
 	ReportStatusOpen      = "open"
 	ReportStatusResolved  = "resolved"
@@ -35,6 +37,7 @@ type ModerationReport struct {
 	ResolvedByUser *User `gorm:"foreignKey:ResolvedByUserID" json:"resolved_by_user,omitempty"`
 }
 
+// TableName returns the database table name for ModerationReport.
 func (ModerationReport) TableName() string {
 	return "moderation_reports"
 }

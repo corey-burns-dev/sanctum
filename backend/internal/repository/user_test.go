@@ -43,7 +43,7 @@ func TestUserRepository_Integration(t *testing.T) {
 			Email:    email,
 			Password: "hashedpassword",
 		}
-		repo.Create(ctx, user)
+		require.NoError(t, repo.Create(ctx, user))
 
 		byEmail, err := repo.GetByEmail(ctx, email)
 		assert.NoError(t, err)
@@ -61,16 +61,16 @@ func TestUserRepository_Integration(t *testing.T) {
 			Email:    fmt.Sprintf("posts_%d@example.com", ts),
 			Password: "hashedpassword",
 		}
-		repo.Create(ctx, user)
+		require.NoError(t, repo.Create(ctx, user))
 
 		// Create some posts
 		postRepo := NewPostRepository(testDB)
 		for i := 1; i <= 3; i++ {
-			postRepo.Create(ctx, &models.Post{
+			require.NoError(t, postRepo.Create(ctx, &models.Post{
 				Title:   fmt.Sprintf("Post %d", i),
 				Content: "Content",
 				UserID:  user.ID,
-			})
+			}))
 		}
 
 		fetched, err := repo.GetByIDWithPosts(ctx, user.ID, 2)
@@ -86,13 +86,14 @@ func TestUserRepository_Integration(t *testing.T) {
 			Email:    fmt.Sprintf("upd_%d@example.com", ts),
 			Password: "hashedpassword",
 		}
-		repo.Create(ctx, user)
+		require.NoError(t, repo.Create(ctx, user))
 
 		user.Bio = "New Bio"
 		err := repo.Update(ctx, user)
 		assert.NoError(t, err)
 
-		fetched, _ := repo.GetByID(ctx, user.ID)
+		fetched, err := repo.GetByID(ctx, user.ID)
+		assert.NoError(t, err)
 		assert.Equal(t, "New Bio", fetched.Bio)
 
 		err = repo.Delete(ctx, user.ID)

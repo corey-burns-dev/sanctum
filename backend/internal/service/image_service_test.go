@@ -275,13 +275,17 @@ func tinyPNG(t *testing.T, w, h int) []byte {
 func noisyPNG(t *testing.T, w, h int) []byte {
 	t.Helper()
 	src := rand.NewSource(42)
+	// #nosec G404: weak random is fine for test image generation
 	rng := rand.New(src)
 	img := image.NewRGBA(image.Rect(0, 0, w, h))
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
 			img.SetRGBA(x, y, color.RGBA{
+				// #nosec G115: Intn(256) is safe for uint8
 				R: uint8(rng.Intn(256)),
+				// #nosec G115
 				G: uint8(rng.Intn(256)),
+				// #nosec G115
 				B: uint8(rng.Intn(256)),
 				A: 255,
 			})
@@ -299,6 +303,7 @@ func transparentPNG(t *testing.T, w, h int) []byte {
 	img := image.NewRGBA(image.Rect(0, 0, w, h))
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
+			// #nosec G115: modulo 255 is safe for uint8
 			img.SetRGBA(x, y, color.RGBA{R: 255, G: 0, B: 0, A: uint8((x + y) % 255)})
 		}
 	}

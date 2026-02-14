@@ -35,7 +35,7 @@ func (s *Server) AddMessageReaction(c *fiber.Ctx) error {
 	var req struct {
 		Emoji string `json:"emoji"`
 	}
-	if err := c.BodyParser(&req); err != nil {
+	if bodyErr := c.BodyParser(&req); bodyErr != nil {
 		return models.RespondWithError(c, fiber.StatusBadRequest,
 			models.NewValidationError("Invalid request body"))
 	}
@@ -45,28 +45,28 @@ func (s *Server) AddMessageReaction(c *fiber.Ctx) error {
 			models.NewValidationError("emoji is required"))
 	}
 
-	if _, err := s.chatSvc().GetConversationForUser(ctx, convID, userID); err != nil {
+	if _, convErr := s.chatSvc().GetConversationForUser(ctx, convID, userID); convErr != nil {
 		status := fiber.StatusForbidden
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(convErr, gorm.ErrRecordNotFound) {
 			status = fiber.StatusNotFound
 		}
-		return models.RespondWithError(c, status, err)
+		return models.RespondWithError(c, status, convErr)
 	}
 
 	var message models.Message
-	if err := s.db.WithContext(ctx).
+	if dbErr := s.db.WithContext(ctx).
 		Select("id", "conversation_id").
 		Where("id = ? AND conversation_id = ?", messageID, convID).
-		First(&message).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		First(&message).Error; dbErr != nil {
+		if errors.Is(dbErr, gorm.ErrRecordNotFound) {
 			return models.RespondWithError(c, fiber.StatusNotFound, models.NewNotFoundError("Message", messageID))
 		}
-		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+		return models.RespondWithError(c, fiber.StatusInternalServerError, dbErr)
 	}
 
 	reaction := models.MessageReaction{MessageID: messageID, UserID: userID, Emoji: emoji}
-	if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&reaction).Error; err != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	if createErr := s.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&reaction).Error; createErr != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, createErr)
 	}
 
 	summary, err := s.getMessageReactionSummary(ctx, messageID, userID)
@@ -111,23 +111,23 @@ func (s *Server) RemoveMessageReaction(c *fiber.Ctx) error {
 			models.NewValidationError("emoji query parameter is required"))
 	}
 
-	if _, err := s.chatSvc().GetConversationForUser(ctx, convID, userID); err != nil {
+	if _, convErr := s.chatSvc().GetConversationForUser(ctx, convID, userID); convErr != nil {
 		status := fiber.StatusForbidden
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(convErr, gorm.ErrRecordNotFound) {
 			status = fiber.StatusNotFound
 		}
-		return models.RespondWithError(c, status, err)
+		return models.RespondWithError(c, status, convErr)
 	}
 
-	if err := s.db.WithContext(ctx).
+	if deleteErr := s.db.WithContext(ctx).
 		Where("message_id = ? AND user_id = ? AND emoji = ?", messageID, userID, emoji).
-		Delete(&models.MessageReaction{}).Error; err != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+		Delete(&models.MessageReaction{}).Error; deleteErr != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, deleteErr)
 	}
 
-	summary, err := s.getMessageReactionSummary(ctx, messageID, userID)
-	if err != nil {
-		return models.RespondWithError(c, fiber.StatusInternalServerError, err)
+	summary, summaryErr := s.getMessageReactionSummary(ctx, messageID, userID)
+	if summaryErr != nil {
+		return models.RespondWithError(c, fiber.StatusInternalServerError, summaryErr)
 	}
 
 	if s.chatHub != nil {

@@ -51,6 +51,7 @@ func TestGetMyMentions(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/me/mentions", nil)
 		resp, _ := app.Test(req)
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("expected 200, got %d", resp.StatusCode)
 		}
@@ -67,8 +68,11 @@ func TestGetMyMentions(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/users/me/mentions", nil)
 		resp, _ := app.Test(req)
+		defer func() { _ = resp.Body.Close() }()
 		var mentions []models.MessageMention
-		json.NewDecoder(resp.Body).Decode(&mentions)
+		if err := json.NewDecoder(resp.Body).Decode(&mentions); err != nil {
+			t.Fatalf("decode mentions: %v", err)
+		}
 		if len(mentions) != 1 {
 			t.Errorf("expected 1 mention, got %d", len(mentions))
 		}

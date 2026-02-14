@@ -3,10 +3,10 @@ package seed
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"math"
 	"math/rand"
+	"os"
 	"strings"
 	"time"
 
@@ -136,17 +136,18 @@ func categoryOverrideForSlug(slug string, r *rand.Rand) func(*models.Post) {
 // urlQueryEscape provides a minimal placeholder for escaping spaces to +
 func urlQueryEscape(s string) string {
 	// very small escape: replace spaces with + and remove apostrophes
-	out := ""
+	var b strings.Builder
 	for _, r := range s {
-		if r == ' ' {
-			out += "+"
-		} else if r == '\'' {
+		switch r {
+		case ' ':
+			b.WriteByte('+')
+		case '\'':
 			// skip
-		} else {
-			out += string(r)
+		default:
+			b.WriteRune(r)
 		}
 	}
-	return out
+	return b.String()
 }
 
 // computeCounts converts a total count and fractional distribution into
@@ -188,12 +189,11 @@ func NewSeeder(db *gorm.DB, opts SeedOptions) *Seeder {
 	}
 }
 
-// parseCountsFile reads a JSON file mapping sanctum slug to desired counts.
-// Example shape: { "pc-gaming": { "total": 10, "text":4, "link":4, "video":2 } }
 // ParseCountsFile reads a JSON file mapping sanctum slug to desired counts.
 // Example shape: { "pc-gaming": { "total": 10, "text":4, "link":4, "video":2 } }
 func ParseCountsFile(path string) (map[string]map[string]int, error) {
-	b, err := ioutil.ReadFile(path)
+	// #nosec G304: path comes from CLI flags in a dev tool
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -224,6 +224,7 @@ func (s *Seeder) SeedSanctumWithExactCounts(users []*models.User, sanctum *model
 		return fmt.Errorf("no counts provided for sanctum %s", sanctum.Slug)
 	}
 
+	// #nosec G404: Non-cryptographic randomness is acceptable for seeding test data
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	pickUser := func() *models.User { return users[r.Intn(len(users))] }
 
@@ -318,6 +319,7 @@ func (s *Seeder) SeedSocialMesh(userCount int) ([]*models.User, error) {
 
 	// Friendships
 	// #nosec G404: Non-cryptographic randomness is acceptable for seeding test data
+	// #nosec G404: Non-cryptographic randomness is acceptable for seeding test data
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	existingFriendships := make(map[string]bool)
 	for _, u1 := range users {
@@ -352,6 +354,7 @@ func (s *Seeder) SeedSocialMesh(userCount int) ([]*models.User, error) {
 func (s *Seeder) SeedEngagement(users []*models.User, postCount int) ([]*models.Post, error) {
 	log.Printf("🔥 Seeding engagement for %d posts...", postCount)
 	posts := make([]*models.Post, 0, postCount)
+	// #nosec G404: Non-cryptographic randomness is acceptable for seeding test data
 	// #nosec G404: Non-cryptographic randomness is acceptable for seeding test data
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -391,6 +394,7 @@ func (s *Seeder) SeedEngagement(users []*models.User, postCount int) ([]*models.
 func (s *Seeder) SeedActiveGames(users []*models.User) error {
 	log.Println("🎮 Seeding active games...")
 	// #nosec G404: Non-cryptographic randomness is acceptable for seeding test data
+	// #nosec G404: Non-cryptographic randomness is acceptable for seeding test data
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	gameTypes := []models.GameType{models.TicTacToe, models.ConnectFour}
@@ -424,6 +428,7 @@ func (s *Seeder) SeedSanctumWithDistributionSingle(users []*models.User, sanctum
 	}
 	textCount, mediaCount, linkCount, videoCount := computeCounts(countPerSanctum, dist)
 
+	// #nosec G404: Non-cryptographic randomness is acceptable for seeding test data
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	pickUser := func() *models.User { return users[r.Intn(len(users))] }
 
@@ -486,6 +491,7 @@ func (s *Seeder) SeedSanctumWithDistributionSingle(users []*models.User, sanctum
 func (s *Seeder) SeedDMs(users []*models.User) error {
 	log.Println("💬 Seeding DM history...")
 	// #nosec G404: Non-cryptographic randomness is acceptable for seeding test data
+	// #nosec G404: Non-cryptographic randomness is acceptable for seeding test data
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	for i := 0; i < 10; i++ {
@@ -526,6 +532,7 @@ func (s *Seeder) SeedSanctumPosts(users []*models.User) error {
 		return err
 	}
 
+	// #nosec G404: Non-cryptographic randomness is acceptable for seeding test data
 	// #nosec G404: Non-cryptographic randomness is acceptable for seeding test data
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -588,6 +595,7 @@ func (s *Seeder) SeedSanctumsWithDistribution(users []*models.User, countPerSanc
 		}
 		textCount, mediaCount, linkCount, videoCount := computeCounts(countPerSanctum, dist)
 
+		// #nosec G404: Non-cryptographic randomness is acceptable for seeding test data
 		// #nosec G404: Non-cryptographic randomness is acceptable for seeding test data
 		r := rand.New(rand.NewSource(time.Now().UnixNano()))
 

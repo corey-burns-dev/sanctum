@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"strings"
-	"time"
 	"unicode"
 
 	"sanctum/internal/models"
@@ -127,53 +126,6 @@ func (s *Server) isBannedByUserID(ctx context.Context, userID uint) (bool, error
 	return user.IsBanned, nil
 }
 
-func (s *Server) areUsersBlocked(ctx context.Context, userID, otherUserID uint) (bool, error) {
-	if s.db == nil {
-		return false, nil
-	}
-	var count int64
-	if err := s.db.WithContext(ctx).
-		Model(&models.UserBlock{}).
-		Where(
-			"(blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)",
-			userID, otherUserID, otherUserID, userID,
-		).
-		Count(&count).Error; err != nil {
-		if isSchemaMissingError(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	return count > 0, nil
-}
-
-func (s *Server) isUserMutedInChatroom(ctx context.Context, roomID, userID uint) (bool, error) {
-	if s.db == nil {
-		return false, nil
-	}
-	var mute models.ChatroomMute
-	err := s.db.WithContext(ctx).
-		Where("conversation_id = ? AND user_id = ?", roomID, userID).
-		First(&mute).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return false, nil
-		}
-		if isSchemaMissingError(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	if mute.MutedUntil == nil {
-		return true, nil
-	}
-	return mute.MutedUntil.After(nowUTC()), nil
-}
-
-func nowUTC() time.Time {
-	return time.Now().UTC()
-}
-
 func isSchemaMissingError(err error) bool {
 	if err == nil {
 		return false
@@ -253,13 +205,13 @@ func (s *Server) canManageChatroomModeratorsByUserID(ctx context.Context, userID
 	}
 
 	var conv models.Conversation
-	if err := s.db.WithContext(ctx).
+	if dbErr := s.db.WithContext(ctx).
 		Select("id", "sanctum_id").
-		First(&conv, roomID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		First(&conv, roomID).Error; dbErr != nil {
+		if errors.Is(dbErr, gorm.ErrRecordNotFound) {
 			return false, nil
 		}
-		return false, err
+		return false, dbErr
 	}
 	if conv.SanctumID == nil {
 		return false, nil
@@ -278,19 +230,19 @@ func (s *Server) canModerateChatroomByUserID(ctx context.Context, userID, roomID
 	}
 
 	var conv models.Conversation
-	if err := s.db.WithContext(ctx).
+	if dbErr := s.db.WithContext(ctx).
 		Select("id", "sanctum_id", "created_by").
-		First(&conv, roomID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		First(&conv, roomID).Error; dbErr != nil {
+		if errors.Is(dbErr, gorm.ErrRecordNotFound) {
 			return false, nil
 		}
-		return false, err
+		return false, dbErr
 	}
 
 	if conv.SanctumID != nil {
-		canManage, err := s.canManageSanctumByUserID(ctx, userID, *conv.SanctumID)
-		if err != nil {
-			return false, err
+		canManage, manageErr := s.canManageSanctumByUserID(ctx, userID, *conv.SanctumID)
+		if manageErr != nil {
+			return false, manageErr
 		}
 		if canManage {
 			return true, nil
