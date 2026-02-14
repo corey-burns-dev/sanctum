@@ -707,3 +707,20 @@ deps-freshness:
 	@echo "$(BLUE)Checking backend outdated dependencies...$(NC)"
 	cd backend && $(GO) list -u -m -f '{{if .Update}}{{.Path}} {{.Version}} -> {{.Update.Version}}{{end}}' all
 	@echo "$(GREEN)✓ Freshness check complete$(NC)"
+# Perf targets (added by perf agent)
+.PHONY: perf-preview perf-harness perf-ws perf-e2e perf-e2e-local
+
+perf-preview:
+cd frontend && bun run build && bun run preview -- --host
+
+perf-harness:
+@echo "Open http://localhost:4173/perf/chat or http://localhost:4173/perf/chat?wsFeed=1"
+
+perf-ws:
+node scripts/ws-simulate-simple.js
+
+perf-e2e:
+PERF_TEST_ONLY=true cd frontend && bun run test:e2e -- --grep "chat stress smoke"
+
+perf-e2e-local:
+PERF_TEST_ONLY=true cd frontend && bun run test:e2e -- --grep "chat stress smoke"
