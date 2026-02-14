@@ -8,6 +8,8 @@ K6_DOCKER_IMAGE ?= grafana/k6:0.49.0
 ENVIRONMENT ?= dev
 ifeq ($(ENVIRONMENT),prod)
 	COMPOSE_FILES := -f compose.yml -f compose.prod.yml
+else ifeq ($(ENVIRONMENT),stage)
+	COMPOSE_FILES := -f compose.yml -f compose.stage.yml
 else ifeq ($(ENVIRONMENT),stress)
 	COMPOSE_FILES := -f compose.yml -f compose.prod.yml -f compose.stress.yml
 else
