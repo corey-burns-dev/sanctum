@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
 import {
-  ADMIN_STATE_PATH,
-  readTokenFromStorageState,
-  USER_STATE_PATH,
+    ADMIN_STATE_PATH,
+    readTokenFromStorageState,
+    USER_STATE_PATH,
 } from './fixtures/auth'
 import { createSanctumRequest, uniqueSlug } from './utils/api'
 
@@ -18,12 +18,11 @@ test.describe('Sanctum admin approve flow', () => {
     const slug = uniqueSlug('e2e-approve')
     const name = `E2E Approve ${slug}`
 
-    const createResponse = await createSanctumRequest(request, userToken, {
+    await createSanctumRequest(request, userToken, {
       requested_name: name,
       requested_slug: slug,
       reason: 'Needs approval',
     })
-    expect(createResponse.ok()).toBeTruthy()
 
     await page.goto('/admin/sanctum-requests')
 

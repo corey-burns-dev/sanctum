@@ -19,12 +19,26 @@ export async function createSanctumRequest(
   token: string,
   payload: SanctumRequestPayload
 ) {
-  return request.post(`${API_BASE}/sanctums/requests`, {
+  const res = await request.post(`${API_BASE}/sanctums/requests`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
     data: payload,
   })
+
+  if (!res.ok()) {
+    let body: string
+    try {
+      body = await res.text()
+    } catch (e) {
+      body = `<unable to read body: ${String(e)}>`
+    }
+    throw new Error(
+      `createSanctumRequest failed: status=${res.status()} body=${body}`
+    )
+  }
+
+  return res
 }
 
 export async function listAdminRequests(
