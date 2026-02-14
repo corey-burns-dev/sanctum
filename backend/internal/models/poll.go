@@ -6,7 +6,7 @@ import "time"
 // Poll represents a poll attached to a post.
 type Poll struct {
 	ID               uint         `gorm:"primaryKey" json:"id"`
-	PostID           uint         `gorm:"uniqueIndex;not null" json:"post_id"`
+	PostID           uint         `gorm:"uniqueIndex:polls_post_id_key;not null" json:"post_id"`
 	Post             *Post        `gorm:"foreignKey:PostID" json:"-"`
 	Question         string       `gorm:"type:text;not null" json:"question"`
 	Options          []PollOption `gorm:"foreignKey:PollID" json:"options,omitempty"`
