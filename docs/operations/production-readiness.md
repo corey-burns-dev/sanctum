@@ -457,6 +457,7 @@ Strict ticket-based authentication for all `/api/ws/*` endpoints.
 
 ## 📚 Related Documentation
 
+- **Cloudflare Setup:** [operations/cloudflare-setup.md](cloudflare-setup.md)
 - **Stress Testing:** [operations/stress-testing.md](stress-testing.md)
 - **CI Runbook:** [operations/runbooks/ci-runbook.md](runbooks/ci-runbook.md)
 - **Rollback Runbook:** [operations/runbooks/rollback-runbook.md](runbooks/rollback-runbook.md)
