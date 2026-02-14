@@ -1,0 +1,14 @@
+services:
+  app:
+    environment:
+      - DB_NAME=sanctum_test
+      - DB_USER=sanctum_user
+      - DB_PASSWORD=sanctum_password
+      - POSTGRES_USER=sanctum_user
+      - POSTGRES_PASSWORD=sanctum_password
+      - POSTGRES_DB=sanctum_test
+  postgres_test:
+    environment:
+      - POSTGRES_USER=sanctum_user
+      - POSTGRES_PASSWORD=sanctum_password
+      - POSTGRES_DB=sanctum_test

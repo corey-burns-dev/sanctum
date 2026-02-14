@@ -11,7 +11,34 @@ const API_BASE = (
 ).replace(/\/$/, '')
 
 export function uniqueSlug(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  // Produce a slug that matches server validation: 3-24 chars,
+  // lowercase letters, numbers, and hyphens only.
+  const maxLen = 24
+
+  // sanitize prefix to allowed characters
+  let base = (prefix || 's')
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+  // short unique suffix (letters + numbers)
+  const suffixRaw = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+  const suffix = suffixRaw.slice(-6)
+
+  // compute available length for base (leave room for a hyphen)
+  const sep = base ? '-' : ''
+  let avail = maxLen - sep.length - suffix.length
+  if (avail <= 0) {
+    // fallback short base
+    base = 's'
+    avail = maxLen - 1 - suffix.length
+  }
+  if (base.length > avail) base = base.slice(0, avail)
+
+  let candidate = `${base}${base ? '-' : ''}${suffix}`
+  candidate = candidate.replace(/^-+|-+$/g, '')
+  if (candidate.length < 3) candidate = candidate.padEnd(3, 'x')
+  return candidate
 }
 
 export async function createSanctumRequest(

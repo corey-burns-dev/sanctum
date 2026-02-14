@@ -623,6 +623,26 @@ test-frontend:
 	@echo "$(BLUE)Running frontend tests...$(NC)"
 	cd frontend && $(BUN) run test:run
 
+install-githooks:
+	@echo "$(BLUE)Installing repo-managed git hooks into .git/hooks...$(NC)"
+	@if [ ! -d .git ]; then \
+		echo "$(RED).git not found — initialize your repo before installing hooks (git init)$(NC)"; exit 1; \
+	fi
+	@cp -R githooks/* .git/hooks/ || (echo "$(RED)Failed to copy hooks$(NC)"; exit 1)
+	@chmod +x .git/hooks/* || true
+	@echo "$(GREEN)✓ Git hooks installed. Run 'make install-githooks' on each clone.$(NC)"
+
+.PHONY: test-e2e-up test-e2e-down
+test-e2e-up:
+	@echo "$(BLUE)Starting e2e test stack (app -> sanctum_test)...$(NC)"
+	@./scripts/compose.sh -f compose.yml -f compose.override.yml -f compose.e2e.override.yml up -d postgres_test redis app
+	@echo "$(GREEN)✓ e2e stack started$(NC)"
+
+test-e2e-down:
+	@echo "$(BLUE)Stopping e2e test stack...$(NC)"
+	@./scripts/compose.sh -f compose.yml -f compose.override.yml -f compose.e2e.override.yml down
+	@echo "$(GREEN)✓ e2e stack stopped$(NC)"
+
 test-up:
 	$(DOCKER_COMPOSE) $(COMPOSE_FILES) up -d postgres_test redis
 
