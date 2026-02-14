@@ -282,7 +282,7 @@ install:
 # Swagger documentation
 swagger:
 	@echo "$(BLUE)Generating Swagger documentation...$(NC)"
-	cd backend && ~/go/bin/swag init -g cmd/server/main.go --output ./docs
+	cd backend && go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g cmd/server/main.go --output ./docs
 	@echo "$(GREEN)✓ Swagger docs generated$(NC)"
 
 # Environment setup

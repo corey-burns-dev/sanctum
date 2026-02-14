@@ -35,6 +35,9 @@ jobs:
         with:
           bun-version: "1.3.9"
 
+      - name: Generate .env for compose validation
+        run: ./scripts/generate_env.sh
+
       - name: Validate compose (dev)
         run: ./scripts/compose.sh -f compose.yml -f compose.override.yml config
 
