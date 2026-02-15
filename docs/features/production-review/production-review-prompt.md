@@ -345,7 +345,7 @@ Issues that:
 
 ### Infrastructure
 
-- `compose.yml`, `compose.prod.yml` - Docker Compose setup
+- `compose.yml` - Docker Compose setup (prod overlay removed)
 - `Dockerfile`, `frontend/Dockerfile` - Container builds
 - `.env.example` - Environment configuration template
 - `backend/config.production.example.yml` - Production config

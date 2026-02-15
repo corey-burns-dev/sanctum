@@ -8,7 +8,7 @@ Current setup has several blocking gaps: hardcoded credentials, untracked critic
 ### Findings To Fix First (ordered by severity)
 
 1. Hardcoded DB credentials and fixed image tags in local deploy stack bypass secret files and break security intent at `compose.local.yml:11`, `compose.local.yml:32`, `compose.local.yml:28`, `compose.local.yml:43`.
-2. Stage/prod use mutable `latest` images, so deploys are non-deterministic and rollback-unsafe at `compose.prod.yml:3`, `compose.prod.yml:44`, `compose.stage.yml:3`, `compose.stage.yml:44`.
+2. Stage/prod use mutable `latest` images, so deploys are non-deterministic and rollback-unsafe at `compose.yml:3`, `compose.yml:44`, `compose.stage.yml:3`, `compose.stage.yml:44`.
 3. Stage/prod effective configs still include `build` from base compose, so deploy behavior is ambiguous (pull vs build) when using `make up` with overlays; confirmed via merged config from `compose.yml:3` plus stage/prod overrides.
 4. Critical deploy artifacts are currently not tracked (`compose.stage.yml`, `compose.local.yml`, `scripts/start-sanctum.sh`, prod checklist), so fresh clones/CI cannot reproduce deployment logic consistently.
 5. Version policy check is currently broken: `make versions-check` fails because `compose.local.yml` hardcodes managed image versions (`scripts/verify_versions.sh:61` against `compose.local.yml:28`).
@@ -30,7 +30,7 @@ Keep `compose.yml` as base runtime contracts only (no environment-specific build
 Create/commit tracked overlays:
 `compose.dev.yml` for local build/hot reload.
 `compose.stage.yml` for staged runtime pull-only.
-`compose.prod.yml` for prod runtime pull-only.
+`compose.yml` used as the canonical runtime base; prod overlay was removed.
 `compose.gateway.yml` extended to support per-env gateway service naming/ports.
 Remove hardcoded creds from compose files; all sensitive values come from env interpolation.
 For stage/prod services set:

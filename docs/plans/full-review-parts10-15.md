@@ -47,8 +47,8 @@ return partial data plus `warnings[]` entries.
 8. Update frontend type:
 `frontend/src/api/types.ts` (`AdminUserDetailResponse.warnings?: string[]`).
 
-### 4) MEDIUM-4: Resource Limits in `compose.prod.yml`
-1. Add `deploy.resources.limits` to each prod service in `compose.prod.yml`.
+### 4) MEDIUM-4: Resource Limits in production compose overrides
+1. Add `deploy.resources.limits` to each prod service in the production compose overrides.
 2. Use balanced defaults:
 `app: 1.00 CPU / 768M`,
 `postgres: 1.50 CPU / 1G`,
@@ -92,7 +92,7 @@ admin user detail returns warnings on supplementary query failures.
 `frontend/src/api/client.test.ts` adds refresh bootstrap/retry behavior.
 6. Frontend admin detail rendering test (or component-level assertion) for warning banner display.
 7. Compose validation:
-`docker compose -f compose.yml -f compose.prod.yml config` passes with new limits.
+`docker compose -f compose.yml config` passes with new limits (prod overlay removed).
 
 ## Rollout Order
 1. PR-1: `MEDIUM-3` WS atomic ticket fix + tests.

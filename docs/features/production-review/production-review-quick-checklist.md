@@ -109,7 +109,7 @@ Use this condensed checklist to guide your production readiness review.
 4. `backend/internal/database/migrations/`
 5. `backend/cmd/server/main.go`
 6. `.env`, `.gitignore`
-7. `compose.yml`, `compose.prod.yml`
+7. `compose.yml` (prod overlay removed)
 
 ### High Priority
 

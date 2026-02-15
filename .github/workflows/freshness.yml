@@ -41,8 +41,7 @@ jobs:
       - name: Validate compose (dev)
         run: ./scripts/compose.sh -f compose.yml -f compose.override.yml config
 
-      - name: Validate compose (prod)
-        run: ./scripts/compose.sh -f compose.yml -f compose.prod.yml config
+      # Prod compose validation removed (compose.prod.yml not present)
 
       - name: Verify version catalog consistency
         run: make versions-check

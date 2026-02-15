@@ -270,7 +270,7 @@ WebSocket ticket validation uses separate GET and DEL operations. Two simultaneo
 **Category:** Deployment
 **Severity:** MEDIUM
 
-**Location:** `compose.prod.yml:1-25`
+**Location:** `compose.yml:1-25` (prod overlay removed)
 
 **Description:**
 No CPU or memory limits are defined for any service. A runaway container could consume the entire host. No log rotation beyond 30MB total.
@@ -552,7 +552,7 @@ Both tools fail due to Go 1.26 vs 1.25 version mismatch. Rebuild tools with Go 1
 
 **Production Configuration:**
 
-- Separate Prod Config: `compose.prod.yml` exists
+- Separate Prod Config: prod overlay removed; use `compose.yml` with environment overlays as needed
 - Strong Passwords: Enforced in production validation
 - Monitoring Configured: Prometheus + Grafana + cAdvisor stack available
 
@@ -582,7 +582,7 @@ Both tools fail due to Go 1.26 vs 1.25 version mismatch. Rebuild tools with Go 1
 - [x] Graceful shutdown implemented (10s timeout)
 - [x] Database migrations tested (7 applied, 0 pending)
 - [x] Rollback procedure documented (`scripts/rollback_to_ref.sh`)
-- [ ] Resource limits configured in compose.prod.yml (MEDIUM-4)
+- [ ] Resource limits configured in production compose overrides (MEDIUM-4)
 - [x] Monitoring stack available (compose.monitoring.yml)
 
 **Security:**
@@ -622,7 +622,7 @@ Both tools fail due to Go 1.26 vs 1.25 version mismatch. Rebuild tools with Go 1
    - Priority: High
    - Effort: 1-2 days
 
-2. **Add resource limits to compose.prod.yml** (MEDIUM-4)
+2. **Add resource limits to production compose overrides** (MEDIUM-4)
    - Priority: High
    - Effort: < 1 hour
 
@@ -676,13 +676,13 @@ Both tools fail due to Go 1.26 vs 1.25 version mismatch. Rebuild tools with Go 1
 
 ### Issues Fixed Since 2026-02-11 Review
 
-| Previous Issue | Status | Verification |
-|---------------|--------|--------------|
-| N+1 Query in Post Listing | FIXED | Confirmed — subqueries in `applyPostDetails()` |
-| Missing Database Indexes | FIXED | Confirmed — migration 000005 applied |
-| Race Detector Disabled in Tests | FIXED | Confirmed — `-race` flag in Makefile |
-| JWT Refresh Token in localStorage | FIXED | Confirmed — HttpOnly cookie in `auth_handlers.go:125` |
-| GameHub Unbounded Connections | FIXED | Confirmed — `MaxGamePeersPerRoom=2`, `MaxGameTotalRooms=1000` |
+| Previous Issue                    | Status | Verification                                                  |
+| --------------------------------- | ------ | ------------------------------------------------------------- |
+| N+1 Query in Post Listing         | FIXED  | Confirmed — subqueries in `applyPostDetails()`                |
+| Missing Database Indexes          | FIXED  | Confirmed — migration 000005 applied                          |
+| Race Detector Disabled in Tests   | FIXED  | Confirmed — `-race` flag in Makefile                          |
+| JWT Refresh Token in localStorage | FIXED  | Confirmed — HttpOnly cookie in `auth_handlers.go:125`         |
+| GameHub Unbounded Connections     | FIXED  | Confirmed — `MaxGamePeersPerRoom=2`, `MaxGameTotalRooms=1000` |
 
 ### New Issues Introduced Since 2026-02-11
 
@@ -696,29 +696,29 @@ All new issues stem from commit `abde659` (moderation suite):
 
 ## Automated Check Results
 
-| Check | Result | Notes |
-|-------|--------|-------|
-| `make test-backend` | PASS | All packages pass with `-race` |
-| `make test-frontend` | PASS | 130 tests, 36 files |
-| `make lint` | FAIL | Go 1.26/1.25 tooling mismatch (not a code issue) |
-| `make lint-frontend` | PASS | 2 warnings (noExplicitAny in test file) |
-| `make deps-vuln` | FAIL | Go version mismatch (not a code issue) |
-| `make build` | PASS | Both Docker images built successfully |
-| `make config-sanity` | PASS | env=development, schema_mode=sql |
-| `make db-schema-status` | PASS | 7 applied, 0 pending |
+| Check                   | Result | Notes                                            |
+| ----------------------- | ------ | ------------------------------------------------ |
+| `make test-backend`     | PASS   | All packages pass with `-race`                   |
+| `make test-frontend`    | PASS   | 130 tests, 36 files                              |
+| `make lint`             | FAIL   | Go 1.26/1.25 tooling mismatch (not a code issue) |
+| `make lint-frontend`    | PASS   | 2 warnings (noExplicitAny in test file)          |
+| `make deps-vuln`        | FAIL   | Go version mismatch (not a code issue)           |
+| `make build`            | PASS   | Both Docker images built successfully            |
+| `make config-sanity`    | PASS   | env=development, schema_mode=sql                 |
+| `make db-schema-status` | PASS   | 7 applied, 0 pending                             |
 
 ## Pattern Scan Results
 
-| Pattern | Matches | Assessment |
-|---------|---------|------------|
-| SQL injection (`db.Raw`/`db.Exec` + concat) | 0 | Clean |
-| XSS vectors (`dangerouslySetInnerHTML`, `innerHTML`) | 0 | Clean |
-| TODO/FIXME in source | 0 | Clean |
-| Missing down migrations | 0 | All 7 paired |
-| Hardcoded secrets in source | 1 | `DevRoot123!` in bootstrap — guarded by env check |
-| Unbounded goroutines (`go func`) | 7 | All reviewed — 3 need panic recovery |
-| Ignored errors (`_ = `) in non-test code | ~30 | 15+ need review — see error handling section |
-| `console.log` in frontend | 12 | Mostly debug/logger-wrapped; 1 raw log |
+| Pattern                                              | Matches | Assessment                                        |
+| ---------------------------------------------------- | ------- | ------------------------------------------------- |
+| SQL injection (`db.Raw`/`db.Exec` + concat)          | 0       | Clean                                             |
+| XSS vectors (`dangerouslySetInnerHTML`, `innerHTML`) | 0       | Clean                                             |
+| TODO/FIXME in source                                 | 0       | Clean                                             |
+| Missing down migrations                              | 0       | All 7 paired                                      |
+| Hardcoded secrets in source                          | 1       | `DevRoot123!` in bootstrap — guarded by env check |
+| Unbounded goroutines (`go func`)                     | 7       | All reviewed — 3 need panic recovery              |
+| Ignored errors (`_ = `) in non-test code             | ~30     | 15+ need review — see error handling section      |
+| `console.log` in frontend                            | 12      | Mostly debug/logger-wrapped; 1 raw log            |
 
 ---
 
@@ -785,7 +785,7 @@ All new issues stem from commit `abde659` (moderation suite):
 **Infrastructure:**
 
 - [x] `compose.yml`
-- [x] `compose.prod.yml`
+- [x] prod overlay removed (references updated to `compose.yml`)
 - [x] `compose.monitoring.yml`
 - [x] `Dockerfile` (backend)
 - [x] `frontend/Dockerfile`

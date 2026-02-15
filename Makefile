@@ -7,11 +7,13 @@ K6_DOCKER_IMAGE ?= grafana/k6:0.49.0
 # Environment Orchestration
 ENVIRONMENT ?= dev
 ifeq ($(ENVIRONMENT),prod)
-	COMPOSE_FILES := -f compose.yml -f compose.prod.yml
+	# Prod compose file removed; default to base compose
+	COMPOSE_FILES := -f compose.yml
 else ifeq ($(ENVIRONMENT),stage)
 	COMPOSE_FILES := -f compose.yml -f compose.stage.yml
 else ifeq ($(ENVIRONMENT),stress)
-	COMPOSE_FILES := -f compose.yml -f compose.prod.yml -f compose.stress.yml
+	# Use base compose plus stress overrides
+	COMPOSE_FILES := -f compose.yml -f compose.stress.yml
 else
 	COMPOSE_FILES := -f compose.yml -f compose.override.yml
 endif
@@ -688,9 +690,9 @@ db-reset-dev:
 prod-admin:
 	@if [ -z "$(email)" ]; then echo "Usage: make prod-admin email=user@example.com"; exit 1; fi
 	@echo "$(BLUE)Promoting $(email) to admin in production...$(NC)"
-	@$(DOCKER_COMPOSE) -f compose.yml -f compose.prod.yml exec -T postgres psql -U postgres -d sanctum_db -c "UPDATE users SET is_admin = TRUE WHERE email = '$(email)';"
+	@$(DOCKER_COMPOSE) -f compose.yml exec -T postgres psql -U postgres -d sanctum_db -c "UPDATE users SET is_admin = TRUE WHERE email = '$(email)';"
 	@echo "$(GREEN)✓ User promoted. Current production admins:$(NC)"
-	@$(DOCKER_COMPOSE) -f compose.yml -f compose.prod.yml exec -T postgres psql -U postgres -d sanctum_db -c "SELECT id, username, email, is_admin FROM users WHERE is_admin = TRUE ORDER BY id;"
+	@$(DOCKER_COMPOSE) -f compose.yml exec -T postgres psql -U postgres -d sanctum_db -c "SELECT id, username, email, is_admin FROM users WHERE is_admin = TRUE ORDER BY id;"
 
 # Dependency Management
 deps-install-backend:

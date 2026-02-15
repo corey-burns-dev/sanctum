@@ -33,7 +33,7 @@ scripts/rollback_to_ref.sh <target_ref> --execute
 Execute mode includes:
 
 - `git checkout <target_ref>`
-- `docker compose -f compose.yml -f compose.prod.yml up -d --build`
+- `docker compose -f compose.yml up -d --build`
 - readiness verification via `/health/ready`
 - automatic fallback to the prior ref if readiness fails
 

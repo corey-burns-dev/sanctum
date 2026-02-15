@@ -46,12 +46,12 @@ if ! ${EXECUTE}; then
 
 Dry-run rollback plan:
   git checkout ${TARGET_REF}
-  docker compose -f compose.yml -f compose.prod.yml up -d --build
+  docker compose -f compose.yml up -d --build
   curl -sf http://localhost:8375/health/ready
 
 If health check fails:
   git checkout ${CURRENT_REF}
-  docker compose -f compose.yml -f compose.prod.yml up -d --build
+  docker compose -f compose.yml up -d --build
 EOF
   exit 0
 fi
@@ -64,13 +64,13 @@ fi
 rollback_current() {
   echo "Rollback failed. Restoring previous ref ${CURRENT_REF}."
   git checkout "${CURRENT_REF}"
-  docker compose -f compose.yml -f compose.prod.yml up -d --build
+  docker compose -f compose.yml up -d --build
 }
 
 trap rollback_current ERR
 
 git checkout "${TARGET_REF}"
-docker compose -f compose.yml -f compose.prod.yml up -d --build
+docker compose -f compose.yml up -d --build
 
 echo "Waiting for readiness..."
 for _ in $(seq 1 30); do
