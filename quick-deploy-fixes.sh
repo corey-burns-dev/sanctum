@@ -370,7 +370,7 @@ cat > PRODUCTION_CHECKLIST.md << 'EOF'
 
 - [ ] Configure auto-scaling (if using Kubernetes/ECS)
 
-- [ ] Set up CDN for static assets (CloudFront, Cloudflare, etc.)
+- [ ] Set up CDN for static assets (CloudFront, Fastly, etc.)
 
 ## 🔄 Post-Deployment
 

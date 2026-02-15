@@ -13,7 +13,7 @@ Current setup has several blocking gaps: hardcoded credentials, untracked critic
 4. Critical deploy artifacts are currently not tracked (`compose.stage.yml`, `compose.local.yml`, `scripts/start-sanctum.sh`, prod checklist), so fresh clones/CI cannot reproduce deployment logic consistently.
 5. Version policy check is currently broken: `make versions-check` fails because `compose.local.yml` hardcodes managed image versions (`scripts/verify_versions.sh:61` against `compose.local.yml:28`).
 6. Same-host concurrent env support is not defined; default Compose project naming collides across environments (containers/networks/volumes).
-7. Cloudflared config references a credentials filename that does not match current mounted file naming at `data/cloudflared/config.yaml:2`.
+7. Tunnel config references a credentials filename that does not match current mounted file naming at `data/tunnel/config.yaml:2`.
 8. Production config validation does not enforce DB SSL mode in app runtime (`backend/internal/config/config.go:185`), while sanity script does enforce it (`scripts/config_sanity.sh:65`), causing policy inconsistency.
 9. Secrets on disk are plain files; no permission/preflight enforcement currently exists for deploy scripts (`scripts/start-sanctum.sh:37`).
 
@@ -68,8 +68,8 @@ Record deployed SHA per env in a tracked release note or deployment state file.
 
 6. Gateway/tunnel unification for same-host concurrent envs.
 Use gateway as stable ingress entry for stage/prod.
-Update cloudflared config to map prod hostname to prod gateway port and stage hostname to stage gateway port.
-Fix credentials filename/path consistency for cloudflared config.
+Update tunnel/gateway config to map prod hostname to prod gateway port and stage hostname to stage gateway port.
+Fix credentials filename/path consistency for tunnel config.
 Add health checks for gateway and tunnel services and include them in preflight/smoke checks.
 
 7. Runtime config policy alignment.
