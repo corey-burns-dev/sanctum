@@ -2,6 +2,7 @@ import { request as playwrightRequest } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
 import { Client } from 'pg'
+import { TEST_TIMEOUTS } from './config'
 import { ADMIN_STATE_PATH, AUTH_DIR, USER_STATE_PATH } from './fixtures/auth'
 
 const API_BASE_RAW =
@@ -67,7 +68,7 @@ async function signup(
       lastError = err
       if (attempt < maxAttempts) {
         // exponential backoff with jitter
-        const wait = Math.min(2000 * attempt, 10000) + Math.floor(Math.random() * 200)
+        const wait = Math.min(TEST_TIMEOUTS.RETRY_BASE * attempt, TEST_TIMEOUTS.RETRY_MAX) + Math.floor(Math.random() * 200)
         // eslint-disable-next-line no-console
         console.warn(`signup attempt ${attempt} failed, retrying in ${wait}ms:`, String(err))
         // small delay before retrying
@@ -99,16 +100,16 @@ async function promoteAdmin(userID: number) {
   const configuredDatabase =
     process.env.PGDATABASE || process.env.DB_NAME || process.env.POSTGRES_DB
 
+  // Prefer explicitly configured database, then try common test database names
   const candidates = [
     configuredDatabase,
     'sanctum_test',
     'sanctum',
-    'aichat',
-    'social_media',
-    'postgres',
+    'postgres', // fallback for local development
   ].filter((db): db is string => Boolean(db))
 
   const attemptErrors: string[] = []
+  let warnedAboutFallback = false
 
   for (const database of candidates) {
     const client = new Client({ host, port, user, password, database })
@@ -120,6 +121,14 @@ async function promoteAdmin(userID: number) {
         [userID]
       )
       if ((result.rowCount ?? 0) > 0) {
+        // Warn if we're using a fallback database instead of configured one
+        if (!warnedAboutFallback && database !== configuredDatabase && configuredDatabase) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `⚠️  Using fallback database '${database}' instead of configured '${configuredDatabase}'. ` +
+            `Consider setting PGDATABASE=${database} to avoid this warning.`
+          )
+        }
         await client.end()
         return
       }
@@ -131,7 +140,11 @@ async function promoteAdmin(userID: number) {
   }
 
   throw new Error(
-    `unable to promote e2e admin user ${userID}; tried host=${host} port=${port} user=${user}; databases=${candidates.join(', ')}; errors=[${attemptErrors.join(' | ')}]`
+    `Failed to promote e2e admin user ${userID}. ` +
+    `Tried connecting to databases: ${candidates.join(', ')} ` +
+    `at ${host}:${port} with user=${user}.\n` +
+    `Errors:\n${attemptErrors.map(e => `  - ${e}`).join('\n')}\n\n` +
+    `Hint: Ensure PostgreSQL is running and PGDATABASE environment variable is set correctly.`
   )
 }
 

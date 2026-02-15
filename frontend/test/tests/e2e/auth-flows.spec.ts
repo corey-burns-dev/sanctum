@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 test.describe('Auth flows', () => {
-  test('signup redirects to onboarding', async ({ page }) => {
+  test('signup redirects to onboarding @smoke', async ({ page }) => {
     const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
     const username = `e2eauth${suffix}`.slice(0, 20)
     const email = `e2eauth-${suffix}@example.com`

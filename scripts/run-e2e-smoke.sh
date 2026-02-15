@@ -19,5 +19,8 @@ if bun -v >/dev/null 2>&1; then
   bun run test:e2e:install || true
 fi
 
-echo "Running Playwright smoke tests (grep @smoke, single worker)..."
-bun run test:e2e -- --grep @smoke --workers=1
+echo "Running Playwright smoke tests (grep @smoke)..."
+# Use configurable workers (default: 2 for good balance of speed and stability)
+# Set E2E_WORKERS=1 to force sequential execution if needed
+WORKERS=${E2E_WORKERS:-2}
+bun run test:e2e -- --grep @smoke --workers=$WORKERS

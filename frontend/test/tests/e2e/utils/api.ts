@@ -6,6 +6,7 @@ export interface SanctumRequestPayload {
   reason: string
 }
 
+// Legacy type - kept for backward compatibility
 interface SanctumRequestResponse {
   id: number
   requested_slug: string
@@ -80,10 +81,19 @@ export async function createSanctumRequest(
   return res
 }
 
+export interface MySanctumRequest {
+  id: number
+  requested_slug: string
+  requested_name: string
+  status: 'pending' | 'approved' | 'rejected'
+  reason?: string
+  review_notes?: string
+}
+
 export async function listMySanctumRequests(
   request: APIRequestContext,
   token: string
-): Promise<SanctumRequestResponse[]> {
+): Promise<MySanctumRequest[]> {
   const res = await request.get(`${API_BASE}/sanctums/requests/me`, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -97,7 +107,19 @@ export async function listMySanctumRequests(
     )
   }
 
-  return (await res.json()) as SanctumRequestResponse[]
+  return (await res.json()) as MySanctumRequest[]
+}
+
+/**
+ * Get a specific user sanctum request by slug
+ */
+export async function getMySanctumRequestBySlug(
+  request: APIRequestContext,
+  token: string,
+  slug: string
+): Promise<MySanctumRequest | null> {
+  const requests = await listMySanctumRequests(request, token)
+  return requests.find((r) => r.requested_slug === slug) || null
 }
 
 export async function hasMySanctumRequestBySlug(
@@ -109,16 +131,51 @@ export async function hasMySanctumRequestBySlug(
   return requests.some((item) => item.requested_slug === slug)
 }
 
+export interface AdminSanctumRequest {
+  id: number
+  requested_slug: string
+  requested_name: string
+  status: 'pending' | 'approved' | 'rejected'
+  user_id: number
+  reason?: string
+  review_notes?: string
+}
+
 export async function listAdminRequests(
   request: APIRequestContext,
   token: string,
   status: 'pending' | 'approved' | 'rejected'
-) {
-  return request.get(`${API_BASE}/admin/sanctum-requests?status=${status}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  })
+): Promise<AdminSanctumRequest[]> {
+  const res = await request.get(
+    `${API_BASE}/admin/sanctum-requests?status=${status}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  )
+
+  if (!res.ok()) {
+    const body = await responseBodyOrPlaceholder(res)
+    throw new Error(
+      `listAdminRequests failed: status=${res.status()} body=${body}`
+    )
+  }
+
+  return (await res.json()) as AdminSanctumRequest[]
+}
+
+/**
+ * Get a specific sanctum request by slug from the admin requests list
+ */
+export async function getAdminRequestBySlug(
+  request: APIRequestContext,
+  token: string,
+  slug: string,
+  status: 'pending' | 'approved' | 'rejected'
+): Promise<AdminSanctumRequest | null> {
+  const requests = await listAdminRequests(request, token, status)
+  return requests.find((r) => r.requested_slug === slug) || null
 }
 
 export async function approveSanctumRequest(
@@ -133,4 +190,170 @@ export async function approveSanctumRequest(
     },
     data: { review_notes },
   })
+}
+
+/**
+ * Cleanup Utilities
+ * These functions are used in test cleanup hooks to prevent data accumulation
+ */
+
+/**
+ * Delete a sanctum request by ID
+ * Returns true if deleted, false if not found, throws on other errors
+ */
+export async function deleteSanctumRequest(
+  request: APIRequestContext,
+  token: string,
+  requestId: number
+): Promise<boolean> {
+  const res = await request.delete(`${API_BASE}/sanctums/requests/${requestId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (res.status() === 404) {
+    return false // Already deleted or never existed
+  }
+
+  if (!res.ok()) {
+    const body = await responseBodyOrPlaceholder(res)
+    throw new Error(
+      `deleteSanctumRequest failed: status=${res.status()} body=${body}`
+    )
+  }
+
+  return true
+}
+
+/**
+ * Delete all sanctum requests created by the authenticated user
+ * Useful for cleanup in afterEach hooks
+ */
+export async function deleteAllMySanctumRequests(
+  request: APIRequestContext,
+  token: string
+): Promise<number> {
+  const requests = await listMySanctumRequests(request, token)
+  let deletedCount = 0
+
+  for (const req of requests) {
+    try {
+      const deleted = await deleteSanctumRequest(request, token, req.id)
+      if (deleted) deletedCount++
+    } catch (error) {
+      // Log but don't fail cleanup
+      // eslint-disable-next-line no-console
+      console.warn(`Failed to delete request ${req.id}:`, error)
+    }
+  }
+
+  return deletedCount
+}
+
+/**
+ * Delete a post by ID
+ * Returns true if deleted, false if not found, throws on other errors
+ */
+export async function deletePost(
+  request: APIRequestContext,
+  token: string,
+  postId: number
+): Promise<boolean> {
+  const res = await request.delete(`${API_BASE}/posts/${postId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (res.status() === 404) {
+    return false // Already deleted or never existed
+  }
+
+  if (!res.ok()) {
+    const body = await responseBodyOrPlaceholder(res)
+    throw new Error(`deletePost failed: status=${res.status()} body=${body}`)
+  }
+
+  return true
+}
+
+/**
+ * Get user's own posts
+ */
+export async function getMyPosts(
+  request: APIRequestContext,
+  token: string
+): Promise<Array<{ id: number; content: string }>> {
+  const res = await request.get(`${API_BASE}/posts/me`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!res.ok()) {
+    const body = await responseBodyOrPlaceholder(res)
+    throw new Error(`getMyPosts failed: status=${res.status()} body=${body}`)
+  }
+
+  return (await res.json()) as Array<{ id: number; content: string }>
+}
+
+/**
+ * Delete all posts created by the authenticated user
+ * Useful for cleanup in afterEach hooks
+ */
+export async function deleteAllMyPosts(
+  request: APIRequestContext,
+  token: string
+): Promise<number> {
+  try {
+    const posts = await getMyPosts(request, token)
+    let deletedCount = 0
+
+    for (const post of posts) {
+      try {
+        const deleted = await deletePost(request, token, post.id)
+        if (deleted) deletedCount++
+      } catch (error) {
+        // Log but don't fail cleanup
+        // eslint-disable-next-line no-console
+        console.warn(`Failed to delete post ${post.id}:`, error)
+      }
+    }
+
+    return deletedCount
+  } catch (error) {
+    // If getMyPosts fails, log and return 0
+    // eslint-disable-next-line no-console
+    console.warn('Failed to fetch posts for cleanup:', error)
+    return 0
+  }
+}
+
+/**
+ * Delete a sanctum by slug (admin operation)
+ * Returns true if deleted, false if not found, throws on other errors
+ */
+export async function deleteSanctum(
+  request: APIRequestContext,
+  token: string,
+  slug: string
+): Promise<boolean> {
+  const res = await request.delete(`${API_BASE}/admin/sanctums/${slug}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (res.status() === 404) {
+    return false // Already deleted or never existed
+  }
+
+  if (!res.ok()) {
+    const body = await responseBodyOrPlaceholder(res)
+    throw new Error(`deleteSanctum failed: status=${res.status()} body=${body}`)
+  }
+
+  return true
 }
