@@ -14,8 +14,14 @@ if [ -d frontend ]; then
 	  exit 1
 	fi
 	cd - >/dev/null 2>&1 || true
+
+	echo "Running frontend unit tests..."
+	if ! make test-frontend; then
+	  printf "\nERROR: Frontend unit tests failed. Fix tests before pushing.\n"
+	  exit 1
+	fi
   else
-	echo "bun not found; skipping frontend lockfile check"
+	echo "bun not found; skipping frontend lockfile and test checks"
   fi
 fi
 

@@ -9,13 +9,14 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const hasHydrated = useAuthSessionStore(s => s._hasHydrated)
   const isAuthenticated = useIsAuthenticated()
-  const { data: tokenValid } = useValidateToken()
+  const { data: tokenValid, isLoading } = useValidateToken()
   const location = useLocation()
 
   // Wait for Zustand to rehydrate auth state from localStorage before making
   // any redirect decisions. Without this gate the initial `accessToken: null`
   // would cause an immediate redirect to /login on every protected route.
-  if (!hasHydrated) {
+  // We also wait for token validation if we are authenticated.
+  if (!hasHydrated || (isAuthenticated && isLoading)) {
     return (
       <div className='min-h-screen bg-background flex items-center justify-center'>
         <div className='text-center'>
