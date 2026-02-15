@@ -4,7 +4,7 @@ import { Client } from 'pg'
 import { ADMIN_STATE_PATH, USER_STATE_PATH } from './fixtures/auth'
 
 const API_BASE_RAW =
-  process.env.PLAYWRIGHT_API_URL || 'http://localhost:8375/api'
+  process.env.PLAYWRIGHT_API_URL || 'http://127.0.0.1:8375/api'
 const API_BASE = API_BASE_RAW.endsWith('/') ? API_BASE_RAW : `${API_BASE_RAW}/`
 
 /**

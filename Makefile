@@ -80,6 +80,9 @@ help:
 	@echo "  make test-api           - 🧪 Test all API endpoints"
 	@echo "  make test-frontend      - 🧪 Run frontend unit tests"
 	@echo "  make test-backend-integration - 🧪 Run integration tests (requires DB/Redis)"
+	@echo "  make test-e2e           - 🧪 Run E2E smoke tests (backend + frontend must be running)"
+	@echo "  make test-e2e-up        - 🚀 Start backend stack for E2E (postgres_test, redis, app)"
+	@echo "  make test-e2e-down      - ⬇️  Stop E2E stack"
 	@echo "  make stress-low         - 🧪 Run mixed low-profile stress test (k6 + artifacts)"
 	@echo "  make stress-medium      - 🧪 Run mixed medium-profile stress test (k6 + artifacts)"
 	@echo "  make stress-high        - 🧪 Run mixed high-profile stress test (k6 + artifacts)"
@@ -174,9 +177,16 @@ up:
 	@echo "$(BLUE)Starting services in background...$(NC)"
 	@set -a; [ -f .env ] && . ./.env; set +a; $(DOCKER_COMPOSE) $(COMPOSE_FILES) up -d
 
+# Compose files for down: include e2e override so postgres_test (test profile) is stopped too
+DOWN_COMPOSE_FILES := -f compose.yml -f compose.override.yml -f compose.e2e.override.yml
+
 down:
 	@echo "$(BLUE)Stopping all services...$(NC)"
-	$(DOCKER_COMPOSE) $(COMPOSE_FILES) down
+	$(DOCKER_COMPOSE) $(DOWN_COMPOSE_FILES) down --remove-orphans
+	@sleep 1; docker network rm sanctum_default 2>/dev/null && echo "$(GREEN)✓ Network removed$(NC)" || \
+	  (ids=$$(docker ps -aq --filter network=sanctum_default 2>/dev/null); \
+	   [ -n "$$ids" ] && echo "$$ids" | xargs docker rm -f 2>/dev/null; \
+	   docker network rm sanctum_default 2>/dev/null && echo "$(GREEN)✓ Network removed$(NC)" || true)
 
 # Recreate targets (rebuild from scratch without cache)
 recreate:
@@ -632,15 +642,20 @@ install-githooks:
 	@chmod +x .git/hooks/* || true
 	@echo "$(GREEN)✓ Git hooks installed. Run 'make install-githooks' on each clone.$(NC)"
 
-.PHONY: test-e2e-up test-e2e-down
+.PHONY: test-e2e test-e2e-up test-e2e-down
+test-e2e:
+	@echo "$(BLUE)Running E2E smoke tests...$(NC)"
+	@echo "$(YELLOW)Ensure backend is running (make dev or make test-e2e-up) and frontend (make dev-frontend).$(NC)"
+	PLAYWRIGHT_API_URL=$${PLAYWRIGHT_API_URL:-http://127.0.0.1:8375/api} cd frontend && $(BUN) run test:e2e:smoke
+
 test-e2e-up:
 	@echo "$(BLUE)Starting e2e test stack (app -> sanctum_test)...$(NC)"
-	@./scripts/compose.sh -f compose.yml -f compose.override.yml -f compose.e2e.override.yml up -d postgres_test redis app
+	@./scripts/compose.sh -f compose.yml -f compose.override.yml -f compose.e2e.override.yml up -d --wait --wait-timeout 120 postgres_test redis app
 	@echo "$(GREEN)✓ e2e stack started$(NC)"
 
 test-e2e-down:
 	@echo "$(BLUE)Stopping e2e test stack...$(NC)"
-	@./scripts/compose.sh -f compose.yml -f compose.override.yml -f compose.e2e.override.yml down
+	@./scripts/compose.sh -f compose.yml -f compose.override.yml -f compose.e2e.override.yml down --remove-orphans
 	@echo "$(GREEN)✓ e2e stack stopped$(NC)"
 
 test-up:

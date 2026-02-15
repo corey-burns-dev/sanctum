@@ -64,7 +64,14 @@ test.describe('Sanctum request user flow', () => {
     // Step 3: Navigate to My Requests page
     await page.goto('/sanctums/requests', { waitUntil: 'networkidle' })
 
-    // Assertion: Wait for list to load then verify request appears (slug shown as /slug in UI)
+    // Wait for list to finish loading (avoids asserting while "Loading your requests..." is shown)
+    await expect(page.getByText('Loading your requests...')).not.toBeVisible({
+      timeout: TEST_TIMEOUTS.POLL,
+    })
+    // Fail fast with a clear message if the list failed to load
+    await expect(page.getByText('Failed to load your requests.')).not.toBeVisible()
+
+    // Assertion: Wait for list to show our request (slug shown as /slug in UI)
     await expect(
       page.locator('article').filter({ hasText: slug }).first()
     ).toBeVisible({ timeout: TEST_TIMEOUTS.POLL })

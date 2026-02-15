@@ -2,6 +2,24 @@
 
 This directory contains end-to-end tests for the Sanctum application using Playwright.
 
+## Prerequisites
+
+**Backend and frontend must be running** before you run E2E tests. The global setup creates test users via the API at `http://localhost:8375/api` (or `PLAYWRIGHT_API_URL`); tests then use the frontend at `http://localhost:5173` (or `PLAYWRIGHT_BASE_URL`).
+
+From the repo root:
+
+```bash
+# Start backend (+ DB/Redis). Use either:
+make test-e2e-up    # E2E stack (compose)
+# or
+make dev            # Your usual dev stack
+
+# Start frontend (separate terminal)
+make dev-frontend
+```
+
+If you see `ECONNREFUSED ::1:8375`, the API isn’t reachable. Start the backend, or force IPv4: `PLAYWRIGHT_API_URL=http://127.0.0.1:8375/api`.
+
 ## Overview
 
 The test suite is organized into two tiers:

@@ -13,7 +13,7 @@ interface SanctumRequestResponse {
 }
 
 const API_BASE = (
-  process.env.PLAYWRIGHT_API_URL || 'http://localhost:8375/api'
+  process.env.PLAYWRIGHT_API_URL || 'http://127.0.0.1:8375/api'
 ).replace(/\/$/, '')
 
 async function responseBodyOrPlaceholder(res: ResponseLike): Promise<string> {
