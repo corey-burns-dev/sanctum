@@ -618,13 +618,13 @@ test-frontend:
 	cd frontend && $(BUN) run test:run
 
 install-githooks:
-	@echo "$(BLUE)Installing repo-managed git hooks into .git/hooks...$(NC)"
+	@echo "$(BLUE)Configuring repo-managed git hooks path (.githooks)...$(NC)"
 	@if [ ! -d .git ]; then \
 		echo "$(RED).git not found — initialize your repo before installing hooks (git init)$(NC)"; exit 1; \
 	fi
-	@cp -R githooks/* .git/hooks/ || (echo "$(RED)Failed to copy hooks$(NC)"; exit 1)
-	@chmod +x .git/hooks/* || true
-	@echo "$(GREEN)✓ Git hooks installed. Run 'make install-githooks' on each clone.$(NC)"
+	@./scripts/install-hooks.sh || (echo "$(RED)Failed to configure core.hooksPath$(NC)"; exit 1)
+	@chmod +x .githooks/* || true
+	@echo "$(GREEN)✓ Git hooks configured. Run 'make install-githooks' on each clone.$(NC)"
 
 .PHONY: test-e2e test-e2e-up test-e2e-down
 test-e2e:

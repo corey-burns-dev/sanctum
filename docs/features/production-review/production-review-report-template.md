@@ -455,7 +455,7 @@ if err := server.Start(); err != nil {
 **Infrastructure:**
 
 - [ ] `compose.yml`
-- [ ] production compose overrides (compose.prod.yml removed)
+- [ ] production compose overrides
 - [ ] `Dockerfile` (backend)
 - [ ] `Dockerfile` (frontend)
 - [ ] `.env.example`
