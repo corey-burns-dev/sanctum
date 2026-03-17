@@ -612,10 +612,10 @@ func buildDeterministicImageHash(userID uint, content []byte) string {
 
 func writeBytesToFile(path string, data []byte) error {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o750); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o600) // #nosec G703 -- path is validated and scoped to image output dir
+	return os.WriteFile(path, data, 0o644) // #nosec G703 -- path is validated and scoped to image output dir
 }
 
 func cleanupImageFiles(paths []string) {

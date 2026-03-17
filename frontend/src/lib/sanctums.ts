@@ -30,7 +30,7 @@ export function buildSanctumSections(sanctums: SanctumDTO[]) {
   const explore = sanctums
     .filter((s) => !used.has(s.slug))
     .slice()
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .toSorted((a, b) => a.name.localeCompare(b.name));
 
   return { system, featured, explore };
 }

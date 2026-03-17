@@ -145,7 +145,10 @@ export default function Chat() {
   const { data: allChatrooms = [], isLoading: allLoading, error: allError } = useAllChatrooms();
   const { data: allConversations = [], isLoading: conversationsLoading } = useConversations();
   const joinedChatroomsQuery = useJoinedChatrooms();
-  const joinedChatrooms = joinedChatroomsQuery.data || [];
+  const joinedChatrooms = useMemo(
+    () => joinedChatroomsQuery.data || [],
+    [joinedChatroomsQuery.data],
+  );
   const joinChatroom = useJoinChatroom();
   const leaveConversation = useLeaveConversation();
 

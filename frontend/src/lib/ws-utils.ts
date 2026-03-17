@@ -55,10 +55,10 @@ export async function createTicketedWS(options: TicketedWSOptions): Promise<WebS
     throw err;
   }
 
-  if (options.onOpen) ws.onopen = options.onOpen;
-  if (options.onMessage) ws.onmessage = options.onMessage;
-  if (options.onClose) ws.onclose = options.onClose;
-  if (options.onError) ws.onerror = options.onError;
+  if (options.onOpen) ws.addEventListener("open", options.onOpen);
+  if (options.onMessage) ws.addEventListener("message", options.onMessage as EventListener);
+  if (options.onClose) ws.addEventListener("close", options.onClose as EventListener);
+  if (options.onError) ws.addEventListener("error", options.onError);
 
   return ws;
 }

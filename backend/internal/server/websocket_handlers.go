@@ -145,9 +145,9 @@ func (s *Server) WebSocketChatHandler() fiber.Handler {
 					content, _ := incomingMsg["content"].(string)
 
 					if content != "" && s.isUserParticipant(ctx, userID, convID) {
-						// Rate limit messages - same as HTTP (15 per minute)
+						// Rate limit messages - same as HTTP (40 per minute)
 						id := fmt.Sprintf("user:%d", userID)
-						allowed, err := middleware.CheckRateLimit(ctx, s.redis, s.config.Env, "send_chat", id, 15, time.Minute)
+						allowed, err := middleware.CheckRateLimit(ctx, s.redis, s.config.Env, "send_chat", id, 40, time.Minute)
 						if err != nil {
 							log.Printf("rate limit check error: %v", err)
 						}

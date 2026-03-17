@@ -40,7 +40,7 @@ export default function UserProfile() {
     if (!user) return [];
     return scannedComments
       .filter((c) => c.user_id === user.id)
-      .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
+      .toSorted((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
   }, [scannedComments, user]);
 
   const likesReceived = useMemo(() => {

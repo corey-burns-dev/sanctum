@@ -806,76 +806,86 @@ export function ChatProvider({ children }: ChatProviderProps) {
     };
   }, []);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: wsRef is a stable React ref; reading .current at call time is intentional
-  const joinRoom = useCallback((conversationId: number) => {
-    // Always record the intent to join this room so we can re-join when
-    // the WebSocket connects. If the socket is open, send the join.
-    if (!joinedRoomsRef.current.has(conversationId)) {
-      joinedRoomsRef.current.add(conversationId);
-      setJoinedRooms(new Set(joinedRoomsRef.current));
-    }
+  const joinRoom = useCallback(
+    (conversationId: number) => {
+      // Always record the intent to join this room so we can re-join when
+      // the WebSocket connects. If the socket is open, send the join.
+      if (!joinedRoomsRef.current.has(conversationId)) {
+        joinedRoomsRef.current.add(conversationId);
+        setJoinedRooms(new Set(joinedRoomsRef.current));
+      }
 
-    const ws = wsRef.current;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "join", conversation_id: conversationId }));
-    }
-  }, []);
+      const ws = wsRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "join", conversation_id: conversationId }));
+      }
+    },
+    [wsRef],
+  );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: wsRef is a stable React ref; reading .current at call time is intentional
-  const leaveRoom = useCallback((conversationId: number) => {
-    // Always remove from requested joins immediately. If the socket is open,
-    // also send the leave message to the server.
-    if (joinedRoomsRef.current.has(conversationId)) {
-      joinedRoomsRef.current.delete(conversationId);
-      setJoinedRooms(new Set(joinedRoomsRef.current));
-    }
+  const leaveRoom = useCallback(
+    (conversationId: number) => {
+      // Always remove from requested joins immediately. If the socket is open,
+      // also send the leave message to the server.
+      if (joinedRoomsRef.current.has(conversationId)) {
+        joinedRoomsRef.current.delete(conversationId);
+        setJoinedRooms(new Set(joinedRoomsRef.current));
+      }
 
-    const ws = wsRef.current;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "leave", conversation_id: conversationId }));
-    }
-  }, []);
+      const ws = wsRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "leave", conversation_id: conversationId }));
+      }
+    },
+    [wsRef],
+  );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: wsRef is a stable React ref; reading .current at call time is intentional
-  const sendTyping = useCallback((conversationId: number, isTyping: boolean) => {
-    const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  const sendTyping = useCallback(
+    (conversationId: number, isTyping: boolean) => {
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
-    ws.send(
-      JSON.stringify({
-        type: "typing",
-        conversation_id: conversationId,
-        is_typing: isTyping,
-      }),
-    );
-  }, []);
+      ws.send(
+        JSON.stringify({
+          type: "typing",
+          conversation_id: conversationId,
+          is_typing: isTyping,
+        }),
+      );
+    },
+    [wsRef],
+  );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: wsRef is a stable React ref; reading .current at call time is intentional
-  const sendMessage = useCallback((conversationId: number, content: string) => {
-    const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  const sendMessage = useCallback(
+    (conversationId: number, content: string) => {
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
-    ws.send(
-      JSON.stringify({
-        type: "message",
-        conversation_id: conversationId,
-        content,
-      }),
-    );
-  }, []);
+      ws.send(
+        JSON.stringify({
+          type: "message",
+          conversation_id: conversationId,
+          content,
+        }),
+      );
+    },
+    [wsRef],
+  );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: wsRef is a stable React ref; reading .current at call time is intentional
-  const markAsRead = useCallback((conversationId: number) => {
-    const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  const markAsRead = useCallback(
+    (conversationId: number) => {
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
-    ws.send(
-      JSON.stringify({
-        type: "read",
-        conversation_id: conversationId,
-      }),
-    );
-  }, []);
+      ws.send(
+        JSON.stringify({
+          type: "read",
+          conversation_id: conversationId,
+        }),
+      );
+    },
+    [wsRef],
+  );
 
   const value = useMemo<ChatContextValue>(
     () => ({

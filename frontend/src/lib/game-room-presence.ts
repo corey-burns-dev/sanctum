@@ -58,7 +58,7 @@ function saveRooms(userId: number, rooms: ResumableGameRoom[]) {
 
 export function getResumableGameRooms(userId: number | null | undefined): ResumableGameRoom[] {
   if (!userId) return [];
-  return loadRooms(userId).sort((a, b) => b.updatedAt - a.updatedAt);
+  return loadRooms(userId).toSorted((a, b) => b.updatedAt - a.updatedAt);
 }
 
 export function upsertResumableGameRoom(

@@ -409,7 +409,7 @@ export default function Posts({ mode = "all", sanctumId }: PostsProps) {
     });
 
     return [...counts.entries()]
-      .sort((a, b) => b[1] - a[1])
+      .toSorted((a, b) => b[1] - a[1])
       .slice(0, 6)
       .map(([id, count]) => ({
         id,

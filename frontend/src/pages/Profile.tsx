@@ -86,7 +86,7 @@ export default function Profile() {
 
     return scannedComments
       .filter((comment) => comment.user_id === user.id)
-      .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
+      .toSorted((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
   }, [scannedComments, user]);
 
   const likesReceived = useMemo(() => {

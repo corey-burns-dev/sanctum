@@ -38,7 +38,7 @@ export const ParticipantsList = memo(function ParticipantsList({
 }: ParticipantsListProps) {
   const onlineParticipants = Object.values(participants)
     .filter((p) => p.online || onlineUserIds.has(p.id))
-    .sort((a, b) => (a.username || "").localeCompare(b.username || ""));
+    .toSorted((a, b) => (a.username || "").localeCompare(b.username || ""));
 
   return (
     <div className="space-y-2">

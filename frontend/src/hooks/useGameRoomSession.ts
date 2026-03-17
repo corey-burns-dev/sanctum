@@ -131,7 +131,6 @@ export function useGameRoomSession({
 
   const isSocketReady = connectionState === "connected";
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: mutable wsRef.current is read intentionally at call time
   const sendJoinNow = useCallback(() => {
     if (!roomId || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       return false;
@@ -146,9 +145,8 @@ export function useGameRoomSession({
     hasJoinedRef.current = true;
     shouldAutoJoinRef.current = false;
     return true;
-  }, [roomId]);
+  }, [roomId, wsRef]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: mutable wsRef.current is read intentionally at call time
   const sendAction = useCallback(
     (action: GameSocketAction, options?: SendActionOptions) => {
       const showConnectingToast = options?.showConnectingToast ?? true;
@@ -173,10 +171,9 @@ export function useGameRoomSession({
       wsRef.current.send(JSON.stringify(message));
       return true;
     },
-    [roomId],
+    [roomId, wsRef],
   );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: mutable wsRef.current is read intentionally at call time
   const joinRoom = useCallback(() => {
     if (!roomId) return false;
 
@@ -190,9 +187,15 @@ export function useGameRoomSession({
 
     if (hasJoinedRef.current) return true;
     return sendJoinNow();
-  }, [isSocketReady, joinPendingDescription, joinPendingTitle, roomId, sendJoinNow]);
+  }, [
+    isSocketReady,
+    joinPendingDescription,
+    joinPendingTitle,
+    roomId,
+    sendJoinNow,
+    wsRef,
+  ]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: mutable wsRef.current is read intentionally at call time
   useEffect(() => {
     if (!autoJoinPendingRoom || !room || !currentUserId) {
       shouldAutoJoinRef.current = false;
@@ -208,7 +211,7 @@ export function useGameRoomSession({
     }
 
     shouldAutoJoinRef.current = false;
-  }, [autoJoinPendingRoom, room, currentUserId, sendJoinNow]);
+  }, [autoJoinPendingRoom, room, currentUserId, sendJoinNow, wsRef]);
 
   useTokenRefreshReconnect({
     token,

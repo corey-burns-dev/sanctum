@@ -28,7 +28,7 @@ export function ChatDockConversationList({
   // Deduplicate and sort friend DMs by last message time
   const sorted = deduplicateDMConversations(conversations, currentUserId)
     .slice()
-    .sort((a, b) => {
+    .toSorted((a, b) => {
       const ta = a.last_message?.created_at || a.created_at;
       const tb = b.last_message?.created_at || b.created_at;
       return new Date(tb).getTime() - new Date(ta).getTime();

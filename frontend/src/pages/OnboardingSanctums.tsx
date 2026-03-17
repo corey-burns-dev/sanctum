@@ -11,7 +11,7 @@ export default function OnboardingSanctums() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const sortedSanctums = useMemo(
-    () => [...sanctums].sort((a, b) => a.name.localeCompare(b.name)),
+    () => [...sanctums].toSorted((a, b) => a.name.localeCompare(b.name)),
     [sanctums],
   );
 

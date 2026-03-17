@@ -972,3 +972,10 @@ perf-e2e-local:
 	PGPORT=$${PGPORT:-$${POSTGRES_PORT:-5434}} \
 	PERF_TEST_ONLY=true \
 	cd frontend && bun run test:e2e -- --grep "@preprod"
+
+# Build and push production images from this PC to GHCR
+push-images:
+	docker build -t ghcr.io/burnsco/sanctum/backend:latest .
+	docker build -t ghcr.io/burnsco/sanctum/frontend:latest ./frontend
+	docker push ghcr.io/burnsco/sanctum/backend:latest
+	docker push ghcr.io/burnsco/sanctum/frontend:latest

@@ -37,7 +37,7 @@ function parsePostTime(value: string | undefined): number {
 }
 
 export function sortPostsNewestFirst(posts: Post[]): Post[] {
-  return [...posts].sort((a, b) => {
+  return [...posts].toSorted((a, b) => {
     const byTime = parsePostTime(b.created_at) - parsePostTime(a.created_at);
     if (byTime !== 0) return byTime;
     return b.id - a.id;
@@ -84,23 +84,23 @@ function sortPosts(posts: Post[], sort: PostSort): Post[] {
         const engagement = (p.likes_count ?? 0) + (p.comments_count ?? 0) * 2;
         return engagement / (ageHours + 2) ** 1.5;
       };
-      return [...posts].sort((a, b) => score(b) - score(a));
+      return [...posts].toSorted((a, b) => score(b) - score(a));
     }
     case "top":
-      return [...posts].sort(
+      return [...posts].toSorted(
         (a, b) =>
           (b.likes_count ?? 0) - (a.likes_count ?? 0) ||
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       );
     case "best":
-      return [...posts].sort(
+      return [...posts].toSorted(
         (a, b) =>
           (b.likes_count ?? 0) +
           (b.comments_count ?? 0) * 1.5 -
           ((a.likes_count ?? 0) + (a.comments_count ?? 0) * 1.5),
       );
     default: // 'new'
-      return [...posts].sort(
+      return [...posts].toSorted(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       );
   }

@@ -223,9 +223,9 @@ class ApiClient {
       });
 
       if (isTimeout) {
-        throw new Error(`Request timeout: ${endpoint}`);
+        throw new Error(`Request timeout: ${endpoint}`, { cause: error });
       }
-      throw new Error(`Connection failed: ${msg}`);
+      throw new Error(`Connection failed: ${msg}`, { cause: error });
     }
   }
 

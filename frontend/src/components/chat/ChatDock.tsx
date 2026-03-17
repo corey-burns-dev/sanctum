@@ -570,7 +570,7 @@ export function ChatDock() {
 
       setTypingState((prev) => {
         const next = { ...prev };
-        const roomTyping = { ...(next[convId] || {}) };
+        const roomTyping = { ...next[convId] };
 
         if (isTyping) {
           roomTyping[userId] = {

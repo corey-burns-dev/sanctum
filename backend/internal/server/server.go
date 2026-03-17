@@ -331,10 +331,10 @@ func (s *Server) SetupMiddleware(app *fiber.App) {
 		MaxAge:           86400, // 24 hours
 	}))
 
-	// Global rate limiting (100 requests per minute per IP); disabled in development/test/stress so workflows are not throttled.
+	// Global rate limiting (300 requests per minute per IP); disabled in development/test/stress so workflows are not throttled.
 	if s.config.Env != "development" && s.config.Env != "test" && s.config.Env != "stress" {
 		app.Use(limiter.New(limiter.Config{
-			Max:        100,
+			Max:        300,
 			Expiration: 1 * time.Minute,
 			// Never rate-limit preflight requests; they should be handled by CORS.
 			Next: func(c *fiber.Ctx) bool {
@@ -446,7 +446,7 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	friends.Get("/", s.GetFriends)
 	// Specific /requests routes before generic /:userId
 	friends.Post("/requests/:userId", middleware.RateLimit(
-		s.redis, s.config.Env, 5, 5*time.Minute, "friend_request"), s.SendFriendRequest)
+		s.redis, s.config.Env, 15, 5*time.Minute, "friend_request"), s.SendFriendRequest)
 	friends.Get("/requests", s.GetPendingRequests)
 	friends.Get("/requests/sent", s.GetSentRequests)
 	friends.Post("/requests/:requestId/accept", s.AcceptFriendRequest)
@@ -464,7 +464,7 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	posts.Post("/:id/like", s.LikePost)
 	posts.Delete("/:id/like", s.UnlikePost)
 	posts.Post("/:id/comments", middleware.RateLimit(
-		s.redis, s.config.Env, 1, time.Minute, "create_comment"), s.CreateComment)
+		s.redis, s.config.Env, 5, time.Minute, "create_comment"), s.CreateComment)
 	posts.Put("/:id/comments/:commentId", s.UpdateComment)
 	posts.Delete("/:id/comments/:commentId", s.DeleteComment)
 	posts.Post("/:id/report", middleware.RateLimitWithPolicy(s.redis, s.config.Env, 5, 10*time.Minute, middleware.FailClosed, "report"), s.ReportPost)
@@ -480,7 +480,7 @@ func (s *Server) SetupRoutes(app *fiber.App) {
 	// Define specific /:id/:resource routes BEFORE generic /:id route
 	conversations.Get("/:id/messages", s.GetMessages)
 	conversations.Post("/:id/messages", middleware.RateLimit(
-		s.redis, s.config.Env, 15, time.Minute, "send_chat"), s.SendMessage)
+		s.redis, s.config.Env, 40, time.Minute, "send_chat"), s.SendMessage)
 	conversations.Post("/:id/read", s.MarkConversationRead)
 	conversations.Post("/:id/messages/:messageId/reactions", s.AddMessageReaction)
 	conversations.Delete("/:id/messages/:messageId/reactions", s.RemoveMessageReaction)

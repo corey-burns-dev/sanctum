@@ -208,36 +208,49 @@ export function useManagedWebSocket({
     setPlannedReconnectState(planned);
   }, []);
 
-  const scheduleReconnect = useCallback(() => {
-    if (!enabledRef.current || unmountedRef.current) {
+  const scheduleReconnect = useCallback(
+    (isRateLimited = false) => {
+      if (!enabledRef.current || unmountedRef.current) {
+        console.log(
+          formatLogPrefix(getSocketID(wsRef.current)),
+          "Reconnect skipped: enabled=",
+          enabledRef.current,
+          "unmounted=",
+          unmountedRef.current,
+        );
+        return;
+      }
+      if (reconnectTimeoutRef.current !== null) {
+        return;
+      }
+
+      const delays = reconnectDelaysRef.current;
+      const attempt = reconnectAttemptsRef.current;
+      const idx = Math.min(attempt, delays.length - 1);
+      let delay = delays[idx];
+
+      // If we hit a rate limit (429), use a much longer delay (30-60s)
+      // to allow the server-side window to reset and prevent retry storms.
+      if (isRateLimited) {
+        delay = 30000 + Math.random() * 30000;
+        console.warn(
+          formatLogPrefix(getSocketID(wsRef.current)),
+          `Rate limit hit (429), using extended backoff: ${Math.round(delay)}ms`,
+        );
+      }
+
+      reconnectAttemptsRef.current = attempt + 1;
       console.log(
         formatLogPrefix(getSocketID(wsRef.current)),
-        "Reconnect skipped: enabled=",
-        enabledRef.current,
-        "unmounted=",
-        unmountedRef.current,
+        `Scheduling reconnect attempt ${attempt + 1} in ${Math.round(delay)}ms`,
       );
-      return;
-    }
-    if (reconnectTimeoutRef.current !== null) {
-      return;
-    }
-
-    const delays = reconnectDelaysRef.current;
-    const attempt = reconnectAttemptsRef.current;
-    const idx = Math.min(attempt, delays.length - 1);
-    const delay = delays[idx];
-
-    reconnectAttemptsRef.current = attempt + 1;
-    console.log(
-      formatLogPrefix(getSocketID(wsRef.current)),
-      `Scheduling reconnect attempt ${attempt + 1} in ${delay}ms`,
-    );
-    reconnectTimeoutRef.current = window.setTimeout(() => {
-      reconnectTimeoutRef.current = null;
-      connectRef.current();
-    }, delay);
-  }, [formatLogPrefix, getSocketID]);
+      reconnectTimeoutRef.current = window.setTimeout(() => {
+        reconnectTimeoutRef.current = null;
+        connectRef.current();
+      }, delay);
+    },
+    [formatLogPrefix, getSocketID],
+  );
 
   const close = useCallback(
     (planned = false) => {
@@ -301,7 +314,11 @@ export function useManagedWebSocket({
       } catch (err) {
         console.error(formatLogPrefix(socketID), "createSocket failed:", err);
         setConnectionState("disconnected");
-        scheduleReconnect();
+
+        // Check for 429 Too Many Requests
+        const isRateLimited =
+          err && typeof err === "object" && "status" in err && err.status === 429;
+        scheduleReconnect(isRateLimited);
         return;
       }
 
@@ -319,7 +336,7 @@ export function useManagedWebSocket({
       socketIdByInstanceRef.current.set(ws, socketID);
       wsRef.current = ws;
 
-      ws.onopen = (event) => {
+      const onOpenHandler = (event: Event) => {
         if (wsRef.current !== ws) return;
 
         console.log(formatLogPrefix(socketID), "State: connected");
@@ -351,7 +368,7 @@ export function useManagedWebSocket({
         onOpenRef.current?.(ws, event);
       };
 
-      ws.onmessage = (event) => {
+      const onMessageHandler = (event: MessageEvent) => {
         if (wsRef.current !== ws) return;
         if (handlePingMessage(ws, event)) return;
         // Check for connected message (handshake completion)
@@ -363,7 +380,7 @@ export function useManagedWebSocket({
         onMessageRef.current?.(ws, event);
       };
 
-      ws.onerror = (event) => {
+      const onErrorHandler = (event: Event) => {
         if (wsRef.current !== ws) return;
         clearHandshakeTimeout();
         console.error(
@@ -378,7 +395,7 @@ export function useManagedWebSocket({
         });
       };
 
-      ws.onclose = (event) => {
+      const onCloseHandler = (event: CloseEvent) => {
         clearHandshakeTimeout();
         if (wsRef.current === ws) {
           wsRef.current = null;
@@ -411,6 +428,11 @@ export function useManagedWebSocket({
         onCloseRef.current?.(ws, event, meta);
         scheduleReconnect();
       };
+
+      ws.addEventListener("open", onOpenHandler);
+      ws.addEventListener("message", onMessageHandler);
+      ws.addEventListener("error", onErrorHandler);
+      ws.addEventListener("close", onCloseHandler);
     })();
   }, [
     handlePingMessage,
